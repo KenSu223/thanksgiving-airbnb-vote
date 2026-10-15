@@ -21,6 +21,8 @@ const views = {
     sub: '三辆 2026 BMW X5 M60，每辆 5 个座 · 先到先得选座位，再告诉大家你带几件什么行李' },
   calendar: { nav: 'Schedule', navSub: '日程', icon: 'schedule', group: 'trip',
     sub: '按天看每个人的安排：住哪、航班、接送机' },
+  todos: { nav: 'Tasks', navSub: '待办', icon: 'tasks', group: 'trip',
+    sub: '出发前要准备的、路上要跑的腿、回来要收尾的 · 加一条，指派给谁，或者自己点「我来」认领' },
   food: { nav: 'Dining', navSub: '餐厅', icon: 'dining', group: 'explore', tripScoped: true,
     sub: '看中哪家就把 Google 地图链接贴进来，大家点想去' },
   activities: { nav: 'Activities', navSub: '活动', icon: 'activities', group: 'explore',

@@ -18,6 +18,7 @@ import FlightsView from './features/flights/FlightsView.jsx';
 import ActivitiesView from './features/activities/ActivitiesView.jsx';
 import CalendarView from './features/calendar/CalendarView.jsx';
 import CarsView from './features/cars/CarsView.jsx';
+import TodosView from './features/todos/TodosView.jsx';
 import { useHashRoute } from './lib/useHashRoute.js';
 
 // 每个页面一直挂着（切走只是藏起来），回来时房源、地图、牌桌都还在；切回来时淡入一下。
@@ -71,6 +72,7 @@ function Shell() {
           <Pane active={view === 'angel'}><AngelView active={view === 'angel'} /></Pane>
           <Pane active={view === 'flights'}><FlightsView active={view === 'flights'} /></Pane>
           <Pane active={view === 'cars'}><CarsView active={view === 'cars'} /></Pane>
+          <Pane active={view === 'todos'}><TodosView active={view === 'todos'} /></Pane>
           <Pane active={view === 'activities'}><ActivitiesView active={view === 'activities'} /></Pane>
           <p className="md:hidden text-center text-slate-400 text-sm mt-10 mb-6">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
         </main>

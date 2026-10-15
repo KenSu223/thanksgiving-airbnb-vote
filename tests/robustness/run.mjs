@@ -95,8 +95,11 @@ try {
     // And the addressed game-reactions suite (WebSocket).
     const reactionsPath = new URL('reactions.mjs', import.meta.url).pathname;
     const reactions = existsSync(reactionsPath) ? await runSuite('reactions.mjs') : true;
+    // And the to-do list suite.
+    const todosPath = new URL('todos.mjs', import.meta.url).pathname;
+    const todos = existsSync(todosPath) ? await runSuite('todos.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && polls && google && cars && reactions && storms;
+    ok = fuzz && email && users && polls && google && cars && reactions && todos && storms;
   }
 } finally {
   stopServer();
