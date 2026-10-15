@@ -28,7 +28,7 @@ const views = {
   activities: { nav: 'Activities', navSub: '活动', icon: 'activities', group: 'explore',
     sub: '从 Reddit、本地媒体和官方推荐里扒的第一批 20 个候选 · 喜欢哪个就投票，票高的优先排进行程' },
   games: { nav: 'Games', navSub: '游戏', icon: 'games', group: 'together',
-    sub: 'Blackjack、斗地主、掼蛋、川麻、鲁班躲技能、2048 · 筹码和豆子只是好玩，不跟分账挂钩' },
+    sub: 'Blackjack、斗地主、掼蛋、川麻、鲁班躲技能、2048、谁是卧底 · 筹码和豆子只是好玩，不跟分账挂钩' },
   angel: { nav: 'Gifts', navSub: '神秘天使', icon: 'gifts', group: 'together',
     sub: '刷卡片选你想要的礼物 · 大家选好后抽签，偷偷给分到的人准备惊喜' },
   split: { nav: 'Expenses', navSub: '分账', icon: 'expenses', group: 'together',

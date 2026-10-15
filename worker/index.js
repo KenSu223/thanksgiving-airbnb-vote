@@ -24,6 +24,7 @@ export { MahjongHall } from './mahjong/hall.js';
 export { StoreDO } from './store/store.js';
 export { DodgeBoard } from './dodge/board.js';
 export { Board2048 } from './g2048/board.js';
+export { UndercoverHall } from './party/halls.js';
 
 const ROUTES = { ...listingRoutes, ...userRoutes, ...authRoutes, ...adminRoutes, ...splitRoutes, ...foodRoutes, ...angelRoutes, ...weatherRoutes, ...activityRoutes, ...flightRoutes, ...pollRoutes, ...carRoutes, ...todoRoutes };
 
@@ -40,6 +41,8 @@ export default {
     if (url.pathname.startsWith('/api/dodge/')) return env.DODGE.get(env.DODGE.idFromName('board')).fetch(request);
     // 2048: one WebSocket endpoint; the object keeps everyone's board.
     if (url.pathname === '/api/2048') return env.G2048.get(env.G2048.idFromName('board')).fetch(request);
+    // 谁是卧底 / 阿瓦隆 / 狼人杀: one WebSocket endpoint per game, its hall holds two tables.
+    if (url.pathname === '/api/undercover') return env.UC_HALL.get(env.UC_HALL.idFromName('hall')).fetch(request);
     const handler = ROUTES[request.method + ' ' + url.pathname];
     if (handler) return handler(request, env, url);
     return env.ASSETS.fetch(request);

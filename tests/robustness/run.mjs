@@ -103,8 +103,10 @@ try {
     const todos = existsSync(todosPath) ? await runSuite('todos.mjs') : true;
     // 2048: the server-owned board, resume, the best-tile board.
     const g2048 = await runSuite('g2048.mjs');
+    // Party games (谁是卧底 / 阿瓦隆 / 狼人杀): whole games over real sockets.
+    const party = await runSuite('party.mjs');
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && leaderboards && polls && google && cars && reactions && todos && g2048 && storms;
+    ok = fuzz && email && users && leaderboards && polls && google && cars && reactions && todos && g2048 && party && storms;
   }
 } finally {
   stopServer();

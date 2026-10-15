@@ -33,7 +33,7 @@ export function useTable(active, { path, roomKey, noHint }) {
     ws.current = s; satConfirmed.current = false;
     s.onopen = () => {
       retry.current = 0; setLive(true);
-      if (wantSeat.current && actions.current.me) send({ type: 'sit', room: roomRef.current, ...actions.current.me });
+      if (wantSeat.current && actions.current.me) { send({ type: 'sit', room: roomRef.current, ...actions.current.me, ...actions.current.extra }); actions.current.extra = null; }
       else { const c = credRef.current; if (c.name && c.token) send({ type: 'identify', name: c.name, token: c.token }); } // 围观也要能发表情：先证明身份，不用坐下
     };
     s.onmessage = e => {
@@ -56,14 +56,16 @@ export function useTable(active, { path, roomKey, noHint }) {
       if (wanted()) setTimeout(() => actions.current.connect(), Math.min(10000, 800 * 2 ** retry.current++));
     };
   };
-  actions.current.sit = me => {
+  // extra（派对游戏的座位号 { seat }）只跟这一次坐下走；断线重连时再坐下不带它，免得把人挪回去
+  actions.current.sit = (me, extra) => {
     actions.current.me = { name: me.name, token: me.token };
     wantSeat.current = true;
-    if (ws.current && ws.current.readyState === 1) send({ type: 'sit', room: roomRef.current, ...actions.current.me });
-    else actions.current.connect();
+    if (ws.current && ws.current.readyState === 1) send({ type: 'sit', room: roomRef.current, ...actions.current.me, ...extra });
+    else { actions.current.extra = extra; actions.current.connect(); }
   };
 
-  const sit = () => ensureName(me => actions.current.sit(me));
+  // sit()（牌桌）或 sit({ seat })（派对游戏选座位）；onClick 直接传进来的点击事件不算
+  const sit = extra => ensureName(me => actions.current.sit(me, Number.isInteger(extra?.seat) ? { seat: extra.seat } : null));
   // 站起来：服务器这时才保存豆子（这局打到一半的话，托管打完再存）
   const standUp = useCallback(() => {
     send({ type: 'leave' });
