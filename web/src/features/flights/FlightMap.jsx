@@ -5,28 +5,9 @@ import { addHomeButton } from '../../lib/mapTools.js';
 import { esc } from '../../lib/format.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { duration, localTime } from './plan.js';
+import { arc } from '../../lib/geo.js';
 
 const COLORS = ['#4f46e5', '#e11d48', '#059669', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d', '#ea580c', '#2563eb'];
-
-// 大圆航线上的点（经度展开成连续的，跨太平洋的线不会绕地球另一边）
-function arc(a, b, n = 64) {
-  const r = Math.PI / 180, toV = p => [Math.cos(p.lat * r) * Math.cos(p.lng * r), Math.cos(p.lat * r) * Math.sin(p.lng * r), Math.sin(p.lat * r)];
-  const A = toV(a), B = toV(b);
-  const w = Math.acos(Math.min(1, Math.max(-1, A[0] * B[0] + A[1] * B[1] + A[2] * B[2])));
-  const pts = [];
-  let prevLng = a.lng;
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    const s1 = w ? Math.sin((1 - t) * w) / Math.sin(w) : 1 - t, s2 = w ? Math.sin(t * w) / Math.sin(w) : t;
-    const v = [0, 1, 2].map(k => s1 * A[k] + s2 * B[k]);
-    let lng = Math.atan2(v[1], v[0]) / r;
-    while (lng - prevLng > 180) lng -= 360;
-    while (lng - prevLng < -180) lng += 360;
-    prevLng = lng;
-    pts.push([Math.atan2(v[2], Math.hypot(v[0], v[1])) / r, lng]);
-  }
-  return pts;
-}
 
 // 机头朝上的小飞机，转到航向
 const PLANE = color => '<div class="fl-plane"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="' + color + '" stroke="#fff" stroke-width="1.2" stroke-linejoin="round" '

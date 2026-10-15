@@ -1,0 +1,33 @@
+/* 旅程地图：地图 + 下面一条可以横着滑的站点条。站点是深色小牌，住处带名字 */
+.jm-map-wrap { position:relative; }
+.jm-map { height:420px; }
+@media (max-width: 640px) { .jm-map { height:320px; } }
+.jm-empty { position:absolute; inset:0; display:grid; place-items:center; padding:2rem; text-align:center; font-size:.9rem; color:#64748b; background:rgba(255,255,255,.6); z-index:500; }
+
+.jm-play { display:inline-flex; align-items:center; gap:.45rem; padding:.45rem 1rem; border-radius:999px; font-size:.85rem; font-weight:600; color:#fff;
+  background:linear-gradient(135deg,#1f2150,#3b3f8f); box-shadow:0 6px 16px -8px rgba(31,33,80,.7); transition: transform .15s, box-shadow .15s; }
+.jm-play:hover { transform:translateY(-1px); box-shadow:0 10px 20px -8px rgba(31,33,80,.75); }
+
+.jm-stop { position:absolute; transform:translate(-50%,-50%); display:flex; align-items:center; gap:.35rem; white-space:nowrap; padding:.2rem .55rem .2rem .2rem;
+  border-radius:999px; background:#14163a; color:#fff; font-size:.72rem; font-weight:600; box-shadow:0 4px 12px rgba(15,23,42,.3); }
+.jm-stop b { display:grid; place-items:center; width:1.25rem; height:1.25rem; border-radius:999px; background:linear-gradient(135deg,#f7a86c,#e2674f); font-size:.68rem; }
+.jm-stop.stay b { background:linear-gradient(135deg,#818cf8,#6366f1); }
+.jm-stop span { max-width:11rem; overflow:hidden; text-overflow:ellipsis; }
+.jm-dot { position:absolute; width:8px; height:8px; transform:translate(-50%,-50%); border-radius:99px; background:#fff; border:2px solid #64748b; }
+
+.jm-plane { position:absolute; transform:translate(-50%,-50%); line-height:0; filter:drop-shadow(0 2px 3px rgba(15,23,42,.35)); }
+.jm-car { position:absolute; transform:translate(-50%,-50%); display:grid; place-items:center; width:26px; height:26px; border-radius:999px;
+  background:#0f172a; box-shadow:0 0 0 3px rgba(255,255,255,.9), 0 4px 10px rgba(15,23,42,.35); }
+
+.jm-steps { display:flex; gap:.5rem; overflow-x:auto; padding:.75rem 1rem 1rem; scrollbar-width:thin; }
+.jm-step { display:flex; align-items:flex-start; gap:.55rem; width:13.5rem; text-align:left; padding:.6rem .75rem; border-radius:.9rem;
+  background:rgba(255,255,255,.55); border:1px solid rgba(255,255,255,.75); transition: background .2s, border-color .2s, box-shadow .2s; }
+.jm-step:hover { background:#fff; }
+.jm-step.active { background:#fff; border-color:rgba(99,102,241,.45); box-shadow:0 8px 18px -10px rgba(79,70,229,.5); }
+.jm-step.past { opacity:.7; }
+.jm-step-ico { flex:none; display:grid; place-items:center; width:1.75rem; height:1.75rem; border-radius:.6rem; background:#eef0fb; color:#4f46e5; }
+.jm-step.active .jm-step-ico { background:#4f46e5; color:#fff; }
+.jm-step-title { display:block; font-size:.82rem; font-weight:600; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.jm-step-when { display:block; font-size:.72rem; color:#64748b; margin-top:1px; }
+.jm-compact .jm-stop { padding:.2rem; }
+.jm-compact .jm-stop span { display:none; }

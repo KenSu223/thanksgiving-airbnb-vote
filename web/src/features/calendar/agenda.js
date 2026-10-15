@@ -13,14 +13,19 @@ const timeOf = ms => localTime(ms, TZ, false);
 const addDays = (date, n) => { const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 
+// 一段行程住哪：投票截止后是大家定下的那间，之前是目前票数最高的。{ top, chosen } 或 top 为空
+export function tripStay(key, listingsByTrip, voteByTrip = {}) {
+  const T = TRIPS[key], all = listingsByTrip[key] || [], vote = voteByTrip[key];
+  const chosen = vote && vote.chosenId ? all.find(l => l.id === vote.chosenId) : null;
+  return { top: chosen || sortListings(all.filter(l => (l.votes || []).length), 'votes', T)[0] || null, chosen };
+}
+
 // 🏠 每段行程票数最高的那间：入住、住在、退房（Airbnb 没给具体时间，算全天）
 export function stayEvents(listingsByTrip, voteByTrip = {}) {
   const out = [];
   for (const [key, T] of Object.entries(TRIPS)) {
-    const all = listingsByTrip[key] || [];
     const vote = voteByTrip[key];
-    const chosen = vote && vote.chosenId ? all.find(l => l.id === vote.chosenId) : null; // 投票截止后：大家定下的那间
-    const top = chosen || sortListings(all.filter(l => (l.votes || []).length), 'votes', T)[0];
+    const { top, chosen } = tripStay(key, listingsByTrip, voteByTrip);
     if (!top) {
       out.push({ id: key + ':none', at: null, date: T.checkIn, icon: '🏠', tone: 'muted', title: T.date + ' 住哪还没定', detail: '去 Stays 投票，票最高的会出现在这里' });
       continue;

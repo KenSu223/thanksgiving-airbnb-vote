@@ -3,6 +3,7 @@ import { api } from '../../lib/api.js';
 import { TRIPS } from '../../lib/config.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { ALL, byDay, eventTime, flightEvents, stayEvents } from './agenda.js';
+import JourneyMap from './JourneyMap.jsx';
 
 const WEEK = '日一二三四五六';
 const dayLabel = date => { const d = new Date(date + 'T12:00:00Z'); return { md: (d.getUTCMonth() + 1) + '/' + d.getUTCDate(), wd: '周' + WEEK[d.getUTCDay()] }; };
@@ -61,6 +62,8 @@ export default function CalendarView({ active }) {
         </select>
         <span className="text-xs text-slate-500">时间都是丹佛时间 · 住宿按每段行程票数最高的那间 · 餐厅和活动报名之后也会出现在这里</span>
       </section>
+
+      {loaded && <JourneyMap people={people} who={me} listings={listings} votes={votes} visible={active} />}
 
       {/* 日期条：点一下跳到那天 */}
       <nav className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
