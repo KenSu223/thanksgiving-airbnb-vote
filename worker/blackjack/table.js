@@ -1,4 +1,4 @@
-import { BlackjackGame } from './game.js';
+import { BJ, BlackjackGame } from './game.js';
 import { cleanName, getUsers, sameName, USER_ADMIN } from '../users/users.js';
 import { noteReaction, freshReactions } from '../games/reactions.js';
 import { j } from '../lib/http.js';
@@ -127,10 +127,14 @@ export class BlackjackTable {
     }
     this.broadcast();
   }
+  // Ranked by what you've actually won: chips now minus everything you were
+  // handed (1000 to start + 1000 per 补给). It goes negative, so going broke and
+  // getting refilled over and over doesn't climb the board.
   leaderboard() {
     const rows = new Map(this.board);
     for (const s of this.game.seats) rows.set(s.key, { name: s.name, chips: s.chips, refills: s.refills, seated: true });
-    return [...rows.values()].sort((a, b) => b.chips - a.chips).slice(0, 30);
+    return [...rows.values()].map(r => ({ ...r, net: r.chips - BJ.startChips * (1 + (r.refills || 0)) }))
+      .sort((a, b) => b.net - a.net || b.chips - a.chips).slice(0, 30);
   }
   send(ws, extra) {
     try { ws.send(JSON.stringify({ type: 'state', table: this.game.view(), you: this.sockets.get(ws), reactions: freshReactions(this.reactions, Date.now()), board: this.leaderboard(), ...extra })); }

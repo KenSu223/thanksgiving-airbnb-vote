@@ -242,14 +242,16 @@ export default function DodgeView({ active }) {
         </section>
         <aside className="glass-card rounded-2xl p-5 self-start">
           <h2 className="font-bold text-lg mb-1">🏆 躲技能排行榜</h2>
-          <p className="text-xs text-slate-500 mb-3">每人最好的一次 · 新成绩由服务器重放核对 · ▶ 看回放</p>
+          <p className="text-xs text-slate-500 mb-3">每人最好的一次 · 新成绩由服务器重放核对 · 只公开前三名的回放（▶），给大家核对，其他人的不公开</p>
           {board.length ? board.map((r, i) => (
             <div key={r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (mine && r.name === mine.name ? ' font-bold text-indigo-700' : '')}>
               <span className="truncate">{i < 3 ? ['🥇', '🥈', '🥉'][i] : (i + 1) + '.'} {r.name}
                 {r.bot && <span className="dg-bot-mark" title={BOT_NOTE(r.react)} aria-label={BOT_NOTE(r.react)}> 🤖</span>}</span>
               <span className="flex items-center gap-1.5">
                 <span className="tabular-nums whitespace-nowrap">{secs(r.ticks)} 秒<span className="text-xs font-normal text-slate-400"> · {r.runs} 局</span></span>
-                {r.replay
+                {/* only the top 3's replays are public (the server hands out no others); below that, an empty slot keeps the times lined up */}
+                {i >= 3 ? <span className="dg-watch dg-watch-none" aria-hidden="true" />
+                  : r.replay
                   ? <button className="dg-watch" onClick={() => watch(r.name)} aria-label={`看 ${r.name} 的回放`} title="看回放">▶</button>
                   : <span className="dg-watch dg-watch-none" title="以前的纪录，没有回放" aria-hidden="true">·</span>}
               </span>

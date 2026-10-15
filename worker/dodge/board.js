@@ -10,7 +10,7 @@
 //   POST /api/dodge/start { name, token }                  -> { seed, ticket }
 //   POST /api/dodge/score { name, token, ticket, events }  -> { ticks, by, best, newBest, rank, board, bot, react }
 //   GET  /api/dodge/board                                  -> { board }
-//   GET  /api/dodge/replay?name=                           -> { name, seed, v, events, ticks, by, stats, bot }
+//   GET  /api/dodge/replay?name=                           -> { name, seed, v, events, ticks, by, stats, bot } (top 3 only)
 //   POST /api/dodge/scrub-user { target, byName, byToken }  (PM only; user deletion reaches in)
 // Times are in ticks: 60 a second.
 import { getUsers, sameName, cleanName, USER_ADMIN } from '../users/users.js';
@@ -19,6 +19,9 @@ import { HZ, SIM_VERSION } from '../../web/src/features/dodge/sim.js';
 import { badEvents, replay } from '../../web/src/features/dodge/verify.js';
 
 const TICKET_DAYS = 7; // a run saved on the device can still be sent this long after it started
+// Only the top 3's replays are public, for everyone to check; the rest stay
+// private (still saved, so they show once that person climbs into the top 3).
+const OPEN_REPLAYS = 3;
 
 // Records taken off the board by hand, each exactly once ([flag, key]): the
 // flag is kept, so a later record of the same person is never touched.
@@ -52,9 +55,13 @@ export class DodgeBoard {
         this.key = await crypto.subtle.importKey('raw', secret, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
       });
   }
+  // [key, record], best first
+  ranked() {
+    return [...this.best].sort(([, a], [, b]) => b.ticks - a.ticks || a.at - b.at);
+  }
   top() {
-    return [...this.best.values()].sort((a, b) => b.ticks - a.ticks || a.at - b.at).slice(0, 50)
-      .map(r => ({ name: r.name, ticks: r.ticks, runs: r.runs, at: r.at, replay: !!r.replay, bot: !!r.bot, react: r.react ?? null }));
+    return this.ranked().slice(0, 50)
+      .map(([, r], i) => ({ name: r.name, ticks: r.ticks, runs: r.runs, at: r.at, replay: i < OPEN_REPLAYS && !!r.replay, bot: !!r.bot, react: r.react ?? null }));
   }
 
   async fetch(request) {
@@ -134,9 +141,13 @@ export class DodgeBoard {
     return j({ ok: true, ticks: r.ticks, by: r.by, best: rec.ticks, newBest, rank: board.findIndex(x => x.name === user.name) + 1, board, bot: r.bot, react: r.stats.medianMs });
   }
 
-  // A best run, to watch again: same seed, same inputs, same game.
+  // A best run, to watch again: same seed, same inputs, same game. Top 3 only.
   async replayOf(name) {
-    const rec = await this.state.storage.get('r:' + cleanName(String(name || '')).toLowerCase());
+    const key = cleanName(String(name || '')).toLowerCase();
+    const rank = this.ranked().findIndex(([k]) => k === key);
+    if (rank < 0) return j({ ok: false, error: '这条纪录没有回放' }, 404);
+    if (rank >= OPEN_REPLAYS) return j({ ok: false, error: '只公开前三名的回放' }, 403);
+    const rec = await this.state.storage.get('r:' + key);
     return rec ? j({ ok: true, ...rec }) : j({ ok: false, error: '这条纪录没有回放' }, 404);
   }
 }
