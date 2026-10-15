@@ -2,7 +2,8 @@
 // over the WebSocket, moves applied and a new tile spawned by the server, a
 // stale move from another tab refused, picking the same game up from a second
 // tab and after every tab closed (it's saved then), a new game, the board
-// ranking by biggest tile, and a bad login refused.
+// ranking by biggest tile, and a bad login refused. Plus the autopilot:
+// PM's grants (who may flip it on) and the 🤖 marking of bot games.
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/g2048.mjs
 const B = process.env.TEST_BASE || 'http://localhost:8791';
 const WS = B.replace(/^http/, 'ws') + '/api/2048';
@@ -105,6 +106,69 @@ d.send({ type: 'hello', name: u.name, token: 'not-the-token' });
 const refused = await d.next(m => m.error, 'bad login');
 ck('a wrong token is refused', /登录/.test(refused.error) && !refused.game);
 await c.close(); await d.close();
+
+// ---------- Autopilot grants (same shape as Dodge's) ----------
+// PM always may use the bot; anyone else only once PM grants them, and
+// only PM can grant or see the list.
+const J = async (m, p, o) => {
+  const r = await fetch(B + p, { method: m, headers: { 'Content-Type': 'application/json' }, body: o === undefined ? undefined : JSON.stringify(o) });
+  const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch { /* ignore */ }
+  return j;
+};
+const grantsOf = x => J('GET', '/api/2048/grants?' + new URLSearchParams({ name: x.name, token: x.token }));
+const pmLogin = await J('POST', '/api/login', { name: 'PM', token: 'pm-2048-' + tag });
+const pm = { name: pmLogin.user?.name, token: pmLogin.user?.token };
+const pal = await login('BotPal');
+ck('grant test users created', !!(pm.token && pal.token));
+const pmView = await grantsOf(pm);
+ck('PM is admin and can always use the bot', pmView.isAdmin === true && pmView.canBot === true, JSON.stringify(pmView));
+const palView = await grantsOf(pal);
+ck('ungranted account: no bot, no admin, no list', palView.canBot === false && palView.isAdmin === false && (palView.grants || []).length === 0, JSON.stringify(palView));
+const selfGrant = await J('POST', '/api/2048/grants', { name: pal.name, token: pal.token, target: pal.name, on: true });
+ck('granting by a non-admin rejected', selfGrant.ok === false, JSON.stringify(selfGrant));
+const granted = await J('POST', '/api/2048/grants', { name: pm.name, token: pm.token, target: pal.name, on: true });
+ck('PM grants the pal', granted.ok === true && granted.grants.some(n => n.toLowerCase() === pal.name.toLowerCase()), JSON.stringify(granted));
+ck('pal can now use the bot', (await grantsOf(pal)).canBot === true);
+const revoked = await J('POST', '/api/2048/grants', { name: pm.name, token: pm.token, target: pal.name, on: false });
+ck('PM revokes the pal', revoked.ok === true && !revoked.grants.some(n => n.toLowerCase() === pal.name.toLowerCase()), JSON.stringify(revoked));
+ck('pal loses the bot', (await grantsOf(pal)).canBot === false);
+const anonG = await J('GET', '/api/2048/grants');
+ck('anonymous grant check is harmless', anonG.ok === true && anonG.canBot === false && anonG.isAdmin === false, JSON.stringify(anonG));
+
+// ---------- Bot games are marked, human games are not ----------
+// A fresh player's record comes from their first game, so one bot move
+// in it marks the game and the board row; a human move in a fresh game
+// marks neither.
+const bm = await login('BotMark');
+const e = await open();
+e.send({ type: 'hello', name: bm.name, token: bm.token });
+let eg = (await e.next(m => m.game, 'bot-mark game')).game;
+let botState = null;
+for (const dir of ['left', 'up', 'right', 'down']) {
+  e.send({ type: 'move', dir, n: eg.moves, bot: true });
+  const r = await e.next(m => m.game, 'bot move reply');
+  eg = r.game;
+  if (r.spawn) { botState = r; break; }
+}
+ck('a bot move marks the game as a bot game', !!botState && botState.game.bot === true, JSON.stringify(botState?.game));
+ck('the best record out of a bot game is marked', botState.best?.bot === true, JSON.stringify(botState.best));
+const look = await open();
+const lookState = await look.next(m => m.board, 'board on connect');
+ck('the board row is marked 🤖 (bot)', (lookState.board || []).some(r => r.name === bm.name && r.bot === true), JSON.stringify(lookState.board).slice(0, 300));
+await look.close(); await e.close();
+const hm = await login('HandMark');
+const h2 = await open();
+h2.send({ type: 'hello', name: hm.name, token: hm.token });
+let hg = (await h2.next(m => m.game, 'hand game')).game;
+let handState = null;
+for (const dir of ['left', 'up', 'right', 'down']) {
+  h2.send({ type: 'move', dir, n: hg.moves });
+  const r = await h2.next(m => m.game, 'hand move reply');
+  hg = r.game;
+  if (r.spawn) { handState = r; break; }
+}
+ck('a human move leaves the game and the record unmarked', !!handState && !handState.game.bot && handState.best?.bot !== true, JSON.stringify(handState?.game) + JSON.stringify(handState?.best));
+await h2.close();
 
 console.log(`\n2048: ${pass} passed, ${fail} failed (${merges} moves scored)`);
 process.exit(fail ? 1 : 0);

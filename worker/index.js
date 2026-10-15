@@ -40,7 +40,8 @@ export default {
     // 鲁班七号躲技能: one leaderboard object checks and keeps everyone's best run.
     if (url.pathname.startsWith('/api/dodge/')) return env.DODGE.get(env.DODGE.idFromName('board')).fetch(request);
     // 2048: one WebSocket endpoint; the object keeps everyone's board.
-    if (url.pathname === '/api/2048') return env.G2048.get(env.G2048.idFromName('board')).fetch(request);
+    // /api/2048/grants is its HTTP side door for the autopilot grants (PM).
+    if (url.pathname === '/api/2048' || url.pathname === '/api/2048/grants') return env.G2048.get(env.G2048.idFromName('board')).fetch(request);
     // 谁是卧底 / 阿瓦隆 / 狼人杀: one WebSocket endpoint per game, its hall holds two tables.
     if (url.pathname === '/api/undercover') return env.UC_HALL.get(env.UC_HALL.idFromName('hall')).fetch(request);
     if (url.pathname === '/api/avalon') return env.AV_HALL.get(env.AV_HALL.idFromName('hall')).fetch(request);

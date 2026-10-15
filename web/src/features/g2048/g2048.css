@@ -8,6 +8,7 @@
 .g48-btn { padding:.5rem 1rem; border-radius:.6rem; background:#8f7a66; color:#f9f6f2; font-weight:800; }
 .g48-btn:hover { background:#9f8b77; }
 .g48-btn-ghost { background:rgba(255,255,255,.75); color:#776e65; }
+.g48-bot.on { background:#f65e3b; }
 .g48-help { margin-top:.8rem; font-size:.82rem; line-height:1.5; color:#8f7a66; }
 
 .g48-board { --g:2.6%; --s:calc((100% - 5 * var(--g)) / 4); position:relative; width:100%; max-width:30rem; aspect-ratio:1; margin:0 auto;
