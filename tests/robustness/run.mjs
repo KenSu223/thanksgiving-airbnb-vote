@@ -101,8 +101,10 @@ try {
     // And the to-do list suite.
     const todosPath = new URL('todos.mjs', import.meta.url).pathname;
     const todos = existsSync(todosPath) ? await runSuite('todos.mjs') : true;
+    // 2048: the server-owned board, resume, the best-tile board.
+    const g2048 = await runSuite('g2048.mjs');
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && leaderboards && polls && google && cars && reactions && todos && storms;
+    ok = fuzz && email && users && leaderboards && polls && google && cars && reactions && todos && g2048 && storms;
   }
 } finally {
   stopServer();
