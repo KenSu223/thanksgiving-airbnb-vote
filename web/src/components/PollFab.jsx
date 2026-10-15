@@ -171,12 +171,18 @@ export default function PollFab() {
 
   return (
     <>
-      {/* 悬浮球：手机在左下（避开底部导航和游戏桌的 😆），桌面在右下 */}
-      <button onClick={() => setCenterOpen(true)} aria-label="投票中心"
-        className="glass-pill fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] left-3 z-40 flex items-center gap-1.5 rounded-full py-2.5 pl-3.5 pr-4 font-bold shadow-[0_10px_28px_-8px_rgba(30,27,75,.45)] transition hover:scale-[1.04] active:scale-95 md:bottom-6 md:left-auto md:right-4">
-        <span className="text-lg leading-none">🗳️</span> 投票
-        {active.length > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-indigo-600 px-1 text-[11px] font-extrabold text-white">{active.length}</span>}
-        {unvoted.length > 0 && <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white bg-rose-500" />}
+      {/* 悬浮球：一颗圆球，不带文字 —— 宽药丸会压住底下的输入框和卡片
+          文字。角标一颗顶两颗：数字是进行中的投票数；有你没投的时
+          候角标变红，没投的投完就变回靛蓝。手机在左下（避开底部导航
+          和游戏桌的 😆），桌面在右下。 */}
+      <button onClick={() => setCenterOpen(true)} aria-label="投票中心" title="投票中心"
+        className="glass-pill fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] left-4 z-40 grid h-[52px] w-[52px] place-items-center rounded-full shadow-[0_10px_28px_-8px_rgba(30,27,75,.45)] transition hover:scale-105 active:scale-95 md:bottom-6 md:left-auto md:right-5">
+        <span className="text-[22px] leading-none">🗳️</span>
+        {active.length > 0 && (
+          <span className={'absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] font-extrabold text-white ring-2 ring-white/90 ' + (unvoted.length > 0 ? 'bg-rose-500' : 'bg-indigo-600')}>
+            {active.length}
+          </span>
+        )}
       </button>
 
       {/* 投票中心 */}
@@ -246,7 +252,7 @@ export default function PollFab() {
           <div className="login-pop glass-sheet w-full max-w-sm rounded-[28px] px-5 py-5" role="alertdialog" aria-modal="true" aria-label="新投票">
             <div className="mb-2 flex items-center gap-2 text-sm font-bold text-indigo-600"><span className="text-lg">📣</span>{popup.by} 发起了投票</div>
             <PollCard poll={popup} busy={busy} onVote={vote} onClose={closePoll} onDelete={deletePoll} myKey={myKey} />
-            <button onClick={later} className="mt-3 w-full text-center text-sm font-medium text-slate-400 transition hover:text-slate-600">稍后再说（在左下角投票球里找我）</button>
+            <button onClick={later} className="mt-3 w-full text-center text-sm font-medium text-slate-400 transition hover:text-slate-600">稍后再说（点 🗳️ 投票球随时投）</button>
           </div>
         </div>
       )}
