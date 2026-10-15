@@ -72,3 +72,12 @@ class_name = "DodgeBoard"
 [[migrations]]
 tag = "v5"
 new_sqlite_classes = ["DodgeBoard"]
+
+# 2048: one Durable Object holding everyone's game in progress and best tile.
+[[durable_objects.bindings]]
+name = "G2048"
+class_name = "Board2048"
+
+[[migrations]]
+tag = "v6"
+new_sqlite_classes = ["Board2048"]

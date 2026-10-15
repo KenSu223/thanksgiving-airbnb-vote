@@ -1,0 +1,49 @@
+/* 2048: the classic look. Cells and tiles are placed by --r / --c (row, column); a tile that
+   moves just changes them and slides (left/top transition). Text scales with the board (cqw). */
+.g48-card { background:#faf8ef; color:#776e65; }
+.g48-title { font-size:2.6rem; font-weight:900; line-height:1; letter-spacing:-.02em; color:#776e65; }
+.g48-stat { display:flex; flex-direction:column; align-items:center; min-width:4.5rem; padding:.25rem .8rem; border-radius:.5rem; background:#bbada0; color:#fff; line-height:1.15; }
+.g48-stat span { font-size:.68rem; font-weight:700; color:#eee4da; }
+.g48-stat b { font-size:1.15rem; }
+.g48-btn { padding:.5rem 1rem; border-radius:.6rem; background:#8f7a66; color:#f9f6f2; font-weight:800; }
+.g48-btn:hover { background:#9f8b77; }
+.g48-btn-ghost { background:rgba(255,255,255,.75); color:#776e65; }
+.g48-help { margin-top:.8rem; font-size:.82rem; line-height:1.5; color:#8f7a66; }
+
+.g48-board { --g:2.6%; --s:calc((100% - 5 * var(--g)) / 4); position:relative; width:100%; max-width:30rem; aspect-ratio:1; margin:0 auto;
+  border-radius:.8rem; background:#bbada0; container-type:inline-size; touch-action:none; user-select:none; -webkit-user-select:none; overflow:hidden; }
+.g48-cell, .g48-tile { position:absolute; width:var(--s); height:var(--s); border-radius:.45rem;
+  left:calc(var(--g) + var(--c) * (var(--s) + var(--g))); top:calc(var(--g) + var(--r) * (var(--s) + var(--g))); }
+.g48-cell { background:rgba(238,228,218,.35); }
+.g48-tile { display:flex; align-items:center; justify-content:center; font-weight:900; font-size:2rem; font-size:13cqw; z-index:2;
+  transition:left .1s ease-in-out, top .1s ease-in-out; }
+.g48-tile.g48-mid { font-size:1.6rem; font-size:10.5cqw; }
+.g48-tile.g48-wide { font-size:1.25rem; font-size:8cqw; }
+.g48-tile.g48-gone { z-index:1; }
+.g48-new { animation:g48-appear .16s ease .09s both; }
+.g48-merged { z-index:3; animation:g48-pop .2s ease .09s both; }
+@keyframes g48-appear { 0% { opacity:0; transform:scale(0); } 100% { opacity:1; transform:scale(1); } }
+@keyframes g48-pop { 0% { transform:scale(0); } 50% { transform:scale(1.18); } 100% { transform:scale(1); } }
+
+.g48-v2 { background:#eee4da; color:#776e65; }
+.g48-v4 { background:#ede0c8; color:#776e65; }
+.g48-v8 { background:#f2b179; color:#f9f6f2; }
+.g48-v16 { background:#f59563; color:#f9f6f2; }
+.g48-v32 { background:#f67c5f; color:#f9f6f2; }
+.g48-v64 { background:#f65e3b; color:#f9f6f2; }
+.g48-v128 { background:#edcf72; color:#f9f6f2; box-shadow:0 0 18px 4px rgba(243,215,116,.24); }
+.g48-v256 { background:#edcc61; color:#f9f6f2; box-shadow:0 0 18px 6px rgba(243,215,116,.32); }
+.g48-v512 { background:#edc850; color:#f9f6f2; box-shadow:0 0 18px 8px rgba(243,215,116,.4); }
+.g48-v1024 { background:#edc53f; color:#f9f6f2; box-shadow:0 0 18px 10px rgba(243,215,116,.48); }
+.g48-v2048 { background:#edc22e; color:#f9f6f2; box-shadow:0 0 20px 12px rgba(243,215,116,.56); }
+.g48-v4096 { background:#3c3a32; color:#f9f6f2; }
+
+/* game over / won: over the board */
+.g48-over { position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:1rem;
+  background:rgba(238,228,218,.78); color:#776e65; animation:g48-fade .4s ease both; }
+.g48-over.g48-win { background:rgba(237,194,46,.6); color:#f9f6f2; }
+@keyframes g48-fade { from { opacity:0; } to { opacity:1; } }
+
+/* the leaderboard's tile */
+.g48-chip { display:inline-flex; align-items:center; justify-content:center; min-width:2.6rem; padding:1px 6px; border-radius:.35rem; font-weight:900; font-size:.78rem; box-shadow:none; }
+@media (prefers-reduced-motion: reduce) { .g48-tile { transition:none; } .g48-new, .g48-merged, .g48-over { animation:none; } }
