@@ -55,8 +55,21 @@ async function sendScore(s) {
   return { ok: false, retry: true, error: '网络有点问题，成绩先存在这台设备上' };
 }
 
+// PM 专属外挂开关：只有 PM 本人看得见。开着时 bot.js 的算法接管走位。
+function BotSwitch({ on, onToggle }) {
+  return (
+    <button onClick={onToggle} aria-pressed={on}
+      className={'dg-btn ' + (on ? 'bg-rose-400 text-slate-900' : 'bg-white/15 text-white')}>
+      🤖 外挂：自动走位 {on ? '已开' : '已关'}
+    </button>
+  );
+}
+
 export default function DodgeView({ active }) {
   const { name, ensureName } = useSession();
+  const isPM = !!name && name.toLowerCase() === 'pm';
+  const [bot, setBot] = useState(() => load('dodgeBot', '') === '1');
+  const toggleBot = () => setBot(b => { save('dodgeBot', b ? '' : '1'); return !b; });
   const [board, setBoard] = useState([]);
   // while playing: { me: { name, token }, seed, ticket, practice?, n }; while watching: { replay, seed, n }
   const [run, setRun] = useState(null);
@@ -198,7 +211,7 @@ export default function DodgeView({ active }) {
   // the first run on an upright phone: wait for it to be turned before counting down
   const hold = paused || (touch && portrait);
   const game = run && (
-    <DodgeGame key={run.n} seed={run.seed} touch={touch} hold={hold} onGo={() => setStarted(true)} onDead={dead} onPause={() => setPaused(true)}
+    <DodgeGame key={run.n} seed={run.seed} touch={touch} hold={hold} bot={isPM && bot} onGo={() => setStarted(true)} onDead={dead} onPause={() => setPaused(true)}
       replay={run.replay?.events} replayName={run.replay?.name}>
       {overlay}{pause}
     </DodgeGame>
@@ -208,7 +221,12 @@ export default function DodgeView({ active }) {
     <div>
       <div className="grid lg:grid-cols-3 gap-5">
         <section className={run && !touch ? "lg:col-span-3" : "lg:col-span-2"}>
-          {run && !touch ? <div className="dg-box">{game}</div> : (
+          {run && !touch ? (
+            <div>
+              {isPM && <div className="mb-2 flex justify-end"><BotSwitch on={bot} onToggle={toggleBot} /></div>}
+              <div className="dg-box">{game}</div>
+            </div>
+          ) : (
             <div className="dg-intro rounded-2xl shadow-xl p-5 md:p-7 text-white">
               <DodgePreview />
               <div className="dg-intro-content">
@@ -225,6 +243,7 @@ export default function DodgeView({ active }) {
               {mine && <p className="mt-3 text-amber-200 font-bold">你的最好：{secs(mine.ticks)} 秒</p>}
               {homeTip && <p className="dg-tip mt-3">{HOME_TIP}</p>}
               <button onClick={start} className="dg-btn dg-start mt-4 text-lg">进入训练 <span aria-hidden="true">→</span></button>
+              {isPM && <div className="mt-3"><BotSwitch on={bot} onToggle={toggleBot} /></div>}
               {msg && <p className="mt-2 text-sm text-amber-200">{msg}</p>}
               </div>
             </div>
