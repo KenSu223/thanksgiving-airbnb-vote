@@ -1,5 +1,5 @@
 import { CardRun } from '../games/PlayingCard.jsx';
-import { ReactBubble } from '../games/Reactions.jsx';
+import { ReactBubbles } from '../games/Reactions.jsx';
 
 // 一个座位：名字、地主/农民、剩几张、豆子，以及这一轮说了什么 / 出了什么。
 export function Said({ said }) {
@@ -8,15 +8,16 @@ export function Said({ said }) {
   return <div className="gt-said"><CardRun cards={said.cards} /></div>;
 }
 
-export default function SeatBox({ s, idx, t, timer, compact, react }) {
+export default function SeatBox({ s, idx, t, timer, compact, reacts }) {
   if (!s) return <div className="gt-seat empty">空位</div>;
   const turn = t.turn === idx && (t.phase === 'bidding' || t.phase === 'playing');
   const role = t.landlord < 0 ? null : t.landlord === idx ? '👑 地主' : '农民';
   const badge = role && <span className={'gt-role' + (t.landlord === idx ? ' gold' : '')}>{role}</span>;
   // 两边的小座位框太窄，地主/农民放到第二行，名字才不会被挤掉
+  // data-react-to：表情拖放的目标（玩家 key），Reactions.jsx 靠它命中座位
   return (
-    <div className={'gt-seat' + (turn ? ' turn' : '') + (s.connected ? '' : ' away') + (compact ? ' compact' : '')}>
-      <ReactBubble value={react} />
+    <div data-react-to={s.name.toLowerCase()} className={'gt-seat' + (turn ? ' turn' : '') + (s.connected ? '' : ' away') + (compact ? ' compact' : '')}>
+      <ReactBubbles list={reacts} />
       <div className="flex items-center justify-between gap-2">
         <span className="font-bold truncate">{s.name}{s.me ? '（你）' : ''}</span>
         {!compact && badge}

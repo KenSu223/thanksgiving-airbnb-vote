@@ -4,7 +4,7 @@ import { reduceMotion } from '../../lib/motion.js';
 import { useBlackjack } from './useBlackjack.js';
 import Card from './Card.jsx';
 import Seat from './Seat.jsx';
-import { ReactionBar } from '../games/Reactions.jsx';
+import { ReactionBar, reactionsFor } from '../games/Reactions.jsx';
 import Controls from './Controls.jsx';
 import Leaderboard from './Leaderboard.jsx';
 import './blackjack.css';
@@ -63,14 +63,14 @@ export default function BlackjackView({ active }) {
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {t.seats.length ? t.seats.map(s => <Seat key={s.key} s={s} t={t} mine={s.key === st.you} cardDelay={cardDelay} react={st?.reactions?.[s.key]} />)
+              {t.seats.length ? t.seats.map(s => <Seat key={s.key} s={s} t={t} mine={s.key === st.you} cardDelay={cardDelay} reacts={reactionsFor(st?.reactions, s.key)} />)
                 : <p className="col-span-full text-center text-emerald-100/80 text-sm py-6">桌上还没人，坐下开一局吧</p>}
             </div>
             <div className="mt-5"><Controls t={t} me={me} live={live} send={send} sit={sit} standUp={standUp} /></div>
           </>
         )}
         <p className="text-sm mt-3 min-h-[1.25rem] text-amber-200">{msg}</p>
-        <ReactionBar send={send} seated={!!st?.you} />
+        <ReactionBar send={send} />
       </section>
       <Leaderboard rows={st?.board || []} />
     </div>

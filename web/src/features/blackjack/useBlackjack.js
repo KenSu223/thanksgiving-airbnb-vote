@@ -4,7 +4,7 @@ import { useSession } from '../../session/SessionContext.jsx';
 // 21 点：牌局都在服务器（Durable Object）里，这里只负责连线。
 // 不在 21 点页面、也没坐下就不连：没人连着时 Durable Object 能休息，省免费额度。
 export function useBlackjack(active) {
-  const { name, ensureName, openLogin } = useSession();
+  const { name, token, ensureName, openLogin } = useSession();
   const [st, setSt] = useState(null); // 服务器发来的 { table, you, board } + 收到的时间 at
   const [live, setLive] = useState(false);
   const [msg, setMsg] = useState('');
@@ -12,6 +12,8 @@ export function useBlackjack(active) {
   const wantSeat = useRef(false), satConfirmed = useRef(false);
   const activeRef = useRef(active);
   activeRef.current = active;
+  const credRef = useRef({ name, token });
+  credRef.current = { name, token };
   const actions = useRef({}); // connect / sit，给 socket 回调用最新的版本
 
   const wanted = () => (activeRef.current && document.visibilityState === 'visible') || wantSeat.current;
@@ -23,7 +25,11 @@ export function useBlackjack(active) {
     if (ws.current || !wanted()) return;
     const s = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/bj');
     ws.current = s; satConfirmed.current = false;
-    s.onopen = () => { retry.current = 0; setLive(true); if (wantSeat.current && actions.current.me) send({ type: 'sit', ...actions.current.me }); };
+    s.onopen = () => {
+      retry.current = 0; setLive(true);
+      if (wantSeat.current && actions.current.me) send({ type: 'sit', ...actions.current.me });
+      else { const c = credRef.current; if (c.name && c.token) send({ type: 'identify', name: c.name, token: c.token }); } // 围观也要能发表情：先证明身份，不用坐下
+    };
     s.onmessage = e => {
       let m;
       try { m = JSON.parse(e.data); } catch (err) { return; }
@@ -72,6 +78,9 @@ export function useBlackjack(active) {
   useEffect(() => {
     if (st?.you && name && st.you !== name.toLowerCase()) standUp();
   }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 登录/换人之后补上身份（围观发表情用；坐下了就不用，sit 本身就证明了）
+  useEffect(() => { if (name && token) send({ type: 'identify', name, token }); }, [name, token, send]);
 
   const me = st?.you ? st.table.seats.find(s => s.key === st.you) : null;
   return { st, live, me, msg, send, sit, standUp };

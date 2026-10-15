@@ -8,7 +8,7 @@ import { load, save } from '../../lib/storage.js';
 // path：WebSocket 地址（/api/ddz）；roomKey：记住看哪张桌的 localStorage key；
 // noHint：点「提示」却没有能出的牌时显示的话。
 export function useTable(active, { path, roomKey, noHint }) {
-  const { name, ensureName, openLogin } = useSession();
+  const { name, token, ensureName, openLogin } = useSession();
   const [st, setSt] = useState(null); // 服务器发来的 { room, seatedAt, you, table, lobby, board } + 收到的时间 at
   const [live, setLive] = useState(false);
   const [msg, setMsg] = useState('');
@@ -18,6 +18,8 @@ export function useTable(active, { path, roomKey, noHint }) {
   const wantSeat = useRef(false), satConfirmed = useRef(false);
   const activeRef = useRef(active), roomRef = useRef(room);
   activeRef.current = active; roomRef.current = room;
+  const credRef = useRef({ name, token });
+  credRef.current = { name, token };
   const actions = useRef({});
 
   const wanted = () => (activeRef.current && document.visibilityState === 'visible') || wantSeat.current;
@@ -29,7 +31,11 @@ export function useTable(active, { path, roomKey, noHint }) {
     if (ws.current || !wanted()) return;
     const s = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + path + '?room=' + roomRef.current);
     ws.current = s; satConfirmed.current = false;
-    s.onopen = () => { retry.current = 0; setLive(true); if (wantSeat.current && actions.current.me) send({ type: 'sit', room: roomRef.current, ...actions.current.me }); };
+    s.onopen = () => {
+      retry.current = 0; setLive(true);
+      if (wantSeat.current && actions.current.me) send({ type: 'sit', room: roomRef.current, ...actions.current.me });
+      else { const c = credRef.current; if (c.name && c.token) send({ type: 'identify', name: c.name, token: c.token }); } // 围观也要能发表情：先证明身份，不用坐下
+    };
     s.onmessage = e => {
       let m;
       try { m = JSON.parse(e.data); } catch (err) { return; }
@@ -79,6 +85,9 @@ export function useTable(active, { path, roomKey, noHint }) {
   useEffect(() => {
     if (st?.you && name && st.you !== name.toLowerCase()) standUp();
   }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 登录/换人之后补上身份（围观发表情用；坐下了就不用，sit 本身就证明了）
+  useEffect(() => { if (name && token) send({ type: 'identify', name, token }); }, [name, token, send]);
 
   return { st, live, msg, flash, hint, setHint, room, watch, send, sit, standUp };
 }

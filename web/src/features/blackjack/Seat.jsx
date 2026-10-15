@@ -1,5 +1,5 @@
 import Card from './Card.jsx';
-import { ReactBubble } from '../games/Reactions.jsx';
+import { ReactBubbles } from '../games/Reactions.jsx';
 
 export const BJ_RESULT = { win: '赢了', lose: '输了', push: '平局', bust: '爆了 💥', blackjack: 'Blackjack! 🎉', refill: '破产了，补给 1000' };
 
@@ -14,12 +14,12 @@ function label(s, t, turn) {
   return (BJ_RESULT[s.result] || '') + net;
 }
 
-export default function Seat({ s, t, mine, cardDelay, react }) {
+export default function Seat({ s, t, mine, cardDelay, reacts }) {
   const turn = t.turn === s.key;
   const tone = /^(win|blackjack)$/.test(s.result) ? 'text-amber-300' : /^(lose|bust)$/.test(s.result) ? 'text-rose-200' : 'text-emerald-100';
   return (
-    <div className={'bj-seat' + (mine ? ' me' : '') + (turn ? ' turn' : '') + (s.connected ? '' : ' away')}>
-      <ReactBubble value={react} />
+    <div data-react-to={s.key} className={'bj-seat' + (mine ? ' me' : '') + (turn ? ' turn' : '') + (s.connected ? '' : ' away')}>
+      <ReactBubbles list={reacts} />
       <div className="flex items-center justify-between gap-2 text-sm mb-1">
         <span className="font-bold truncate">{s.name}{mine ? '（你）' : ''}</span>
         <span className="font-bold text-amber-200 tabular-nums">🪙 {s.chips.toLocaleString()}</span>

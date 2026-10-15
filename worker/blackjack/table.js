@@ -10,7 +10,8 @@ export class BlackjackTable {
   constructor(state, env) {
     this.state = state; this.env = env;
     this.sockets = new Map(); // socket -> seat key, or null while just watching
-    this.reactions = new Map(); // seat key -> { v, at } — emoji/taunt popups, see games/reactions.js
+    this.ident = new Map(); // socket -> { key, name } once identity is proven (sit or identify) — reactions sign with it
+    this.reactions = []; // [{ v, at, by, byName, to }] — addressed emoji/taunt popups, see games/reactions.js
     this.board = new Map();   // saved chips by key
     this.loaded = null; this.sweeper = null;
     this.game = new BlackjackGame({
@@ -67,7 +68,25 @@ export class BlackjackTable {
     let m;
     try { m = JSON.parse(data); } catch (e) { return; }
     let key = this.sockets.get(ws), err = null;
-    if (m.type === 'sit') {
+    if (m.type === 'identify') {
+      // Watching is anonymous, but reactions carry a name — prove who
+      // you are (same name+token check as sitting) without taking a seat.
+      const users = await getUsers(this.env);
+      const user = users.find(u => sameName(u.name, cleanName(m.name)));
+      if (!this.sockets.has(ws)) return; // closed while we looked the user up
+      if (user && user.token === m.token) this.ident.set(ws, { key: user.name.toLowerCase(), name: user.name });
+    } else if (m.type === 'react') {
+      // Anyone signed in can react — no seat needed — but the target
+      // has to be seated here, and the reaction lands on the target,
+      // signed with the sender's name.
+      const as = this.ident.get(ws);
+      if (!as) err = '先登录再发表情';
+      else {
+        const to = String(m.target || '').toLowerCase();
+        if (!to || !this.game.seats.some(s => s.key === to)) err = '把表情拖到一个在座的人身上';
+        else noteReaction(this.reactions, { by: as.key, byName: as.name, to, value: m.value }, Date.now());
+      }
+    } else if (m.type === 'sit') {
       // Only the logged-in user (name + their token from the user list) can sit as themselves.
       const users = await getUsers(this.env);
       const user = users.find(u => sameName(u.name, cleanName(m.name)));
@@ -79,9 +98,9 @@ export class BlackjackTable {
         for (const [other, ok] of this.sockets) if (ok === k && other !== ws) this.sockets.set(other, null); // a newer tab takes the seat
         err = this.game.sit(k, user.name, this.board.get(k));
         this.sockets.set(ws, err ? null : k);
+        if (!err) this.ident.set(ws, { key: k, name: user.name }); // sitting proves identity too (for reactions)
       }
     } else if (!key) err = '先坐下';
-    else if (m.type === 'react') noteReaction(this.reactions, key, m.value, Date.now());
     else if (m.type === 'bet') err = this.game.bet(key, m.amount);
     else if (m.type === 'hit' || m.type === 'stand' || m.type === 'double') err = this.game.act(key, m.type);
     else if (m.type === 'leave') { this.game.leave(key); this.sockets.set(ws, null); }
@@ -95,6 +114,7 @@ export class BlackjackTable {
     try { ws.close(1000, 'bye'); } catch (e) { /* already closed */ }
     const key = this.sockets.get(ws);
     this.sockets.delete(ws);
+    this.ident.delete(ws);
     if (key && ![...this.sockets.values()].includes(key)) this.game.disconnect(key);
     if (!this.sockets.size) { clearInterval(this.sweeper); this.sweeper = null; }
     this.broadcast();

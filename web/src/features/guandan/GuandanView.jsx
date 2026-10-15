@@ -6,7 +6,7 @@ import { alertsOn, setAlertsOn, unlock, useTurnAlert } from '../games/turnAlert.
 import TableFrame, { useFullTable, RoomPicker, PointsBoard } from '../games/TableFrame.jsx';
 import PlayingCard, { CardRun, faceOf } from '../games/PlayingCard.jsx';
 import CardHand from '../games/CardHand.jsx';
-import { ReactionBar, ReactBubble } from '../games/Reactions.jsx';
+import { ReactionBar, ReactBubbles, reactionsFor } from '../games/Reactions.jsx';
 import './guandan.css';
 
 const PHASE = { waiting: '等人开始', tribute: '进贡中', playing: '对局中', result: '这局结束' };
@@ -25,13 +25,13 @@ function Said({ said, isWild }) {
   return <div className="gt-said gd-said"><CardRun cards={said.cards} isWild={isWild} />{playLabel(said.play) && <span className="gd-tag">{playLabel(said.play)}</span>}</div>;
 }
 
-function Seat({ s, idx, t, me, timer, compact, react }) {
+function Seat({ s, idx, t, me, timer, compact, reacts }) {
   if (!s) return <div className="gt-seat empty">空位</div>;
   const turn = t.turn === idx && t.phase === 'playing';
   const mate = me >= 0 && idx !== me && idx % 2 === me % 2;
   return (
-    <div className={'gt-seat' + (turn ? ' turn' : '') + (s.connected ? '' : ' away') + (compact ? ' compact' : '')}>
-      <ReactBubble value={react} />
+    <div data-react-to={s.name.toLowerCase()} className={'gt-seat' + (turn ? ' turn' : '') + (s.connected ? '' : ' away') + (compact ? ' compact' : '')}>
+      <ReactBubbles list={reacts} />
       <div className="flex items-center justify-between gap-2">
         <span className="font-bold truncate">{s.name}{s.me ? '（你）' : ''}</span>
         {s.place > 0 && <span className={'gt-role' + (s.place === 1 ? ' gold' : '')}>{PLACE[s.place]}</span>}
@@ -158,10 +158,10 @@ export default function GuandanView({ active }) {
           {t && (
             <>
               <div className="gt-mid">
-                <div className="gd-top"><Seat s={t.seats[top]} idx={top} t={t} me={me} timer={timer} compact react={st?.reactions?.[t.seats[top]?.name?.toLowerCase()]} /><Said said={t.said[top]} isWild={isWild} /></div>
+                <div className="gd-top"><Seat s={t.seats[top]} idx={top} t={t} me={me} timer={timer} compact reacts={reactionsFor(st?.reactions, t.seats[top]?.name?.toLowerCase())} /><Said said={t.said[top]} isWild={isWild} /></div>
                 <div className="gd-row">
-                  <div className="gd-side"><Seat s={t.seats[left]} idx={left} t={t} me={me} timer={timer} compact react={st?.reactions?.[t.seats[left]?.name?.toLowerCase()]} /><Said said={t.said[left]} isWild={isWild} /></div>
-                  <div className="gd-side right"><Seat s={t.seats[right]} idx={right} t={t} me={me} timer={timer} compact react={st?.reactions?.[t.seats[right]?.name?.toLowerCase()]} /><Said said={t.said[right]} isWild={isWild} /></div>
+                  <div className="gd-side"><Seat s={t.seats[left]} idx={left} t={t} me={me} timer={timer} compact reacts={reactionsFor(st?.reactions, t.seats[left]?.name?.toLowerCase())} /><Said said={t.said[left]} isWild={isWild} /></div>
+                  <div className="gd-side right"><Seat s={t.seats[right]} idx={right} t={t} me={me} timer={timer} compact reacts={reactionsFor(st?.reactions, t.seats[right]?.name?.toLowerCase())} /><Said said={t.said[right]} isWild={isWild} /></div>
                 </div>
                 {tributeLine && !result && t.phase !== 'waiting' && <div className="gd-note">{tributeLine}</div>}
                 {result && (
@@ -185,7 +185,7 @@ export default function GuandanView({ active }) {
                 )}
                 <div className="mt-1 gd-mine"><Said said={t.said[bottom]} isWild={isWild} /></div>
               </div>
-              {!full && <div className="mt-1"><Seat s={t.seats[bottom]} idx={bottom} t={t} me={me} timer={timer} react={st?.reactions?.[t.seats[bottom]?.name?.toLowerCase()]} /></div>}
+              {!full && <div className="mt-1"><Seat s={t.seats[bottom]} idx={bottom} t={t} me={me} timer={timer} reacts={reactionsFor(st?.reactions, t.seats[bottom]?.name?.toLowerCase())} /></div>}
               <CardHand cards={t.seats[bottom]?.cards || Array.from({ length: t.seats[bottom]?.count || 0 }, () => null)}
                 sel={sel} onToggle={flip} isWild={isWild} pickable={me >= 0 && (t.phase === 'playing' || t.mustReturn)} />
             </>
@@ -194,7 +194,7 @@ export default function GuandanView({ active }) {
           <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 gd-msg">{msg}</p>
           </div>
         </TableFrame>
-        <ReactionBar send={send} seated={!!st?.you} />
+        <ReactionBar send={send} />
         <PointsBoard title="掼蛋豆子榜" rows={st?.board || []}>
           规则：两副牌 108 张，四人各 27 张，对面是队友。从 2 打起，打几就是级牌（比 A 大），红心级牌是「配」，能当任何牌（王除外）。
           牌型：单张、对子、三张、三带二、顺子（5 张）、三连对、钢板；炸弹 4–10 张，同花顺比 5 炸大、比 6 炸小，四个王最大。

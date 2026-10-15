@@ -21,7 +21,7 @@ export class TableHall {
     this.state = state; this.env = env;
     this.rooms = rooms; this.actions = actions; this.idleNotice = idleNotice;
     this.sockets = new Map(); // socket -> { key (seated/queued player, or null), room (1..rooms being watched) }
-    this.reactions = new Map(); // room -> Map(player key -> { v, at }) — emoji/taunt popups, see reactions.js
+    this.reactions = new Map(); // room -> [{ v, at, by, byName, to }] — addressed emoji/taunt popups, see reactions.js
     this.board = new Map();   // saved points by player key
     this.loaded = null; this.sweeper = null;
     this.tables = Array.from({ length: rooms }, () => new Game({
@@ -88,14 +88,26 @@ export class TableHall {
     let err = null, extra = null;
     if (m.type === 'watch') {
       info.room = this.clampRoom(m.room);
+    } else if (m.type === 'identify') {
+      // Watching is anonymous, but reactions carry a name — prove who
+      // you are (same name+token check as sitting) without taking a seat.
+      const users = await getUsers(this.env);
+      const user = users.find(u => sameName(u.name, cleanName(m.name)));
+      if (!this.sockets.has(ws)) return; // closed while we looked the user up
+      if (user && user.token === m.token) info.as = { key: user.name.toLowerCase(), name: user.name };
     } else if (m.type === 'react') {
-      if (!info.key) err = '先坐下';
+      // Anyone signed in at the table can react — no seat needed — but
+      // the target has to be seated in the room being watched, and the
+      // reaction lands on the target, signed with the sender's name.
+      if (!info.as) err = '先登录再发表情';
       else {
-        const seatedRoom = this.tables.findIndex(t => t.has(info.key)) + 1;
-        if (seatedRoom) {
-          let rm = this.reactions.get(seatedRoom);
-          if (!rm) { rm = new Map(); this.reactions.set(seatedRoom, rm); }
-          noteReaction(rm, info.key, m.value, Date.now());
+        const to = String(m.target || '').toLowerCase();
+        const table = this.tables[info.room - 1];
+        if (!to || !table || !table.has(to)) err = '把表情拖到一个在座的人身上';
+        else {
+          let list = this.reactions.get(info.room);
+          if (!list) { list = []; this.reactions.set(info.room, list); }
+          noteReaction(list, { by: info.as.key, byName: info.as.name, to, value: m.value }, Date.now());
         }
       }
     } else if (m.type === 'sit') {
@@ -113,6 +125,7 @@ export class TableHall {
         err = here.sit(key, user.name, this.board.get(key));
         info.room = room;
         info.key = err ? null : key;
+        if (!err) info.as = { key, name: user.name }; // sitting proves identity too (for reactions)
       }
     } else if (!info.key) {
       err = '先坐下';
@@ -166,7 +179,7 @@ export class TableHall {
     const seatedAt = this.tables.findIndex(t => t.has(info.key)) + 1;
     try {
       ws.send(JSON.stringify({ type: 'state', room: info.room, seatedAt, you: info.key,
-        reactions: freshReactions(this.reactions.get(info.room) || new Map(), Date.now()),
+        reactions: freshReactions(this.reactions.get(info.room) || [], Date.now()),
         table: this.tables[info.room - 1].view(info.key), lobby: this.lobby(), board: this.leaderboard(), ...extra }));
     } catch (e) { /* socket already gone; its close handler cleans up */ }
   }
