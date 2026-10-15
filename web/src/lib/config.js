@@ -17,6 +17,8 @@ const views = {
     sub: '看中哪间就把 Airbnb 或酒店链接贴进来，票数最高的我们就订它' },
   flights: { nav: 'Flights', navSub: '航班', icon: 'flights', group: 'trip',
     sub: '大家填上到达和离开的航班 · 看航线地图，自动排接机和送机' },
+  cars: { nav: 'Cars', navSub: '用车', icon: 'cars', group: 'trip',
+    sub: '三辆 2026 BMW X5 M60，每辆 5 个座 · 先到先得选座位，再告诉大家你带几件什么行李' },
   calendar: { nav: 'Schedule', navSub: '日程', icon: 'schedule', group: 'trip',
     sub: '按天看每个人的安排：住哪、航班、接送机' },
   food: { nav: 'Dining', navSub: '餐厅', icon: 'dining', group: 'explore', tripScoped: true,

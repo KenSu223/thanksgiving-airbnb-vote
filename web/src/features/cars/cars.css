@@ -1,0 +1,33 @@
+/* Cars：俯视的车身上摆五个座位按钮；空位虚线圈，有人的实心，自己的品牌靛蓝 */
+.car-top { position:relative; width:min(100%, 230px); aspect-ratio:200/360; margin:0 auto; }
+.car-body { position:absolute; inset:0; width:100%; height:100%; filter:drop-shadow(0 10px 18px rgba(30,50,110,.16)); }
+.seat { position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:3px; width:4.2rem; cursor:pointer; background:none; }
+.seat:disabled { cursor:progress; }
+.seat-dot { display:grid; place-items:center; width:2.6rem; height:2.6rem; border-radius:.9rem; font-size:.78rem; font-weight:700; letter-spacing:.02em;
+  color:#94a3b8; border:1.5px dashed #b6c2d6; background:rgba(255,255,255,.75); transition: transform .15s, background .15s, border-color .15s, color .15s; }
+.seat:hover .seat-dot { border-color:#6366f1; color:#4f46e5; transform:translateY(-1px); }
+.seat.taken .seat-dot { border:1.5px solid transparent; background:#1e2147; color:#fff; }
+.seat.mine .seat-dot { background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; box-shadow:0 6px 14px -4px rgba(99,102,241,.6); }
+.seat.driver:not(.taken) .seat-dot { color:#64748b; }
+.seat-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.7rem; font-weight:600; color:#64748b; }
+.seat.taken .seat-name { color:#1e293b; }
+.seat.mine .seat-name { color:#4f46e5; }
+
+.trunk-bar { height:6px; border-radius:99px; background:rgba(148,163,184,.25); overflow:hidden; }
+.trunk-fill { display:block; height:100%; border-radius:99px; transition: width .4s cubic-bezier(.2,.8,.2,1); }
+.trunk-fill.trunk-ok { background:linear-gradient(90deg,#6366f1,#8b5cf6); }
+.trunk-fill.trunk-tight { background:#f59e0b; }
+.trunk-fill.trunk-over { background:#e11d48; }
+span.trunk-ok { color:#64748b; } span.trunk-tight { color:#b45309; } span.trunk-over { color:#be123c; }
+
+.bag-tile { display:flex; flex-direction:column; align-items:center; text-align:center; padding:1rem .75rem .85rem; border-radius:1.1rem;
+  background:rgba(255,255,255,.55); border:1px solid rgba(255,255,255,.7); transition: background .2s, box-shadow .2s, border-color .2s; }
+.bag-tile.on { background:#fff; border-color:rgba(99,102,241,.35); box-shadow:0 8px 18px -10px rgba(79,70,229,.45); }
+.bag-ico { color:#64748b; margin-bottom:.4rem; }
+.bag-tile.on .bag-ico { color:#4f46e5; }
+.stepper { display:flex; align-items:center; gap:.6rem; }
+.stepper button { width:1.9rem; height:1.9rem; border-radius:99px; border:1px solid #cbd5e1; color:#334155; font-size:1rem; line-height:1; background:#fff; }
+.stepper button:hover:not(:disabled) { border-color:#6366f1; color:#4f46e5; }
+.stepper button:disabled { opacity:.35; }
+.stepper span { min-width:1rem; font-weight:700; }
+@media (max-width: 640px) { .car-top { width:min(100%, 190px); } }

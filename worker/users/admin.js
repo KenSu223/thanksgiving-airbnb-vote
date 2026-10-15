@@ -9,8 +9,8 @@
 //
 // Deletion is thorough: the account goes, and so does everything
 // recorded under that person — listing/food/activity votes, saved
-// flights, split expenses and shares, Secret Angel prefs and draw
-// seat (each feature's scrubUserFrom* does its own part), plus the
+// flights, split expenses and shares, car seats and luggage, Secret Angel
+// prefs and draw seat (each feature's scrubUserFrom* does its own part), plus the
 // game records inside the game Durable Objects (table-game 豆子,
 // blackjack chips, the dodge leaderboard), reached
 // through their bindings below. Cards and restaurants they added
@@ -24,6 +24,7 @@ import { scrubUserFromFlights } from '../flights/routes.js';
 import { scrubUserFromSplit } from '../split/store.js';
 import { scrubUserFromAngel } from '../angel/routes.js';
 import { scrubUserFromPolls } from '../polls/routes.js';
+import { scrubUserFromCars } from '../cars/routes.js';
 
 async function handleUserDelete(req, env) {
   let body = {};
@@ -52,6 +53,7 @@ async function handleUserDelete(req, env) {
   };
   await scrubUserFromFlights(env, target);
   await scrubUserFromAngel(env, target);
+  await scrubUserFromCars(env, target);
   // The games keep their records in their own Durable Objects; ask
   // each one to drop this person. A game object being unreachable
   // must not fail the deletion — the account is already gone.
