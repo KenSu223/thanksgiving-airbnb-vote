@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useParty, PartyFrame, TopBar, Banner, SeatGrid, SecretCard, VoteBar, SpeakBar, StartBar, StopButton, LogList, WinsBoard, Choice } from './PartyKit.jsx';
+import { ReactionBar } from '../games/Reactions.jsx';
 
 // 谁是卧底：每人一个词，卧底的词和大家的像但不一样（白板没有词）。轮流用一句话说自己的词（当面说，
 // app 叫号），然后投票，票最多的出局并公布他是平民还是卧底。
@@ -85,6 +86,7 @@ export default function UndercoverView({ active }) {
           {!seated && t && <p className="pt-hint">点一个空座位坐下{t.phase !== 'waiting' && t.phase !== 'result' ? '（这局已经开始了，下一局再坐）' : ''}。没坐下也能看，适合放桌上当播报机。</p>}
           <LogList log={t?.log} />
           <div className="flex justify-between items-center mt-2"><span className="text-xs opacity-60">{st && !p.live ? '连接断了，正在重连…' : p.msg}</span><StopButton p={p} /></div>
+          <ReactionBar send={send} active={active} />
         </PartyFrame>
       </div>
       <WinsBoard title="谁是卧底 胜场榜" rows={st?.board || []}>

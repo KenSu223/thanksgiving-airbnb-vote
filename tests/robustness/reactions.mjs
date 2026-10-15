@@ -1,7 +1,8 @@
 // Addressed table reactions (worker/games/reactions.js): anyone signed
 // in — seated or just watching — can drop an emoji/taunt ON a seated
 // player; it lands on the target, signed with the sender's name.
-// Covers the hall games (Dou Dizhu WS) and Blackjack: identify without
+// Covers the hall games (Dou Dizhu WS), Blackjack and the party games
+// （谁是卧底 / 阿瓦隆 / 狼人杀）: identify without
 // sitting, seated senders, and the refusals (no identity, bad value,
 // target not seated). Uses the global WebSocket client (Node 22+ —
 // that's why CI pins Node 22 in check.yml/deploy.yml).
@@ -124,6 +125,32 @@ e.send({ type: 'react', value: '🔥', target: dKey });
 const bjHit = await d.waitFor(s => reactsOf(s).some(r => r.v === '🔥' && r.to === dKey && r.byName === E.name), 'bj reaction').catch(() => null);
 ck('blackjack: spectator reaction lands signed', !!bjHit, JSON.stringify(d.latest()?.reactions));
 d.close(); e.close();
+
+// ---------- Party games （谁是卧底 / 阿瓦隆 / 狼人杀） ----------
+// They run on the same TableHall as the card games, so the protocol is
+// the same — this pins it per game, since each is its own Durable
+// Object: a seated player is a valid target, a signed-in watcher can
+// drop a signed reaction on them, addressed by the seat's display name
+// (that's what the party SeatGrid puts in data-react-to).
+for (const [label, path] of [['undercover', '/api/undercover'], ['avalon', '/api/avalon'], ['werewolf', '/api/werewolf']]) {
+  const P = await mkUser('ReactParty' + label), Q = await mkUser('ReactWatch' + label);
+  const pKey = P.name.toLowerCase();
+  // Room 2, and stand up afterwards: party seats survive a dropped
+  // socket by design, so just closing would leave seat 0 of room 1
+  // occupied for the party suite that runs after this one.
+  const pc = await connect(path + '?room=2');
+  pc.send({ type: 'sit', room: 2, name: P.name, token: P.token, seat: 0 });
+  await pc.waitFor(s => s.you === pKey && s.table?.seats?.[0]?.name === P.name, label + ' seated');
+  const qc = await connect(path + '?room=2');
+  qc.send({ type: 'identify', name: Q.name, token: Q.token });
+  await new Promise(s => setTimeout(s, 250));
+  qc.send({ type: 'react', value: '😏', target: pKey });
+  const hit = await pc.waitFor(s => reactsOf(s).some(r => r.v === '😏' && r.to === pKey && r.by === Q.name.toLowerCase() && r.byName === Q.name), label + ' reaction').catch(() => null);
+  ck(label + ': spectator reaction lands on the seat, signed', !!hit, JSON.stringify(pc.latest()?.reactions));
+  pc.send({ type: 'leave' });
+  for (let i = 0; i < 50 && pc.latest()?.table?.seats?.[0]; i++) await new Promise(s => setTimeout(s, 60)); // waitFor scans old states too, so poll the latest
+  pc.close(); qc.close();
+}
 
 console.log(`REACTIONS: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useParty, PartyFrame, TopBar, Banner, SeatGrid, SecretCard, StartBar, StopButton, LogList, WinsBoard, Choice } from './PartyKit.jsx';
+import { ReactionBar } from '../games/Reactions.jsx';
 
 // 阿瓦隆：好人（梅林、派西维尔、忠臣）对坏人（刺客、莫甘娜、莫德雷德、奥伯伦、爪牙）。
 // 队长选人 → 所有人公开投票 → 队员暗中出成功 / 失败；三个任务定胜负，好人赢了还要躲过刺客的一刀。
@@ -135,6 +136,7 @@ export default function AvalonView({ active }) {
           {!seated && t && <p className="pt-hint">点一个空座位坐下{inGameLike(ph) ? '（这局已经开始了，下一局再坐）' : ''}。</p>}
           <LogList log={t?.log} />
           <div className="flex justify-between items-center mt-2"><span className="text-xs opacity-60">{st && !p.live ? '连接断了，正在重连…' : p.msg}</span><StopButton p={p} /></div>
+          <ReactionBar send={send} active={active} />
         </PartyFrame>
       </div>
       <WinsBoard title="阿瓦隆 胜场榜" rows={st?.board || []}>
