@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useParty, PartyFrame, TopBar, Banner, SeatGrid, SecretCard, VoteBar, SpeakBar, StartBar, StopButton, LogList, WinsBoard, Choice } from './PartyKit.jsx';
+import { ReactionBar } from '../games/Reactions.jsx';
 
 // 狼人杀：app 当上帝——每一步都念出来（开着播报的设备），等该行动的人在手机上选，夜里谁死了天亮再说。
 // 晚上大家都看着自己的手机：轮到的角色有按钮，其他人只看到「天黑请闭眼」。
@@ -191,6 +192,7 @@ export default function WerewolfView({ active }) {
           {!seated && t && <p className="pt-hint">🎙 这台设备可以当「上帝」：不用坐下，打开播报，放在桌子中间。要玩就点一个空座位{t.phase !== 'waiting' && t.phase !== 'result' ? '（这局已经开始了，下一局再坐）' : ''}。</p>}
           <LogList log={t?.log} />
           <div className="flex justify-between items-center mt-2"><span className="text-xs opacity-60">{st && !p.live ? '连接断了，正在重连…' : p.msg}</span><StopButton p={p} /></div>
+          <ReactionBar send={send} active={active} />
         </PartyFrame>
       </div>
       <WinsBoard title="狼人杀 胜场榜" rows={st?.board || []}>

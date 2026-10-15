@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTable, useCountdown, secondsLeft } from '../games/useTable.js';
 import { RoomPicker } from '../games/TableFrame.jsx';
+import { ReactBubbles, reactionsFor } from '../games/Reactions.jsx';
 import { useAnnouncer, useVoiceSetting, useWakeLock, canSpeak, unlockVoice } from './voice.js';
 import './party.css';
 
@@ -55,8 +56,11 @@ export function Banner({ title, sub, p, tone = '' }) {
 
 // 座位格子。badges(i, seat) 给每个座位的小标签；pick 时可以点的座位亮起来。
 // 局中只摆在玩的人（空座位藏起来，手机上一屏看得完）；局外空座位可以点「坐这 / 换到这」。
+// 有人的座位和牌桌一样是表情拖放的目标（data-react-to=玩家 key，见
+// games/Reactions.jsx）：气泡冒在座位角上。服务器那边三个派对游戏共用
+// TableHall，react 的收发和 reactions 字段本来就有，只差前端这一步。
 export function SeatGrid({ p, badges, pickable, picked, onPick, dim }) {
-  const { t, seated, sit, send } = p;
+  const { t, st, seated, sit, send } = p;
   if (!t) return null;
   const open = t.phase === 'waiting' || t.phase === 'result';
   return (
@@ -75,6 +79,7 @@ export function SeatGrid({ p, badges, pickable, picked, onPick, dim }) {
         const cls = 'pt-seat' + (s.me ? ' me' : '') + (canPick ? ' can' : '') + (isPicked ? ' picked' : '') + (dim && dim(i) ? ' dim' : '') + (t.speaker === i ? ' speaking' : '');
         const body = (
           <>
+            <ReactBubbles list={reactionsFor(st?.reactions, s.name.toLowerCase())} />
             <span className="pt-num">{i + 1}</span>
             <span className="pt-name">{s.name}{s.me && <em> (你)</em>}</span>
             <span className="pt-badges">
@@ -88,8 +93,8 @@ export function SeatGrid({ p, badges, pickable, picked, onPick, dim }) {
           </>
         );
         return canPick
-          ? <button key={i} className={cls} onClick={() => onPick(i)}>{body}</button>
-          : <div key={i} className={cls}>{body}</div>;
+          ? <button key={i} data-react-to={s.name.toLowerCase()} className={cls} onClick={() => onPick(i)}>{body}</button>
+          : <div key={i} data-react-to={s.name.toLowerCase()} className={cls}>{body}</div>;
       })}
     </div>
   );
