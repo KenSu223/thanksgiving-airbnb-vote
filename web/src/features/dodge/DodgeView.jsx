@@ -55,7 +55,8 @@ async function sendScore(s) {
   return { ok: false, retry: true, error: '网络有点问题，成绩先存在这台设备上' };
 }
 
-// PM 专属外挂开关：只有 PM 本人看得见。开着时 bot.js 的算法接管走位。
+// 外挂开关：拿到授权的人才看得见（PM 本人 + PM 授权的账号）。
+// 开着时 bot.js 的算法接管走位。
 function BotSwitch({ on, onToggle }) {
   return (
     <button onClick={onToggle} aria-pressed={on}
@@ -66,10 +67,23 @@ function BotSwitch({ on, onToggle }) {
 }
 
 export default function DodgeView({ active }) {
-  const { name, ensureName } = useSession();
-  const isPM = !!name && name.toLowerCase() === 'pm';
+  const { name, token, users, ensureName } = useSession();
   const [bot, setBot] = useState(() => load('dodgeBot', '') === '1');
   const toggleBot = () => setBot(b => { save('dodgeBot', b ? '' : '1'); return !b; });
+  // 外挂授权：服务器说了算（board.js 的 grants）。canBot = 我能用；
+  // isAdmin = 我是 PM，下面还多一块给别人授权的管理面板。
+  const [grant, setGrant] = useState({ canBot: false, isAdmin: false, grants: [] });
+  const loadGrants = useCallback(() => {
+    if (!name) { setGrant({ canBot: false, isAdmin: false, grants: [] }); return; }
+    api(`/api/dodge/grants?name=${encodeURIComponent(name)}&token=${encodeURIComponent(token)}`)
+      .then(r => { if (r.ok) setGrant({ canBot: !!r.canBot, isAdmin: !!r.isAdmin, grants: r.grants || [] }); })
+      .catch(() => {});
+  }, [name, token]);
+  useEffect(() => { if (active) loadGrants(); }, [active, loadGrants]);
+  async function setGrantFor(target, on) {
+    const r = await api('/api/dodge/grants', 'POST', { name, token, target, on }).catch(() => null);
+    if (r && r.ok) setGrant({ canBot: !!r.canBot, isAdmin: !!r.isAdmin, grants: r.grants || [] });
+  }
   const [board, setBoard] = useState([]);
   // while playing: { me: { name, token }, seed, ticket, practice?, n }; while watching: { replay, seed, n }
   const [run, setRun] = useState(null);
@@ -211,7 +225,7 @@ export default function DodgeView({ active }) {
   // the first run on an upright phone: wait for it to be turned before counting down
   const hold = paused || (touch && portrait);
   const game = run && (
-    <DodgeGame key={run.n} seed={run.seed} touch={touch} hold={hold} bot={isPM && bot} onGo={() => setStarted(true)} onDead={dead} onPause={() => setPaused(true)}
+    <DodgeGame key={run.n} seed={run.seed} touch={touch} hold={hold} bot={grant.canBot && bot} onGo={() => setStarted(true)} onDead={dead} onPause={() => setPaused(true)}
       replay={run.replay?.events} replayName={run.replay?.name}>
       {overlay}{pause}
     </DodgeGame>
@@ -223,7 +237,7 @@ export default function DodgeView({ active }) {
         <section className={run && !touch ? "lg:col-span-3" : "lg:col-span-2"}>
           {run && !touch ? (
             <div>
-              {isPM && <div className="mb-2 flex justify-end"><BotSwitch on={bot} onToggle={toggleBot} /></div>}
+              {grant.canBot && <div className="mb-2 flex justify-end"><BotSwitch on={bot} onToggle={toggleBot} /></div>}
               <div className="dg-box">{game}</div>
             </div>
           ) : (
@@ -243,7 +257,24 @@ export default function DodgeView({ active }) {
               {mine && <p className="mt-3 text-amber-200 font-bold">你的最好：{secs(mine.ticks)} 秒</p>}
               {homeTip && <p className="dg-tip mt-3">{HOME_TIP}</p>}
               <button onClick={start} className="dg-btn dg-start mt-4 text-lg">进入训练 <span aria-hidden="true">→</span></button>
-              {isPM && <div className="mt-3"><BotSwitch on={bot} onToggle={toggleBot} /></div>}
+              {grant.canBot && <div className="mt-3"><BotSwitch on={bot} onToggle={toggleBot} /></div>}
+              {grant.isAdmin && (
+                <div className="mt-3 rounded-xl bg-white/10 p-3">
+                  <div className="text-sm font-bold">🛡️ 外挂授权（只有你能管）</div>
+                  <p className="mt-0.5 text-xs text-emerald-50/70">授权谁，谁的这页上就会出现外挂开关。点一下切换。</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {users.filter(u => u.name.toLowerCase() !== 'pm').map(u => {
+                      const on = grant.grants.some(g => g.toLowerCase() === u.name.toLowerCase());
+                      return (
+                        <button key={u.name} onClick={() => setGrantFor(u.name, !on)} aria-pressed={on}
+                          className={'rounded-full px-3 py-1 text-xs font-bold transition ' + (on ? 'bg-rose-400 text-slate-900' : 'bg-white/15 text-white hover:bg-white/25')}>
+                          {u.name}{on ? ' · 已授权' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {msg && <p className="mt-2 text-sm text-amber-200">{msg}</p>}
               </div>
             </div>
