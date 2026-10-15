@@ -21,6 +21,7 @@
 - **2048**（单人游戏）：盘面在服务器上，是一个 Durable Object（`Board2048`，WebSocket `/api/2048`，所有人共用一个）。规则在 `web/src/features/g2048/logic.js`（服务器和页面共用）：页面发一个方向，服务器滑砖、合并、自己出新砖（九成 2、一成 4），所以盘面造不了假。每人一局在玩的（`g:<名字>`）：在内存里，改了以后 2 秒内写进存储，最后一个标签页关掉或者这局结束时马上写——部署最多丢最后两秒的几步，长局也不是每步都写。页面先把砖滑过去（不等服务器），服务器的新砖到了再补上；对不上（另一个标签页先走了）就照服务器的摆。每一步带着「这局走了几步」，过时的标签页发来的那步不算，回它真盘面。离开、刷新、换设备都接着玩。每人的最好（`p:<名字>`）：拼出过的最大一块、最高分、局数；排行榜按最大一块、再按分数排。
 - **派对游戏（谁是卧底 / 阿瓦隆 / 狼人杀）**：每个游戏一个 Durable Object（`UndercoverHall` …，WebSocket `/api/undercover` …），用的还是 `games/hall.js` 的 `TableHall`（两张桌，最多 14 人），只是开了 `rejoin`：手机锁屏、刷新、断线都不会被站起来——座位一直留着（局中超时会替他做默认的事），回来（identify）直接坐回原座位，一个人几个标签页都算坐在那；排行榜按赢的局数排（`boardSort`）。共用的一桌在 `worker/party/room.js`（`PartyRoom`）：自己挑座位号、开局前谁都能改设置、局中不能坐下（可以看）；几样每个游戏都用的东西——轮流发言（大家当面说，app 叫号：「请 3 号发言」，说的人或者开局的人点「说完了」，掉线的谁都能帮他点；到时间自动下一个）、同时投票（可以弃票，票型写进记录）、「看好了」的停顿、计时器；`announce` 的话进 `say`（开着播报的设备念出来）和 `log`（大家看到的记录），`note` 只进记录。局里不公开的东西（谁的词、谁的身份）只在那个人自己的 view 里，看客的 view 里没有。谁都能「结束这局」（亮出所有身份，不算输赢）。PM 删人时（`forget`）局中的座位变成空壳打完这局，不再保存。
   - **谁是卧底**（`undercover.js`，词在 `words.js`）：4–14 人；卧底人数默认 4–6 人 1 个、7–10 人 2 个、11 人以上 3 个，可以改，可以加 1 个白板。谁都不知道自己是不是卧底（白板知道自己是白板）。每轮从一个人开始轮流说（第一轮不从白板开始），然后大家投票，票最多的出局并公布身份（平民 / 卧底 / 白板，不公布词）；平票的人再说一次、其他人在他们里面投，还平就这轮没人出局。卧底和白板全出局平民赢；卧底一方人数不少于平民，或者只剩 3 人时卧底一方还有人，卧底赢。
+  - **阿瓦隆**（`avalon.js`）：5–14 人（官方 5–10 人；11–14 人是我们自己的扩展：坏人和队伍都多一些，`SIDES` / `QUESTS`）。角色：梅林、刺客必有，派西维尔、莫甘娜默认有，莫德雷德、奥伯伦可选，其余是忠臣 / 爪牙；谁知道谁在发牌时算好、只在自己的 view 里（梅林看坏人但看不到莫德雷德；派西维尔看梅林和莫甘娜、分不出谁是谁；坏人互相认识，奥伯伦除外）。队长选人（到时间系统补齐）→ 所有人公开投赞成 / 反对（过半数才通过，没投算赞成，连续否决五次坏人赢）→ 队员暗中出成功 / 失败（好人只能出成功，服务器挡着；没出算成功；7 人以上第四个任务要两张失败）。三败坏人赢；三胜进入刺杀：坏人亮出身份一起商量，刺客指认梅林，中了坏人赢。湖中仙女（7 人以上，默认开）：第二、三、四个任务后拿着的人偷看一个人的阵营（只有他自己看得到）再交给那个人，拿过的人不能被查。
 - **域名**：`denver-thanksgiving-airbnb-vote.thanksgiving-vote.workers.dev`（免费子域名）
 
 ## 前端（`web/`，React + Vite + Tailwind）
@@ -40,7 +41,7 @@
 | `web/src/features/mahjong/` | 川麻：`MahjongView`（三家的碰杠和弃牌、换三张/定缺/碰杠胡按钮、本局输赢）、`MjTile`（麻将牌，万是汉字，条和筒用 SVG 画；`inline` 是放在一行字里的牌）；手牌点一下选中、再点一下打出。电脑上排成一张桌子（对家在上、上家左、下家右，标着上家/对家/下家）；每家的碰杠和打出的牌分两行、各有小标签；换三张、定缺、有人打出你能碰杠胡的牌时，按钮上方一条横幅说做什么、剩几秒、超时会怎样（`turnAlert.js` 的提醒，最后 5 秒变红）；轮到你出牌只是按钮旁边一个会动的 🔔（出牌 60 秒，碰杠胡 10 秒，`MJ`）；能碰杠胡时按钮上带着那张牌、手里一样的牌抬起来；换三张拿到的三张标「新」、缺的那门标「缺」、手牌按门分开、刚摸的那张隔开一点、描一圈粗的橙边（别的地方不用橙色）；手机全屏时自己碰杠的、打过的牌在手牌正上方一行（中间那块会滚动，放里面看不见）；结算一人一行：谁、怎么样（第几胡·自摸/胡谁的·几番，点炮几次，听牌/没听/花猪）、输赢多少，赢的在上、你那行高亮；刚打出去的牌拍到桌上、扬起一点灰（`MjTile` 的 `slam`，换了 key 才会再播） |
 | `web/src/features/dodge/` | 鲁班七号躲技能：`DodgeView`、`DodgeGame`、`draw.js`、`hero.js`、`scenery.js`、`viewport.js`、`sound-events.js`、`sfx.js`、`verify.js`（见上面）；模拟在同一目录的 `sim.js`（服务器也用它重放），测试 `sim.test.js`、`sound-events.test.js`、`verify.test.js` |
 | `web/src/features/g2048/` | 2048：`logic.js`（滑砖、合并、出新砖、还能不能走；服务器也用）、`useG2048.js`（WebSocket，在这页才连）、`G2048View`（盘面：砖按行列定位、换位置就滑过去，新砖淡入、合成的弹一下；方向键 / WASD / 在盘面上滑；结束和拼出 2048 的浮层；排行榜） |
-| `web/src/features/party/` | 派对游戏：`PartyKit.jsx`（连线 `useParty`——就是 `useTable` 加播报；座位格子：局外点空座位坐下 / 换座，投票时点人，局中只摆在玩的人；阶段横幅和倒计时；点一下翻开、5 秒自动盖上的身份牌；说完了 / 投票 / 开始按钮；记录；胜场榜）、`voice.js`（播报：浏览器自带朗读，中文声音；每台设备自己开关，默认只有开局的人和没坐下的那台开着；开着时屏幕常亮）、`UndercoverView` |
+| `web/src/features/party/` | 派对游戏：`PartyKit.jsx`（连线 `useParty`——就是 `useTable` 加播报；座位格子：局外点空座位坐下 / 换座，投票时点人，局中只摆在玩的人；阶段横幅和倒计时；点一下翻开、5 秒自动盖上的身份牌；说完了 / 投票 / 开始按钮；记录；胜场榜）、`voice.js`（播报：浏览器自带朗读，中文声音；每台设备自己开关，默认只有开局的人和没坐下的那台开着；开着时屏幕常亮）、`UndercoverView`、`AvalonView`（五个任务的圆圈和连续否决的点；队长点座位选人；赞成 / 反对、成功 / 失败按钮；湖中仙女和刺杀也是点座位） |
 | `web/src/session/` | 登录：从用户列表选名字，名字和 token 存在 `localStorage`（`vn` / `vt`） |
 | `web/src/components/` | 共用：开场动画、导航、标题、登录框、顶部横幅、照片轮播 `Carousel`（选房和餐厅卡片都用） |
 | `web/src/lib/` | 共用：`api()`、行程和页面配置（`TRIPS`、`VIEWS`）、URL hash 路由（`#nov26/split`） |
@@ -106,7 +107,7 @@ Airbnb 房源页的价格框是浏览器单独请求的（GraphQL 持久化查�
 
 ## 部署（`wrangler.toml`）
 
-声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、四个游戏的 Durable Object（`BlackjackTable`、`DdzHall`、`GuandanHall`、`MahjongHall`；migration v1、v2 各加一个，v3 加掼蛋和川麻两个）、躲技能排行榜 `DodgeBoard`（v5；v4 是 StoreDO）、2048 的 `Board2048`（v6）、谁是卧底的 `UndercoverHall`（v7）。推到 `main` 由 GitHub Action 自动 `npm ci` + `wrangler deploy`；每个 PR 都会跑 `npm run check`（lint + 构建 + 打包 worker）。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
+声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、四个游戏的 Durable Object（`BlackjackTable`、`DdzHall`、`GuandanHall`、`MahjongHall`；migration v1、v2 各加一个，v3 加掼蛋和川麻两个）、躲技能排行榜 `DodgeBoard`（v5；v4 是 StoreDO）、2048 的 `Board2048`（v6）、谁是卧底的 `UndercoverHall`（v7）、阿瓦隆的 `AvalonHall`（v8）。推到 `main` 由 GitHub Action 自动 `npm ci` + `wrangler deploy`；每个 PR 都会跑 `npm run check`（lint + 构建 + 打包 worker）。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
 
 **部署踩坑清单（2026-10-10）：**
 
