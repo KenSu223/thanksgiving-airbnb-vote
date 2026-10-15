@@ -10,6 +10,10 @@ const PATHS = {
   games: <><rect x="3.5" y="3.5" width="17" height="17" rx="3.5" /><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor" /><circle cx="15.5" cy="15.5" r="1.1" fill="currentColor" /><circle cx="12" cy="12" r="1.1" fill="currentColor" /></>,
   gifts: <><rect x="3.5" y="8" width="17" height="4.5" rx="1" /><path d="M5 12.5v8h14v-8M12 8v12.5" /><path d="M12 8C10.5 4.5 7 4 7 6.2 7 8 12 8 12 8Zm0 0c1.5-3.5 5-4 5-1.8C17 8 12 8 12 8Z" /></>,
   expenses: <><rect x="3" y="6" width="18" height="13" rx="2.5" /><path d="M3 10h18" /><path d="M7 15h3" /></>,
+  // 三个组（手机底部的三个大标签）：行程是行李箱，去哪是指南针，一起是两个人
+  trip: <><rect x="3.5" y="7" width="17" height="13" rx="2.5" /><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7" /><path d="M3.5 12.5h17M10.5 12.5v2h3v-2" /></>,
+  explore: <><circle cx="12" cy="12" r="8.5" /><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8Z" /></>,
+  together: <><circle cx="9" cy="8.5" r="3" /><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0" /><circle cx="16.5" cy="9.5" r="2.4" /><path d="M15.2 14.3a4.6 4.6 0 0 1 5.3 4.6" /></>,
 };
 
 export default function NavIcon({ name, size = 20 }) {

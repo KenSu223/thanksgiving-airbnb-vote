@@ -29,10 +29,8 @@
 .nav-item.active::before { content:''; position:absolute; left:.35rem; top:28%; bottom:28%; width:3px; border-radius:3px; background:linear-gradient(#6366f1,#ec4899); }
 .nav-item.active .nav-ico { color:#4f46e5; }
 .nav-item.active .nav-sub { color:#64748b; }
-/* 手机上变成底部标签栏：悬浮玻璃胶囊（Liquid Glass 阶段 1），
-   四周留间隙浮在内容之上，不再贴边满宽 */
-/* 页面多了一行放不下：横着滑，字不换行。滑的是里面那条（.bnav-strip），
-   这样两边淡出只淡标签，不淡胶囊的玻璃底；哪边还有标签，哪边就淡出 */
+/* 手机上变成底部标签栏：悬浮玻璃胶囊（Liquid Glass 阶段 1），四周留间隙浮在内容之上。
+   只放三个大组（行程 / 去哪 / 一起），一排正好放下、平分宽度，不用横着滑 */
 #bottomNav {
   left:10px; right:10px; bottom:calc(10px + env(safe-area-inset-bottom, 0px));
   border-radius:999px;
@@ -46,16 +44,18 @@
 @media (prefers-reduced-transparency: reduce) {
   #bottomNav { background:rgba(247,249,255,.96); -webkit-backdrop-filter:none; backdrop-filter:none; }
 }
-.bnav-strip { position:relative; display:flex; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; }
-.bnav-strip::-webkit-scrollbar { display:none; }
-.bnav-strip.more-r { -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); }
-.bnav-strip.more-l { -webkit-mask-image:linear-gradient(to left, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to left, #000 calc(100% - 2.5rem), transparent); }
-.bnav-strip.more-l.more-r { -webkit-mask-image:linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); }
-/* 宽度按文字来，不定死：标签现在都是一个英文词，但长短还是不一（Activities
-   比 Stays 宽得多），定死宽度时选中项的白胶囊会包不住长的字。min-width
-   保住短标签的节奏，长标签自然撑宽，反正整条本来就能横着滑。 */
-.bnav-item { flex:0 0 auto; min-width:4.6rem; display:flex; flex-direction:column; align-items:center; gap:2px; margin:5px 3px; border-radius:999px; padding:.55rem .7rem .5rem; font-size:.72rem; font-weight:600; color:#64748b; white-space:nowrap; transition: background .2s, color .2s, box-shadow .2s; }
-.bnav-item .nav-ico { display:grid; place-items:center; height:1.4rem; transition: transform .2s; }
+.bnav-strip { display:flex; padding:0 2px; }
+.bnav-item { flex:1 1 0; display:flex; flex-direction:column; align-items:center; gap:2px; margin:5px 3px; border-radius:999px; padding:.5rem .5rem .45rem; font-size:.78rem; font-weight:700; letter-spacing:.06em; color:#64748b; white-space:nowrap; transition: background .2s, color .2s, box-shadow .2s; }
+.bnav-item .nav-ico { display:grid; place-items:center; height:1.45rem; transition: transform .2s; }
 /* 选中项同样是亮玻璃透镜，和桌面侧栏一个语言 */
 .bnav-item.active { background:linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.62)); color:#4f46e5; box-shadow:0 4px 12px rgba(30,50,110,.2), inset 0 1px 0 #fff; }
 .bnav-item.active .nav-ico { transform: translateY(-1px); }
+
+/* 手机上标题下面的分段标签：这一组里的几页，一排（太窄的手机才横着滑） */
+.subtabs { display:flex; gap:3px; margin-top:.9rem; padding:3px; border-radius:999px; overflow-x:auto; scrollbar-width:none;
+  background:rgba(255,255,255,.5); border:1px solid var(--glass-border); box-shadow:0 4px 14px -8px rgba(30,50,110,.25); }
+.subtabs::-webkit-scrollbar { display:none; }
+.subtab { flex:1 0 auto; display:flex; align-items:center; justify-content:center; padding:.45rem .5rem; border-radius:999px;
+  font-size:.86rem; font-weight:600; color:#64748b; white-space:nowrap; transition: background .2s, color .2s, box-shadow .2s; }
+.subtab.active { background:linear-gradient(135deg, rgba(255,255,255,.98), rgba(255,255,255,.72)); color:#4f46e5; box-shadow:0 3px 10px rgba(30,50,110,.18), inset 0 1px 0 #fff; }
+@media (min-width:768px) { .subtabs { display:none; } } /* 电脑上用侧栏（要压过上面的 display:flex） */

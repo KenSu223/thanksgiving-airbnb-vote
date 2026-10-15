@@ -31,7 +31,7 @@
 
 | 目录 | 内容 |
 |---|---|
-| `web/src/App.jsx` | 外框：开场动画、左侧导航/底部标签栏、标题、四个页面（切走只是藏起来，状态都还在） |
+| `web/src/App.jsx` | 外框：开场动画、导航（电脑：左侧栏按 行程 / 去哪 / 一起 三组全摆出来；手机：底部只有这三个组，一排放得下，组里的页面是标题下面的一排分段小标签 `SubTabs`；每组记住上次看的页（localStorage `navLast:<组>`），点正在看的组回到顶上；都在 `components/Nav.jsx`）、标题、各个页面（切走只是藏起来，状态都还在） |
 | `web/src/features/hunt/` | 选房：`HuntView`（数据和投票）、`ListingGrid`（卡片换位动画 FLIP + 投票后锚定位置）、`ListingCard`、`Carousel`（照片轮播）、`ListingMap`（Leaflet 地图）、`AddListingForm`、`price.js`（实时价/排序） |
 | `web/src/features/food/` | 找餐厅：贴 Google 地图链接加店（`AddPlaceForm`）、店铺卡片（想去 / 在 Google 地图打开 / 导航）、`FoodMap`（Leaflet 钉子） |
 | `web/src/features/split/` | 分账：成员、记一笔、余额和结清方案、支出记录（行内修改） |
