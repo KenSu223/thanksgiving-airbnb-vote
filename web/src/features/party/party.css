@@ -87,3 +87,22 @@ button.pt-seat.can:hover, button.pt-seat.can:focus-visible { transform:translate
 .pt-reveal > div { font-size:.82rem; padding:.35rem .5rem; border-radius:.6rem; background:rgba(0,0,0,.25); }
 .pt-reveal .win { box-shadow:inset 0 0 0 2px var(--pt-accent); }
 @media (prefers-reduced-motion: reduce) { .pt-seat.speaking, .pt-timer.hurry { animation:none; } .pt-secret.open { animation:none; } }
+
+/* 身份牌：好人蓝、坏人红；「你知道的人」 */
+.pt-secret.good { background:linear-gradient(135deg, #7dd3fc, #e0f2fe); color:#082f49; }
+.pt-secret.evil { background:linear-gradient(135deg, #fca5a5, #fff1f2); color:#450a0a; }
+.pt-know { margin-top:.35rem; font-size:.95rem; font-weight:700; }
+.pt-know b { font-weight:900; }
+
+/* 阿瓦隆：五个任务一排（人数 / 结果），旁边连续否决的五个点 */
+.av-track { display:flex; align-items:center; gap:.4rem; margin:.2rem 0 .7rem; flex-wrap:wrap; }
+.av-quest { display:flex; flex-direction:column; align-items:center; justify-content:center; width:3.1rem; height:3.1rem; border-radius:9999px;
+  background:rgba(255,255,255,.1); box-shadow:inset 0 0 0 2px rgba(255,255,255,.18); }
+.av-quest .av-size { font-size:1.1rem; font-weight:900; line-height:1; }
+.av-quest .av-cap { font-size:.58rem; font-weight:700; opacity:.8; margin-top:.1rem; }
+.av-quest.ok { background:#2563eb; box-shadow:inset 0 0 0 2px #93c5fd; }
+.av-quest.fail { background:#dc2626; box-shadow:inset 0 0 0 2px #fca5a5; }
+.av-quest.now { box-shadow:inset 0 0 0 3px var(--pt-accent); animation:pt-glow 1.2s ease-in-out infinite alternate; }
+.av-rejects { display:flex; gap:.25rem; margin-left:auto; padding:.3rem .5rem; border-radius:9999px; background:rgba(0,0,0,.25); }
+.av-rejects i { width:.6rem; height:.6rem; border-radius:9999px; background:rgba(255,255,255,.2); }
+.av-rejects i.on { background:#ef4444; }

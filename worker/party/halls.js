@@ -3,6 +3,7 @@
 // shared TableHall; the game is in its own file.
 import { TableHall } from '../games/hall.js';
 import { UndercoverGame } from './undercover.js';
+import { AvalonGame } from './avalon.js';
 
 export const ROOMS = 2;
 
@@ -24,4 +25,14 @@ const party = (Game, actions = {}) => ({ Game, rooms: ROOMS, actions: { ...COMMO
 
 export class UndercoverHall extends TableHall {
   constructor(state, env) { super(state, env, party(UndercoverGame)); }
+}
+export class AvalonHall extends TableHall {
+  constructor(state, env) {
+    super(state, env, party(AvalonGame, {
+      pick: (t, key, m) => t.pick(key, m.seat),
+      propose: (t, key) => t.propose(key),
+      lady: (t, key, m) => t.useLady(key, m.seat),
+      assassinate: (t, key, m) => t.assassinate(key, m.seat),
+    }));
+  }
 }
