@@ -8,10 +8,11 @@ export const TRIPS = {
 export const DEFAULT_TRIP = 'nov25';
 
 // 左侧导航的几个页面。tripScoped：页面内容按行程分（显示行程标签页和日期人数）
-// 这里的顺序就是导航里的标签顺序，八个全直接摆出来
-// 导航：一个英文单词 + 中文名，按行程的先后排、分三组（侧栏上显示组名）。
+// 导航：一个英文单词 + 中文名，按行程的先后排、分三组。电脑上侧栏全摆出来（组名在上面）；
+// 手机上底部只有三个组（行程 / 去哪 / 一起），组里的页面是标题下面的一排小标签（navSub 当标签名）。
 // 页面标题也由这两个名字拼成，导航和标题永远一致。键名就是网址里的 #…，别改（旧链接要能打开）。
-export const NAV_GROUPS = [['trip', '行程'], ['explore', '去哪'], ['together', '一起']];
+// NAV_GROUPS：[键, 组名, 手机底部的图标]
+export const NAV_GROUPS = [['trip', '行程', 'trip'], ['explore', '去哪', 'explore'], ['together', '一起', 'together']];
 const views = {
   hunt: { nav: 'Stays', navSub: '住宿', icon: 'stays', group: 'trip', tripScoped: true,
     sub: '看中哪间就把 Airbnb 或酒店链接贴进来，票数最高的我们就订它' },
