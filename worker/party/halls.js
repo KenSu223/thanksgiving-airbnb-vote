@@ -4,6 +4,7 @@
 import { TableHall } from '../games/hall.js';
 import { UndercoverGame } from './undercover.js';
 import { AvalonGame } from './avalon.js';
+import { WerewolfGame } from './werewolf.js';
 
 export const ROOMS = 2;
 
@@ -33,6 +34,22 @@ export class AvalonHall extends TableHall {
       propose: (t, key) => t.propose(key),
       lady: (t, key, m) => t.useLady(key, m.seat),
       assassinate: (t, key, m) => t.assassinate(key, m.seat),
+    }));
+  }
+}
+export class WerewolfHall extends TableHall {
+  constructor(state, env) {
+    super(state, env, party(WerewolfGame, {
+      guard: (t, key, m) => t.guard(key, m.seat),
+      kill: (t, key, m) => t.wolfPick(key, m.seat),
+      witch: (t, key, m) => t.witch(key, m.use, m.seat),
+      check: (t, key, m) => t.check(key, m.seat),
+      signup: (t, key, m) => t.signup(key, !!m.yes),
+      withdraw: (t, key) => t.withdraw(key),
+      order: (t, key, m) => t.order(key, m.dir),
+      shoot: (t, key, m) => t.shoot(key, m.seat),
+      badge: (t, key, m) => t.badge(key, m.seat),
+      boom: (t, key) => t.boom(key),
     }));
   }
 }

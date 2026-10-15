@@ -25,7 +25,9 @@ const persist = mkdtempSync(join(tmpdir(), 'robustness-state-'));
 // EMAIL_DEV_MODE=1 makes the email-code endpoints return codes in their
 // responses instead of sending mail (worker/users/auth.js) so the email
 // suite can run end to end. Local test instance only — never production.
-const server = spawn('npx', ['wrangler', 'dev', '--port', PORT, '--local', '--compatibility-date', '2026-05-03', '--persist-to', persist, '--var', 'EMAIL_DEV_MODE:1'], {
+// PARTY_SPEED=20 runs the party games' clocks (狼人杀 nights, speaking turns) 20x
+// faster so whole games fit in the suite (worker/games/hall.js).
+const server = spawn('npx', ['wrangler', 'dev', '--port', PORT, '--local', '--compatibility-date', '2026-05-03', '--persist-to', persist, '--var', 'EMAIL_DEV_MODE:1', '--var', 'PARTY_SPEED:20'], {
   detached: true, stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverLog = '';

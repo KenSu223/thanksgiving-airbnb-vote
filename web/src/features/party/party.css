@@ -7,7 +7,8 @@
 .pt-werewolf.night { --pt-bg1:#0b1023; --pt-bg2:#020308; }
 
 .pt-top { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin-bottom:.6rem; }
-.pt-title { font-weight:900; font-size:1.15rem; margin-right:auto; letter-spacing:.02em; }
+/* chips sit right after the title (the app's floating name badge covers the top-right corner on phones) */
+.pt-title { font-weight:900; font-size:1.15rem; margin-right:.25rem; letter-spacing:.02em; }
 .pt-chip { font-size:.8rem; font-weight:800; padding:.3rem .75rem; border-radius:9999px; background:rgba(255,255,255,.12); color:#fff; }
 .pt-chip.on { background:var(--pt-accent); color:var(--pt-accent-ink); }
 
@@ -106,3 +107,6 @@ button.pt-seat.can:hover, button.pt-seat.can:focus-visible { transform:translate
 .av-rejects { display:flex; gap:.25rem; margin-left:auto; padding:.3rem .5rem; border-radius:9999px; background:rgba(0,0,0,.25); }
 .av-rejects i { width:.6rem; height:.6rem; border-radius:9999px; background:rgba(255,255,255,.2); }
 .av-rejects i.on { background:#ef4444; }
+
+/* 狼人杀：结束时每晚发生了什么 */
+.ww-history { margin-top:.6rem; text-align:left; font-size:.8rem; line-height:1.6; padding:.4rem .6rem; border-radius:.6rem; background:rgba(0,0,0,.25); }

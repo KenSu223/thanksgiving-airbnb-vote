@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTable, useCountdown, secondsLeft } from '../games/useTable.js';
 import { RoomPicker } from '../games/TableFrame.jsx';
-import { useAnnouncer, useVoiceSetting, useWakeLock, canSpeak } from './voice.js';
+import { useAnnouncer, useVoiceSetting, useWakeLock, canSpeak, unlockVoice } from './voice.js';
 import './party.css';
 
 // 谁是卧底 / 阿瓦隆 / 狼人杀 共用的零件：连线（useTable，掉线、锁屏回来自动坐回原座位）、
@@ -22,8 +22,9 @@ export function useParty(active, { path, roomKey, game }) {
   return { ...tb, t, me, seated, inGame: !!t?.inGame, voiceOn, setVoice, timer, secs };
 }
 
+// 第一次点到桌上任何地方时顺便把朗读解锁（iPhone 要求）
 export function PartyFrame({ theme, children }) {
-  return <section className={'pt-frame pt-' + theme + ' rounded-2xl shadow-xl p-3 md:p-5'}>{children}</section>;
+  return <section className={'pt-frame pt-' + theme + ' rounded-2xl shadow-xl p-3 md:p-5'} onPointerDownCapture={unlockVoice}>{children}</section>;
 }
 
 // 顶上一排：选桌、播报、站起来

@@ -31,10 +31,13 @@ export class TableHall {
     this.reactions = new Map(); // room -> [{ v, at, by, byName, to }] — addressed emoji/taunt popups, see reactions.js
     this.board = new Map();   // saved points by player key
     this.loaded = null; this.sweeper = null;
+    // Party games run their clocks this many times faster when PARTY_SPEED is set — only
+    // the robustness suite sets it (a 狼人杀 night is ~40 s of deliberate waiting otherwise).
+    const speed = rejoin ? Math.max(1, Number(env?.PARTY_SPEED) || 1) : 1;
     this.tables = Array.from({ length: rooms }, () => new Game({
       now: () => Date.now(),
       rand,
-      schedule: (fn, ms) => setTimeout(() => { fn(); this.broadcast(); }, ms),
+      schedule: (fn, ms) => setTimeout(() => { fn(); this.broadcast(); }, ms / speed),
       cancel: t => clearTimeout(t),
       save: s => this.save(s),
     }));
