@@ -99,3 +99,12 @@ class_name = "AvalonHall"
 [[migrations]]
 tag = "v8"
 new_sqlite_classes = ["AvalonHall"]
+
+# 狼人杀: one Durable Object (party-game hall), two tables.
+[[durable_objects.bindings]]
+name = "WW_HALL"
+class_name = "WerewolfHall"
+
+[[migrations]]
+tag = "v9"
+new_sqlite_classes = ["WerewolfHall"]

@@ -7,6 +7,7 @@ import MahjongView from '../mahjong/MahjongView.jsx';
 import DodgeView from '../dodge/DodgeView.jsx';
 import G2048View from '../g2048/G2048View.jsx';
 import AvalonView from '../party/AvalonView.jsx';
+import WerewolfView from '../party/WerewolfView.jsx';
 import UndercoverView from '../party/UndercoverView.jsx';
 
 // Gameroom：几个小游戏放在一个标签页里，每个有自己的筹码 / 豆子榜。
@@ -20,6 +21,7 @@ const GAMES = [
   { key: '2048', label: '🔢 2048', View: G2048View },
   { key: 'uc', label: '🕵️ 谁是卧底', View: UndercoverView },
   { key: 'av', label: '🏰 阿瓦隆', View: AvalonView },
+  { key: 'ww', label: '🐺 狼人杀', View: WerewolfView },
 ];
 
 export default function GamesView({ active }) {

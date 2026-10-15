@@ -26,6 +26,16 @@ export function speak(text) {
   window.speechSynthesis.speak(u);
 }
 export function hush() { if (canSpeak()) window.speechSynthesis.cancel(); }
+// iPhone only lets a page talk after it has spoken inside a tap; a device whose 播报 is on by
+// default never taps the switch, so the first tap anywhere on the table says nothing, silently.
+let unlocked = false;
+export function unlockVoice() {
+  if (unlocked || !canSpeak()) return;
+  unlocked = true;
+  const u = new SpeechSynthesisUtterance(' ');
+  u.volume = 0;
+  window.speechSynthesis.speak(u);
+}
 
 // table.say: [{ id, text, at }] — the newest announcements. Speaks the ones that are new since the
 // last state (not the backlog when you first open the page), only while `on`.
