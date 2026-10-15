@@ -10,20 +10,29 @@
 // moves, and a long game isn't a storage write per move. Each person's best
 // (biggest tile, then best score) is p:<name>; the board ranks by tile, then score.
 //
-// Messages in:  { type: 'hello', name, token }  { type: 'move', dir, n, bot? }  { type: 'new' }  { type: 'keep' }
+// Messages in:  { type: 'hello', name, token }  { type: 'move', dir, n, bot? }
+//               { type: 'new' }  { type: 'keep' }  { type: 'bot', on }
 //   n is how many moves the page thinks the game has had; a move from a stale
 //   tab (another tab moved first) is refused and that tab gets the real board.
-//   A move made by the autopilot (web/src/features/g2048/bot.js) carries
-//   bot: true: the game is then a bot game for good, and a best set in it
-//   is marked 🤖 on the board — same honesty rule as the Dodge autopilot,
-//   whose runs the server replay flags. Who may use the autopilot is a
-//   grant, exactly like Dodge's (worker/dodge/board.js):
+//   The autopilot itself runs in this object: { type: 'bot', on: true } from
+//   a granted account starts a session the alarm below plays on its own
+//   (a batch of moves about once a second), so it keeps going with every
+//   tab closed and the phone in a pocket. Sessions live in storage
+//   ('bots'); a game ending, the same account turning it off, or a manual
+//   move / new game from that account (they've grabbed the controls) ends
+//   the session. Bot moves go through the same applyMove as page moves,
+//   marked bot all the same: the game is a bot game for good, and a best
+//   set in it is marked 🤖 on the board — same honesty rule as the Dodge
+//   autopilot, whose runs the server replay flags. (A page-sent move can
+//   also declare bot: true; it marks the game the same way.) Who may use
+//   the autopilot is a grant, exactly like Dodge's (worker/dodge/board.js):
 //   GET  /api/2048/grants?name&token               -> { canBot, isAdmin, grants }
 //   POST /api/2048/grants { name, token, target, on }  (PM only)
-// Messages out: { type: 'state', you, game, best, board?, spawn?, error? }
+// Messages out: { type: 'state', you, botOn, game, best, board?, spawn?, error? }
 import { getUsers, sameName, cleanName, USER_ADMIN } from '../users/users.js';
 import { j } from '../lib/http.js';
 import { DIRS, GOAL, move, spawn, fresh, canMove, maxTile } from '../../web/src/features/g2048/logic.js';
+import { plan2048 } from '../../web/src/features/g2048/bot.js';
 
 const FLUSH_MS = 2000;
 const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
@@ -35,6 +44,7 @@ export class Board2048 {
     this.games = new Map();   // key -> { grid, score, moves, over, won, keep, bot, startedAt, updatedAt }
     this.best = new Map();    // key -> { name, tile, score, games, at, bot }
     this.grants = new Set();  // lower-cased names PM has allowed the autopilot
+    this.bots = new Map();    // key -> name: autopilot sessions the alarm is playing
     this.dirty = new Set(); this.flushing = null; this.boardTimer = null;
     this.loaded = null;
   }
@@ -42,9 +52,11 @@ export class Board2048 {
     return this.loaded ||= Promise.all([
       this.state.storage.list({ prefix: 'p:' }),
       this.state.storage.get('grants'),
-    ]).then(([m, g]) => {
+      this.state.storage.get('bots'),
+    ]).then(([m, g, b]) => {
       for (const [k, v] of m) this.best.set(k.slice(2), v);
       if (Array.isArray(g)) for (const k of g) this.grants.add(k);
+      if (Array.isArray(b)) for (const p of b) if (Array.isArray(p)) this.bots.set(p[0], p[1]);
     });
   }
 
@@ -62,6 +74,8 @@ export class Board2048 {
     if (request.method === 'POST' && new URL(request.url).pathname.endsWith('/scrub-user')) return this.scrubUser(request);
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a WebSocket', { status: 426 });
     await this.load();
+    // 保险：有外挂场次却没闹钟在排队（比如闹钟那轮没跑完就被打断），补上
+    if (this.bots.size && !(await this.state.storage.getAlarm())) this.kickBot();
     const [client, server] = Object.values(new WebSocketPair());
     server.accept();
     this.sockets.set(server, null);
@@ -86,6 +100,7 @@ export class Board2048 {
     if (!key) return j({ ok: true, removed: 0 });
     const removed = this.best.delete(key) ? 1 : 0;
     this.games.delete(key); this.dirty.delete(key);
+    await this.stopBot(key);
     if (this.grants.delete(key)) await this.state.storage.put('grants', [...this.grants]);
     await this.state.storage.delete(['p:' + key, 'g:' + key]);
     for (const [ws, who] of this.sockets) if (who?.key === key) this.sockets.set(ws, null);
@@ -145,19 +160,39 @@ export class Board2048 {
     if (!who) return this.send(ws, { error: '先登录再玩' });
     const game = this.games.get(who.key);
     if (!game) return this.send(ws, { error: '先登录再玩' });
+    if (m.type === 'bot') {
+      if (m.on && !this.canBot(who)) return this.send(ws, { error: '没有外挂授权，先找 PM 开' });
+      if (m.on) { this.bots.set(who.key, who.name); await this.saveBots(); this.kickBot(); }
+      else await this.stopBot(who.key);
+      return this.sendTo(who.key, { game });
+    }
     if (m.type === 'new') {
+      await this.stopBot(who.key); // 开新局 = 把方向盘抢回来，服务器外挂先停下
       const g = this.newGame(who.key, who.name);
       this.flush(who.key);
       return this.sendTo(who.key, { game: g, best: this.bestOf(who.key), board: this.top() });
     }
     if (m.type === 'keep') { game.keep = true; this.touch(who.key); return this.sendTo(who.key, { game }); }
     if (m.type !== 'move') return;
+    if (!m.bot) await this.stopBot(who.key); // 手动走步同样是抢方向盘
     if (!DIRS.includes(m.dir)) return this.send(ws, { error: '不认识的方向', game });
     if (m.n !== game.moves) return this.send(ws, { game, stale: true }); // another tab moved first: here's the real board
     if (game.over) return this.send(ws, { game });
-    const r = move(game.grid, m.dir);
-    if (!r.moved) return this.send(ws, { game, still: true });
-    if (m.bot) game.bot = true; // 一个外挂步子，这局就是外挂局了
+    const r = this.applyMove(who, game, m.dir, !!m.bot);
+    if (!r) return this.send(ws, { game, still: true });
+    this.sendTo(who.key, { game, best: this.bestOf(who.key), spawn: r.spawn, dir: r.dir });
+    if (r.improved === 'tile' || (r.improved && game.over) || r.marked) this.broadcastBoard();
+    else if (r.improved) this.boardSoon(); // a better score: the board catches up within a few seconds
+  }
+
+  // One move, applied and recorded: slide, the server's new tile, the
+  // best bookkeeping and the bot marking. Returns null when the slide
+  // goes nowhere. Page moves and the alarm's bot moves both come through
+  // here, so the honesty rules can't drift apart.
+  applyMove(who, game, dir, byBot) {
+    const r = move(game.grid, dir);
+    if (!r.moved) return null;
+    if (byBot) game.bot = true; // 一个外挂步子，这局就是外挂局了
     const s = spawn(r.grid, rand);
     game.grid = s.grid; game.score += r.gained; game.moves++; game.updatedAt = Date.now();
     if (maxTile(game.grid) >= GOAL) game.won = true;
@@ -172,9 +207,40 @@ export class Board2048 {
     }
     this.touch(who.key);
     if (game.over) this.flush(who.key);
-    this.sendTo(who.key, { game, best: this.bestOf(who.key), spawn: { at: s.at, v: s.v }, dir: m.dir });
-    if (improved === 'tile' || (improved && game.over) || marked) this.broadcastBoard();
-    else if (improved) this.boardSoon(); // a better score: the board catches up within a few seconds
+    return { spawn: { at: s.at, v: s.v }, dir, improved, marked };
+  }
+
+  // --- the server-side autopilot -------------------------------------
+  // Sessions are (re)started by { type: 'bot', on: true }; storage keeps
+  // them across this object sleeping or being evicted, and the alarm is
+  // what wakes it back up to play. About eight moves a second — fast
+  // enough to finish a game in a few minutes, gentle on the CPU budget.
+  canBot(who) { return sameName(who.name, USER_ADMIN) || this.grants.has(who.key); }
+  async saveBots() { await this.state.storage.put('bots', [...this.bots]); }
+  async stopBot(key) { if (this.bots.delete(key)) await this.saveBots(); }
+  kickBot() { if (this.bots.size) this.state.storage.setAlarm(Date.now() + 250); }
+
+  async alarm() {
+    await this.load();
+    for (const [key, name] of [...this.bots]) {
+      const who = { key, name };
+      const game = await this.gameOf(key, name);
+      if (game.over) { await this.stopBot(key); continue; }
+      if (game.won && !game.keep) { game.keep = true; this.touch(key); } // 庆祝屏别挡着外挂
+      for (let i = 0; i < 8 && !game.over; i++) {
+        if (!this.bots.has(key)) break; // 刚刚被本人停了（快照是进门时拿的）
+        const dir = plan2048(game.grid);
+        if (!dir) { game.over = true; this.touch(key); break; } // 算法说没路了，就是没路了
+        const r = this.applyMove(who, game, dir, true);
+        if (!r) break;
+        this.sendTo(key, { game, best: this.bestOf(key), spawn: r.spawn, dir: r.dir }); // 开着的页面照常看它走
+        if (r.improved === 'tile' || r.marked) this.broadcastBoard();
+        else if (r.improved) this.boardSoon();
+      }
+      this.flush(key); // 别等那两秒：对象睡过去也不丢进度
+      if (game.over) await this.stopBot(key);
+    }
+    if (this.bots.size) await this.state.storage.setAlarm(Date.now() + 1000);
   }
 
   onClose(ws) {
@@ -247,7 +313,7 @@ export class Board2048 {
 
   send(ws, extra) {
     const who = this.sockets.get(ws);
-    try { ws.send(JSON.stringify({ type: 'state', you: who?.key || null, ...extra })); }
+    try { ws.send(JSON.stringify({ type: 'state', you: who?.key || null, botOn: who ? this.bots.has(who.key) : false, ...extra })); }
     catch (e) { /* socket already gone; its close handler cleans up */ }
   }
   // Every tab of this person (the game moved in one of them)
