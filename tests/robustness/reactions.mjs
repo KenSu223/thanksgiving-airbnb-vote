@@ -3,8 +3,14 @@
 // player; it lands on the target, signed with the sender's name.
 // Covers the hall games (Dou Dizhu WS) and Blackjack: identify without
 // sitting, seated senders, and the refusals (no identity, bad value,
-// target not seated). Uses the global WebSocket client (Node 22+).
+// target not seated). Uses the global WebSocket client (Node 22+ —
+// that's why CI pins Node 22 in check.yml/deploy.yml).
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/reactions.mjs
+if (typeof WebSocket === 'undefined') {
+  console.log('FAIL this suite needs the global WebSocket client (Node 22+)');
+  console.log('REACTIONS: 0 passed, 1 failed');
+  process.exit(1);
+}
 const B = process.env.TEST_BASE || 'http://localhost:8791';
 const WS = B.replace(/^http/, 'ws');
 const J = async (m, p, o) => {
@@ -14,6 +20,10 @@ const J = async (m, p, o) => {
 };
 let pass = 0, fail = 0;
 const ck = (name, cond, extra) => { if (cond) { pass++; console.log('OK  ', name); } else { fail++; console.log('FAIL', name, extra ?? ''); } };
+// A crashed wait shouldn't die as a bare stack: report it as a failure.
+const crash = e => { console.log('FAIL suite crashed:', e?.message || e); console.log(`REACTIONS: ${pass} passed, ${fail + 1} failed`); process.exit(1); };
+process.on('uncaughtException', crash);
+process.on('unhandledRejection', crash);
 const tag = Date.now().toString(36);
 const mkUser = async n => {
   const r = await J('POST', '/api/login', { name: n + tag, token: 'dev-react-' + n + tag });
