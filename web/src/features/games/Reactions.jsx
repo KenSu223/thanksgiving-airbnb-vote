@@ -64,7 +64,7 @@ const abbr = v => v.replace(/\s*[^\p{L}\p{N}？?！!。]+$/u, '').slice(0, 3);
 // 面板里点一个，面板收起，钮就变成选中的那个（emoji 直接显示，文字
 // 缩成小字塞进圆钮）→ 按住钮拖到某个在座的人身上松手，气泡冒在对方
 // 座位旁、带着发送者名字。选中不消耗，想再发直接再拖。
-export function ReactionBar({ send }) {
+export function ReactionBar({ send, active }) {
   const { name, token } = useSession();
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState(REACTION_EMOJIS[0]); // 当前选中的表情/文字
@@ -80,6 +80,15 @@ export function ReactionBar({ send }) {
     if (drag.current?.seatEl) drag.current.seatEl.classList.remove('gt-drop-on');
     drag.current = null;
   }, []);
+
+  // 切到别的标签页/别的游戏就藏起来（钮是 portal 到 body 的，不跟着
+  // 面板一起被 hidden 藏掉），顺手把面板和拖动态收掉
+  useEffect(() => {
+    if (active) return;
+    setOpen(false);
+    setGhost(null);
+    if (drag.current?.seatEl) drag.current.seatEl.classList.remove('gt-drop-on');
+  }, [active]);
 
   // 钮本身就是拖的把手：轻点开/收面板，拖动则把选中值放给座位上的人
   const startDrag = e => {
@@ -114,7 +123,7 @@ export function ReactionBar({ send }) {
 
   const pick = v => { setSel(v); setOpen(false); };
 
-  if (!name || !token) return null; // 没登录发不了（服务器也要验身份）
+  if (!name || !token || !active) return null; // 没登录发不了（服务器也要验身份）；不在当前游戏里就不出现
   // 挂到 body 上：牌桌全屏时桌面是 portal 出去的浮层（z-60），按钮留在
   // 页面树里会被祖先的层叠上下文压在浮层下面（桌面端全屏时就看不见）。
   return createPortal(

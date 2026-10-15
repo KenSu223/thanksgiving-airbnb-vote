@@ -314,7 +314,7 @@ export default function MahjongView({ active }) {
           <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 mj-msg">{msg}</p>
           </div>
         </TableFrame>
-        <ReactionBar send={send} />
+        <ReactionBar send={send} active={active} />
         <PointsBoard title="川麻豆子榜" rows={st?.board || []}>
           规则：血战到底。108 张（万条筒），开局换三张、定缺；只能碰、杠，不能吃；缺的那门要先打完，手里还有就不能胡。
           一炮可以多响；没胡的放过一张能胡的牌，到自己下次摸牌前都不能胡别人打的（过水不胡）。胡了的人退出，剩下的接着打，直到三家胡完或者摸完牌。

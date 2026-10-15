@@ -70,7 +70,7 @@ export default function BlackjackView({ active }) {
           </>
         )}
         <p className="text-sm mt-3 min-h-[1.25rem] text-amber-200">{msg}</p>
-        <ReactionBar send={send} />
+        <ReactionBar send={send} active={active} />
       </section>
       <Leaderboard rows={st?.board || []} />
     </div>
