@@ -49,11 +49,13 @@ function Face({ kind }) {
 }
 
 // inline：放在一行字里的牌（「胡了 X 打的 [三萬]」、按钮上的牌），跟着字走，不另起一行
-export default function MjTile({ kind, size = '', selected, lit, inline, className = '', ...rest }) {
+// slam：刚打出去的牌——拍到桌上，底下扬起一点灰（只在牌出现的那一下播；挂上去时才算，所以要换 key 才会再播）
+export default function MjTile({ kind, size = '', selected, lit, inline, slam, className = '', ...rest }) {
   const Tag = rest.onClick ? 'button' : inline ? 'span' : 'div';
   return (
-    <Tag {...rest} className={'mj-tile ' + size + (kind ? '' : ' back') + (selected ? ' sel' : '') + (lit ? ' lit' : '') + (inline ? ' inline' : '') + (className ? ' ' + className : '')}>
+    <Tag {...rest} className={'mj-tile ' + size + (kind ? '' : ' back') + (selected ? ' sel' : '') + (lit ? ' lit' : '') + (inline ? ' inline' : '') + (slam ? ' slam' : '') + (className ? ' ' + className : '')}>
       {kind && <Face kind={kind} />}
+      {slam && <span className="mj-dust" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>}
     </Tag>
   );
 }

@@ -27,7 +27,8 @@ function Melds({ melds, size = 'sm' }) {
   );
 }
 function River({ tiles, lastHere, size = 'xs' }) {
-  return <div className="mj-river">{tiles.map((k, i) => <MjTile key={i} kind={k} size={size} lit={lastHere && i === tiles.length - 1} />)}</div>;
+  // 刚打出来的那张：亮边，拍到桌上带点灰（新牌是新挂上去的，动画只播这一下）
+  return <div className="mj-river">{tiles.map((k, i) => <MjTile key={i} kind={k} size={size} lit={lastHere && i === tiles.length - 1} slam={lastHere && i === tiles.length - 1} />)}</div>;
 }
 // 一家亮在桌上的牌：碰/杠的，和打出去的（牌河），各带一个小标签，不会混在一起
 function Piles({ melds, river, lastHere, mine }) {
@@ -124,7 +125,8 @@ export default function MahjongView({ active }) {
   const suitCount = s => hand.filter(k => k[0] === s).length;
   const lackPick = mySeat && ['m', 's', 'p'].reduce((a, s) => (suitCount(s) < suitCount(a) ? s : a), 'm');
 
-  // ---- 这一刻要你做决定吗？换三张 / 定缺 / 出牌 / 碰杠胡：横幅说清楚做什么、剩几秒、超时会怎样 ----
+  // ---- 这一刻要你做决定吗？换三张 / 定缺 / 碰杠胡：横幅说清楚做什么、剩几秒、超时会怎样；
+  //      轮到你出牌：按钮旁边一个会动的 🔔 就够了（最后 5 秒变 ⏰、倒计时变红）----
   const acting = !!mySeat && live && !mySeat.auto && !mySeat.won && !seatedElsewhere && (
     (t.phase === 'swap' && !mySeat.swap) || (t.phase === 'lack' && !mySeat.lack) || (t.phase === 'playing' && (!!claim || !!opts)));
   const secs = secondsLeft(st);
@@ -140,8 +142,12 @@ export default function MahjongView({ active }) {
     else if (claim) ask = {
       head: <>🀄 {name(t.claimOn.from)} {t.claimOn.rob ? '补杠' : '打出'} <MjTile kind={claimTile} size="sm" inline lit />，你可以{[claim.hu && '胡', claim.kong && '杠', claim.pong && '碰'].filter(Boolean).join(' / ')}</>,
       sub: '不要就点「过」· 手里一样的牌已经抬起来了', soon: '超时由电脑替你决定（能胡一定胡）' };
-    else ask = { head: opts.hu ? '🀄 轮到你：可以自摸！' : '🔔 轮到你出牌', sub: opts.mustLack ? `先打缺的${SUIT[mySeat.lack]}（标了「缺」的牌）` : '点一张，再点一下打出', soon: '超时自动帮你打一张' };
   }
+  const bell = acting && !ask && (
+    <span className={'gt-bell' + (hurry ? ' hurry' : '')} role="status" aria-label={'轮到你出牌' + (hurry ? '，快没时间了，超时自动帮你打一张' : '')}
+      title={hurry ? '快没时间了，超时自动帮你打一张' : '轮到你出牌'}>{hurry ? '⏰' : '🔔'}</span>
+  );
+  const clock = <span className={'text-sm tabular-nums ' + (hurry ? 'gt-timer-hurry' : 'text-amber-200')}>{timer}</span>;
   const banner = ask && (
     <div className={'gt-yourturn' + (hurry ? ' hurry' : '')} role="status">
       <span>{hurry ? '⏰ 快没时间了 · ' : ''}{ask.head}</span>
@@ -186,31 +192,30 @@ export default function MahjongView({ active }) {
     </>;
     if (mySeat.won) return <><span className="text-sm text-emerald-100">你已经胡了，看他们血战到底</span>{stand}</>;
     if (opts) return <>
+      {bell}
       {opts.hu && <button onClick={() => send({ type: 'hu' })} className="gt-btn bg-rose-500 text-white">自摸！</button>}
       {opts.kongs.map(k => <button key={k.kind} onClick={() => send({ type: 'kong', tile: k.kind })} className="gt-btn bg-amber-400 text-slate-900">杠 <MjTile kind={k.kind} size="xs" inline /></button>)}
       <button onClick={() => sel.size && discard([...sel][0])} disabled={!sel.size} className="gt-btn bg-amber-400 text-slate-900">出牌</button>
-      {auto}{stand}
+      {opts.mustLack && <span className="text-sm text-amber-200">先打缺的{SUIT[mySeat.lack]}</span>}
+      {clock}{auto}{stand}
     </>;
     return <><span className="text-sm text-emerald-100">等别人…</span>{auto}{stand}</>;
   }
 
   const result = t?.phase === 'result' && t.result;
-  // 结算：先说你自己怎么样了
-  let mine = null;
-  if (result && me >= 0) {
-    const w = result.wins.find(x => x.seat === me);
-    const hit = result.wins.filter(x => !x.self && x.from === me);
-    const check = result.check.find(c => c.seat === me);
-    mine = (
-      <div className="mj-you">
-        你本局 <b className={result.deltas[me] > 0 ? 'text-amber-300' : result.deltas[me] < 0 ? 'text-rose-300' : ''}>{sign(result.deltas[me])}</b> 豆
-        {w && <> · 第{w.order}个胡：{w.self ? '自摸' : '胡 ' + name(w.from) + ' 打的'} <MjTile kind={w.tile} size="xs" inline /> {w.fan}番（{w.names.join('·')}）</>}
-        {hit.map(x => <Fragment key={x.seat}> · {name(x.seat)} 胡了你打的 <MjTile kind={x.tile} size="xs" inline />（{x.fan}番）</Fragment>)}
-        {!w && check && <> · {check.hua ? '你是花猪，赔每个不是花猪的人' : check.ready ? '你听牌了' : '你没听牌，赔听牌的人'}</>}
-      </div>
-    );
-  }
+  // 结算：一人一行——谁、怎么样（第几胡·自摸/胡谁的·几番，点炮几次，听牌/没听/花猪）、输赢多少；你那行高亮
+  const scoreRows = result && [0, 1, 2, 3].map(k => {
+    const w = result.wins.find(x => x.seat === k);
+    const fed = result.wins.filter(x => !x.self && x.from === k).length;
+    const c = !w && result.check.find(x => x.seat === k);
+    return { k, delta: result.deltas[k], tags: [
+      w && <span key="w" className="mj-tag win" title={w.names.join('·')}>第{w.order}胡 · {w.self ? '自摸' : '胡' + name(w.from)} <MjTile kind={w.tile} size="xs" inline /> {w.fan}番</span>,
+      fed > 0 && <span key="f" className="mj-tag">点炮{fed > 1 ? ' ×' + fed : ''}</span>,
+      c && <span key="c" className={'mj-tag' + (c.hua || !c.ready ? ' bad' : '')}>{c.hua ? '花猪' : c.ready ? '听牌' : '没听'}</span>,
+    ].filter(Boolean) };
+  }).sort((a, b) => b.delta - a.delta);
   const lastTile = t?.claimOn || (t?.phase === 'playing' && t.last);
+  const discardKey = lastTile ? (lastTile.seat ?? lastTile.from) + ':' + lastTile.kind + ':' + t.wallLeft : '';
   const meLine = full && mySeat && <span className="text-xs text-emerald-50/90">{mySeat.lack ? '缺' + SUIT[mySeat.lack] + ' · ' : ''}{t.ledger[me] ? '本局 ' + sign(t.ledger[me]) + ' · ' : ''}🫘 {mySeat.points?.toLocaleString()}</span>;
   // 手牌上的记号：换三张刚拿到的三张（定缺和第一次出牌前）标「新」；有人打出能碰/杠/胡的牌时，手里一样的抬起来
   const fresh = new Set();
@@ -224,7 +229,7 @@ export default function MahjongView({ active }) {
     <div className={'mj-center' + (result ? ' wide' : '')}>
       {lastTile && !result && !full && (
         <div className="flex items-center gap-2">
-          <MjTile kind={lastTile.kind} size="lg" lit />
+          <MjTile key={discardKey} kind={lastTile.kind} size="lg" lit slam />
           <span className="text-sm text-emerald-100">{name(lastTile.seat ?? lastTile.from)} {t.claimOn?.rob ? '补杠' : '打出'}</span>
         </div>
       )}
@@ -232,14 +237,15 @@ export default function MahjongView({ active }) {
       {result && (
         <div className="gt-result w-full">
           <div className="text-lg font-extrabold">{result.wins.length ? '🀄 这局结束' : '流局'}{won ? ' · 你赢了！' : ''}</div>
-          {mine}
-          {result.wins.map(w => (
-            <div key={w.seat} className="text-sm mt-1">第{w.order}胡 {name(w.seat)} {w.self ? '自摸' : '胡 ' + name(w.from) + ' 的'} <MjTile kind={w.tile} size="xs" inline /> {w.fan}番（{w.names.join('·')}）</div>
-          ))}
-          {result.check.map(c => (
-            <div key={c.seat} className="text-xs mt-1 text-emerald-100">{name(c.seat)}：{c.hua ? '花猪，赔每个不是花猪的人' : c.ready ? '听牌 ' + c.fan + '番' : '没听牌，赔听牌的人'}</div>
-          ))}
-          <div className="text-sm mt-2">{result.names.map((n, k) => n + ' ' + sign(result.deltas[k])).join(' · ')}</div>
+          <div className="mj-score">
+            {scoreRows.map(r => (
+              <div key={r.k} className={'mj-score-row' + (r.k === me ? ' me' : '')}>
+                <span className="mj-score-name">{name(r.k)}{r.k === me ? '（你）' : ''}</span>
+                <span className="mj-score-tags">{r.tags}</span>
+                <span className={'mj-score-delta' + (r.delta > 0 ? ' up' : r.delta < 0 ? ' down' : '')}>{sign(r.delta)}</span>
+              </div>
+            ))}
+          </div>
           {live && (me >= 0 || t.waiting) && !seatedElsewhere && <div className="mt-3">{deal('🔁 再来一局')}</div>}
         </div>
       )}
@@ -256,7 +262,7 @@ export default function MahjongView({ active }) {
             <span className="font-medium text-emerald-100">{status}</span>
             {meLine}
             {t && t.phase !== 'waiting' && <span className="text-xs text-emerald-100">庄：{name(t.dealer)}</span>}
-            {full && lastTile && !result && <span className="flex items-center gap-1 text-xs text-emerald-100">{name(lastTile.seat ?? lastTile.from)} {t.claimOn?.rob ? '补杠' : '打出'} <MjTile kind={lastTile.kind} size="sm" lit /></span>}
+            {full && lastTile && !result && <span className="flex items-center gap-1 text-xs text-emerald-100">{name(lastTile.seat ?? lastTile.from)} {t.claimOn?.rob ? '补杠' : '打出'} <MjTile key={discardKey} kind={lastTile.kind} size="sm" lit slam /></span>}
             <button onClick={toggleAlerts} aria-pressed={alerts} title={alerts ? '轮到你时响一声（点一下关掉）' : '轮到你时不响（点一下打开）'}
               className="text-xs rounded-full bg-white/15 px-2 py-1">{alerts ? '🔔 提醒' : '🔕 提醒'}</button>
             {canEnter && <button onClick={enter} className="text-xs rounded-full bg-white/15 px-2 py-1">⛶ 全屏</button>}

@@ -27,9 +27,10 @@ button.mj-tile { cursor:pointer; touch-action:manipulation; transition:transform
 .mj-tile.sel { transform:translateY(-12px); box-shadow:0 0 0 2px #facc15, 0 4px 10px rgba(0,0,0,.4); }
 
 /* the hand: one row on a wide screen (tiles shrink a little rather than wrap), rows on a phone held upright;
-   a small gap between suits; the tile just drawn stands apart */
+   a small gap between suits; the tile just drawn stands apart, with a glowing ring around it (a picked tile keeps its yellow ring) */
 .mj-hand { display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-end; gap:.2rem; padding-top:1rem; }
 .mj-hand .drawn { margin-left:.6rem; }
+.mj-hand button.mj-tile.drawn:not(.sel) { box-shadow:0 0 0 2px #fff, 0 0 12px 3px rgba(255,255,255,.7), 0 2px 0 #d6cfb8, 0 3px 6px rgba(0,0,0,.35); }
 .mj-gap { flex:none; width:.45rem; }
 @media (min-width:641px) {
   .mj-hand { flex-wrap:nowrap; }
@@ -58,7 +59,34 @@ button.mj-tile { cursor:pointer; touch-action:manipulation; transition:transform
 .mj-opp { display:flex; flex-direction:column; gap:.3rem; min-width:0; }
 .mj-head { display:flex; flex-wrap:wrap; align-items:center; gap:.3rem; }
 .mj-rel { font-size:.65rem; font-weight:800; padding:0 6px; border-radius:9999px; background:rgba(255,255,255,.18); color:#ecfdf5; }
-.mj-you { font-size:.95rem; font-weight:700; margin:.35rem 0 .2rem; }
+/* 结算: one row per player — name, what happened (tags), 豆 — winners first; your row lit */
+.mj-score { display:flex; flex-direction:column; gap:.25rem; margin:.5rem auto 0; max-width:30rem; text-align:left; }
+.mj-score-row { display:grid; grid-template-columns:minmax(4.5rem, auto) 1fr auto; align-items:center; gap:.5rem; padding:.3rem .6rem; border-radius:.6rem; background:rgba(0,0,0,.18); }
+.mj-score-row.me { background:rgba(250,204,21,.18); box-shadow:inset 0 0 0 1px rgba(250,204,21,.6); }
+.mj-score-name { font-weight:800; font-size:.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mj-score-tags { display:flex; flex-wrap:wrap; gap:.25rem; }
+.mj-score-delta { font-weight:900; font-variant-numeric:tabular-nums; }
+.mj-score-delta.up { color:#fcd34d; } .mj-score-delta.down { color:#fda4af; }
+.mj-tag { display:inline-flex; align-items:center; gap:.2rem; font-size:.72rem; font-weight:700; padding:1px 7px; border-radius:9999px; background:rgba(255,255,255,.14); }
+.mj-tag.win { background:#f59e0b; color:#1e1b4b; } .mj-tag.bad { background:rgba(244,63,94,.35); }
+
+/* a discard lands: the tile slams down onto the felt and kicks up a little dust */
+.mj-tile.slam { animation:mj-slam .34s cubic-bezier(.3, 1.4, .5, 1) both; }
+@keyframes mj-slam {
+  0% { transform:translateY(-22px) scale(1.4) rotate(-8deg); opacity:0; }
+  55% { transform:translateY(1px) scale(.95) rotate(0); opacity:1; }
+  75% { transform:translateY(-2px) scale(1.02); }
+  100% { transform:none; }
+}
+.mj-dust { position:absolute; left:50%; bottom:0; width:0; height:0; pointer-events:none; }
+.mj-dust i { position:absolute; left:-4px; top:-4px; width:8px; height:8px; border-radius:50%; background:rgba(236,226,204,.85); opacity:0;
+  animation:mj-dust .6s ease-out .17s both; }
+.mj-dust i:nth-child(1) { --dx:-26px; --dy:-6px; } .mj-dust i:nth-child(2) { --dx:-15px; --dy:-15px; width:6px; height:6px; }
+.mj-dust i:nth-child(3) { --dx:-7px; --dy:-5px; width:5px; height:5px; } .mj-dust i:nth-child(4) { --dx:8px; --dy:-6px; width:5px; height:5px; }
+.mj-dust i:nth-child(5) { --dx:16px; --dy:-14px; width:6px; height:6px; } .mj-dust i:nth-child(6) { --dx:27px; --dy:-5px; }
+@keyframes mj-dust { 0% { opacity:.9; transform:translate(0, 0) scale(.4); } 100% { opacity:0; transform:translate(var(--dx), var(--dy)) scale(1.8); } }
+/* small tiles (the discard rows, the top bar) get a smaller puff */
+.mj-tile.xs .mj-dust, .mj-tile.sm .mj-dust { transform:scale(.55); }
 /* full screen: your own melds and discards right above your hand, one row (the middle of the table scrolls) */
 .mj-mine-strip { display:flex; flex-wrap:nowrap; align-items:center; gap:.6rem; overflow-x:auto; margin-top:.25rem; }
 .mj-mine-strip .mj-melds, .mj-mine-strip .mj-river { flex-wrap:nowrap; }
@@ -86,4 +114,4 @@ button.mj-tile { cursor:pointer; touch-action:manipulation; transition:transform
 .gt-full .mj-tile.lg { width:2.4rem; height:3.2rem; }
 .gt-full .mj-controls { margin-top:.35rem; }
 .gt-full .mj-msg { margin-top:.15rem; min-height:1rem; font-size:.75rem; }
-@media (prefers-reduced-motion: reduce) { button.mj-tile { transition:none; } }
+@media (prefers-reduced-motion: reduce) { button.mj-tile { transition:none; } .mj-tile.slam { animation:none; } .mj-dust { display:none; } }
