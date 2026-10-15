@@ -10,6 +10,12 @@
 // has(key), humans(), waitlist, seats, phase, sweepIdle(), view(key). The
 // subclass passes `actions`: message type -> (table, key, message) returning an
 // error string, { reply } (sent back to that socket only), or nothing.
+// sit() also gets the sit message, so a game can let you pick a seat number.
+//
+// Party games (谁是卧底 / 阿瓦隆 / 狼人杀) pass `rejoin`: a phone going to sleep or a
+// page reload must not cost anyone their seat mid-game, so a socket that proves
+// who it is (identify) goes straight back to that person's seat, and several
+// tabs of one person can all hold it. `boardSort` orders their leaderboard (by wins).
 import { getUsers, sameName, cleanName, USER_ADMIN } from '../users/users.js';
 import { noteReaction, freshReactions } from './reactions.js';
 import { j } from '../lib/http.js';
@@ -17,9 +23,10 @@ import { j } from '../lib/http.js';
 const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
 
 export class TableHall {
-  constructor(state, env, { Game, rooms, actions, idleNotice }) {
+  constructor(state, env, { Game, rooms, actions, idleNotice, rejoin = false, boardSort = null }) {
     this.state = state; this.env = env;
     this.rooms = rooms; this.actions = actions; this.idleNotice = idleNotice;
+    this.rejoin = rejoin; this.boardSort = boardSort;
     this.sockets = new Map(); // socket -> { key (seated/queued player, or null), room (1..rooms being watched) }
     this.reactions = new Map(); // room -> [{ v, at, by, byName, to }] — addressed emoji/taunt popups, see reactions.js
     this.board = new Map();   // saved points by player key
@@ -55,7 +62,9 @@ export class TableHall {
     await this.load();
     const key = cleanName(body.target).toLowerCase();
     if (!key) return j({ ok: true, removed: 0 });
-    this.tableOf(key)?.leave(key); // a seated ghost leaves first; the save that lands is deleted next
+    const t = this.tableOf(key);
+    if (t?.forget) t.forget(key); // party games: drop the seat without ever saving it again
+    else t?.leave(key); // a seated ghost leaves first; the save that lands is deleted next
     const removed = this.board.delete(key) ? 1 : 0;
     await this.state.storage.delete('p:' + key);
     this.broadcast();
@@ -94,7 +103,15 @@ export class TableHall {
       const users = await getUsers(this.env);
       const user = users.find(u => sameName(u.name, cleanName(m.name)));
       if (!this.sockets.has(ws)) return; // closed while we looked the user up
-      if (user && user.token === m.token) info.as = { key: user.name.toLowerCase(), name: user.name };
+      if (user && user.token === m.token) {
+        const key = user.name.toLowerCase();
+        info.as = { key, name: user.name };
+        const t = this.rejoin && this.tableOf(key);
+        if (t) { // back to your seat (sit() just marks you connected again)
+          t.sit(key, user.name, this.board.get(key), {});
+          info.key = key; info.room = this.tables.indexOf(t) + 1;
+        }
+      }
     } else if (m.type === 'react') {
       // Anyone signed in at the table can react — no seat needed — but
       // the target has to be seated in the room being watched, and the
@@ -129,8 +146,8 @@ export class TableHall {
         const here = this.tables[room - 1], elsewhere = this.tableOf(key);
         if (elsewhere && elsewhere !== here) elsewhere.leave(key); // one seat per person
         if (info.key && info.key !== key) this.tableOf(info.key)?.leave(info.key); // switched user in this tab
-        for (const [other, o] of this.sockets) if (other !== ws && o.key === key) o.key = null; // a newer tab takes the seat
-        err = here.sit(key, user.name, this.board.get(key));
+        if (!this.rejoin) for (const [other, o] of this.sockets) if (other !== ws && o.key === key) o.key = null; // a newer tab takes the seat
+        err = here.sit(key, user.name, this.board.get(key), m);
         info.room = room;
         info.key = err ? null : key;
         if (!err) info.as = { key, name: user.name }; // sitting proves identity too (for reactions)
@@ -179,7 +196,7 @@ export class TableHall {
   leaderboard() {
     const rows = new Map(this.board);
     for (const t of this.tables) for (const s of t.humans().concat(t.waitlist)) rows.set(s.key, { name: s.name, points: s.points, refills: s.refills, games: s.games, wins: s.wins, seated: true });
-    return [...rows.values()].sort((a, b) => b.points - a.points).slice(0, 30);
+    return [...rows.values()].sort(this.boardSort || ((a, b) => b.points - a.points)).slice(0, 30);
   }
   send(ws, extra) {
     const info = this.sockets.get(ws);

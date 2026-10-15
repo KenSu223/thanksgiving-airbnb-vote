@@ -76,6 +76,7 @@ async function handleUserDelete(req, env) {
     scrubGame(env.BJ_TABLE, 'main', 'https://internal/scrub-user'),
     scrubGame(env.DODGE, 'board', 'https://internal/api/dodge/scrub-user'),
     scrubGame(env.G2048, 'board', 'https://internal/scrub-user'),
+    scrubGame(env.UC_HALL, 'hall', 'https://internal/scrub-user'),
   ])).reduce((a, b) => a + b, 0);
   return j({ ok: true, users: publicUsers(await getUsers(env)), scrubbed });
 }
