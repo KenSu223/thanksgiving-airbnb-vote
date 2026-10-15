@@ -4,9 +4,7 @@ import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useG2048 } from './useG2048.js';
 import { GOAL, SIZE, move } from './logic.js';
-import { plan2048 } from './bot.js';
 import { api } from '../../lib/api.js';
-import { load, save } from '../../lib/storage.js';
 import './g2048.css';
 
 // 2048：盘面在服务器上（新砖是服务器出的），离开、刷新、换设备都接着玩。
@@ -24,7 +22,9 @@ const gridOf = tiles => {
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 // 外挂开关：拿到授权的人才看得见（PM 本人 + PM 授权的账号，和躲技能一样）。
-// 开着时 bot.js 的算法接管走步，这局会被服务器记成外挂局（排行榜带 🤖）。
+// 开关在服务器那边：开了之后 bot 在服务器上自己玩（bot.js 的算法），关掉
+// 页面、锁屏都照玩；这局会被记成外挂局（排行榜带 🤖）。开关状态以服务器
+// 每份 state 带回的 botOn 为准，这里不自己记。
 function BotSwitch({ on, onToggle }) {
   return (
     <button onClick={onToggle} aria-pressed={on} className={'g48-btn g48-bot' + (on ? ' on' : '')}>
@@ -35,8 +35,7 @@ function BotSwitch({ on, onToggle }) {
 
 export default function G2048View({ active }) {
   const { name, token, users, ensureName } = useSession();
-  const [bot, setBot] = useState(() => load('g2048Bot', '') === '1');
-  const toggleBot = () => setBot(b => { save('g2048Bot', b ? '' : '1'); return !b; });
+  const [botOn, setBotOn] = useState(false); // 服务器外挂开没开：state 说了算
   // 外挂授权：服务器说了算（worker/g2048/board.js 的 grants）。
   // canBot = 我能用；isAdmin = 我是 PM，还多一块给别人授权的管理面板。
   const [grant, setGrant] = useState({ canBot: false, isAdmin: false, grants: [] });
@@ -92,6 +91,7 @@ export default function G2048View({ active }) {
   const onState = useCallback(m => {
     if (m.board) setBoard(m.board);
     if (m.best) setBest(m.best);
+    if (typeof m.botOn === 'boolean') setBotOn(m.botOn);
     if (m.error) { setMsg(m.error); setTimeout(() => setMsg(''), 3000); }
     if (!m.game) return;
     const g = m.game, f = inflight.current;
@@ -112,22 +112,22 @@ export default function G2048View({ active }) {
     if (f) { inflight.current = null; if (m.stale || m.still) queue.current = []; }
     setGame(g); gameRef.current = g;
     if (f && !f.wonBefore && g.won && !reduceMotion) confetti({ particleCount: 160, spread: 100, origin: { y: 0.4 }, colors: CONFETTI_COLORS }); // 这一步拼出了 2048
-    if (queue.current.length && !inflight.current) setTimeout(() => { const q = queue.current.shift(); go.current(q.dir, q.byBot); }, 0);
+    if (queue.current.length && !inflight.current) setTimeout(() => go.current(queue.current.shift()), 0);
   }, [build, put, slide]);
 
   const { live, send } = useG2048(active, onState); // 没登录也连：排行榜照样看
 
-  // 走一步：先滑过去，再告诉服务器。byBot 的步子带上 bot 标记，
-  // 服务器据此把这局记成外挂局（成绩不会冒充手打）。
-  go.current = (dir, byBot = false) => {
+  // 走一步：先滑过去，再告诉服务器。这里走的都是手打步（外挂步在
+  // 服务器那边走，不经过页面）；服务器收到手打步会顺手把外挂停掉。
+  go.current = dir => {
     const g = gameRef.current;
     if (!g || g.over || (g.won && !g.keep)) return;
-    if (inflight.current) { if (queue.current.length < 2) queue.current.push({ dir, byBot }); return; }
+    if (inflight.current) { if (queue.current.length < 2) queue.current.push(dir); return; }
     const r = move(gridOf(tilesRef.current), dir);
     if (!r.moved) return;
     const list = slide(tilesRef.current, r.steps);
     if (!list) { put(build(g.grid)); return; }
-    if (!send({ type: 'move', dir, n: g.moves, ...(byBot ? { bot: true } : {}) })) return;
+    if (!send({ type: 'move', dir, n: g.moves })) return;
     inflight.current = { n: g.moves, dir, wonBefore: g.won };
     put(list);
     setGame({ ...g, score: g.score + r.gained }); // 分先加上，服务器回来会再对一遍
@@ -135,22 +135,10 @@ export default function G2048View({ active }) {
     setTimeout(() => { if (inflight.current?.n === g.moves) { inflight.current = null; queue.current = []; } }, 5000);
   };
 
-  // 外挂自动玩：开着且有授权时，每 180ms 看一眼盘面——上一步回来了
-  // 就让 bot.js 挑下一步（在飞的步子不催，免得排队排出一串旧决定）。
-  // 拼出 2048 的庆祝屏会挡住 go，外挂在就替它点「继续玩」。
-  const botOn = grant.canBot && bot;
-  useEffect(() => {
-    if (!active || !botOn) return;
-    const id = setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      const g = gameRef.current;
-      if (!g || g.over || inflight.current || queue.current.length) return;
-      if (g.won && !g.keep) { send({ type: 'keep' }); return; }
-      const dir = plan2048(gridOf(tilesRef.current));
-      if (dir) go.current(dir, true);
-    }, 180);
-    return () => clearInterval(id);
-  }, [active, botOn, send]);
+  // 外挂开关只是给服务器发一句话；开了之后页面关不关都无所谓，
+  // 回来时 state 里的 botOn 和盘面都是最新的。自己手动走一步，
+  // 服务器也会把外挂停掉（方向盘只能一个人握）。
+  const toggleBot = () => send({ type: 'bot', on: !botOn });
 
   // 方向键 / WASD（打字的时候不算）
   useEffect(() => {
@@ -199,7 +187,7 @@ export default function G2048View({ active }) {
           <div className="g48-stat"><span>分数</span><b className="tabular-nums">{(game?.score ?? 0).toLocaleString()}</b></div>
           <div className="g48-stat"><span>最好</span><b className="tabular-nums">{best ? best.tile.toLocaleString() : '—'}{best?.bot ? ' 🤖' : ''}</b></div>
           {game?.bot && <div className="g48-stat"><span>这局</span><b>🤖 外挂局</b></div>}
-          {grant.canBot && <BotSwitch on={bot} onToggle={toggleBot} />}
+          {grant.canBot && <BotSwitch on={botOn} onToggle={toggleBot} />}
           <button onClick={name ? newGame : () => ensureName(() => {})} className="g48-btn ml-auto">{name ? '新游戏' : '登录开始'}</button>
         </div>
         <div className="g48-board" onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={() => { start.current = null; }}
