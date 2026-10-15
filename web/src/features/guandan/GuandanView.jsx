@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
-import { useTable, useCountdown } from '../games/useTable.js';
+import { useTable, useCountdown, secondsLeft } from '../games/useTable.js';
+import { alertsOn, setAlertsOn, unlock, useTurnAlert } from '../games/turnAlert.js';
 import TableFrame, { useFullTable, RoomPicker, PointsBoard } from '../games/TableFrame.jsx';
 import PlayingCard, { CardRun, faceOf } from '../games/PlayingCard.jsx';
 import CardHand from '../games/CardHand.jsx';
@@ -79,6 +80,20 @@ export default function GuandanView({ active }) {
   const us = me >= 0 ? me % 2 : 0;
   const levels = t && (me >= 0 ? `我们打 ${levelName(t.levels[us])} · 对方打 ${levelName(t.levels[1 - us])}` : `${name(0)}队 ${levelName(t.levels[0])} · ${name(1)}队 ${levelName(t.levels[1])}`);
   const status = !t ? '连接中…' : !live ? '断线了，重连中…' : '桌 ' + room + ' · ' + PHASE[t.phase];
+  // 轮到你（出牌，或者要还贡）：按钮旁边一个会动的 🔔、叮咚一声、手机震一下、后台时标题闪；
+  // 最后 5 秒变 ⏰、倒计时变红（games/turnAlert.js，和斗地主、川麻一样）
+  const deciding = !!t && !!mySeat && live && !mySeat.auto && !seatedElsewhere && ((myTurn && !mySeat.place) || (t.phase === 'tribute' && !!t.mustReturn));
+  const secs = secondsLeft(st);
+  const hurry = deciding && secs != null && secs <= 5;
+  useTurnAlert(deciding ? t.phase + ':' + t.deadline : 0, secs);
+  const [alerts, setAlerts] = useState(alertsOn);
+  const toggleAlerts = () => { setAlertsOn(!alerts); setAlerts(!alerts); };
+  const soon = t?.phase === 'tribute' ? '超时自动帮你还一张' : '超时自动帮你出';
+  const bell = deciding && (
+    <span className={'gt-bell' + (hurry ? ' hurry' : '')} role="status" aria-label={(t.phase === 'tribute' ? '轮到你还贡' : leading ? '轮到你先出' : '轮到你出牌') + (hurry ? '，快没时间了，' + soon : '')}
+      title={hurry ? '快没时间了，' + soon : t.phase === 'tribute' ? '轮到你还贡' : '轮到你出牌'}>{hurry ? '⏰' : '🔔'}</span>
+  );
+  const clock = <span className={'text-sm tabular-nums ' + (hurry ? 'gt-timer-hurry' : 'text-amber-200')}>{timer}</span>;
 
   function giveBack() {
     if (sel.size !== 1) return flash('选一张 10 或以下的牌还回去');
@@ -105,16 +120,17 @@ export default function GuandanView({ active }) {
     if (t.phase === 'result') return full ? <>{deal('🔁 再来一局')}{stand}</> : stand;
     if (t.phase === 'tribute') {
       if (!t.mustReturn) return <><span className="text-sm text-emerald-100">等还贡…</span>{auto}{stand}</>;
-      return <><button onClick={giveBack} disabled={sel.size !== 1} className="gt-btn bg-amber-400 text-slate-900">还贡</button>
-        <span className="text-sm text-amber-200">选一张 10 或以下的牌 · {timer}</span>{auto}{stand}</>;
+      return <>{bell}<button onClick={giveBack} disabled={sel.size !== 1} className="gt-btn bg-amber-400 text-slate-900">还贡</button>
+        <span className="text-sm text-amber-200">选一张 10 或以下的牌</span>{clock}{auto}{stand}</>;
     }
     if (mySeat.place) return <><span className="text-sm text-emerald-100">你已经{PLACE[mySeat.place]}，看队友的</span>{stand}</>;
     if (!myTurn || mySeat.auto) return <><span className="text-sm text-emerald-100">等别人出牌…</span>{auto}{stand}</>;
     return <>
+      {bell}
       <button onClick={() => send({ type: 'pass' })} disabled={leading} className="gt-btn bg-white text-emerald-800">不出</button>
       <button onClick={() => send({ type: 'hint' })} className="gt-btn bg-sky-400 text-slate-900">提示</button>
       <button onClick={() => send({ type: 'play', cards: [...sel] })} disabled={!sel.size} className="gt-btn bg-amber-400 text-slate-900">出牌</button>
-      <span className="text-sm text-amber-200">{timer}</span>{auto}{stand}
+      {clock}{auto}{stand}
     </>;
   }
 
@@ -129,10 +145,14 @@ export default function GuandanView({ active }) {
       <RoomPicker st={st} room={room} watch={watch} phases={PHASE} />
       <div className="grid lg:grid-cols-3 gap-5">
         <TableFrame full={full} onExit={exit} className="lg:col-span-2">
+          {/* 点牌桌任何地方都让浏览器允许提醒出声（浏览器要求先点过页面） */}
+          <div style={{ display: 'contents' }} onPointerDownCapture={unlock}>
           <div className="gt-bar flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 text-sm">
             <span className="font-medium text-emerald-100">{status}</span>
             {meLine}
             {t && <span className="font-bold text-amber-200">本局打 {levelName(t.level)}<span className="font-normal text-emerald-100"> · {levels}</span></span>}
+            <button onClick={toggleAlerts} aria-pressed={alerts} title={alerts ? '轮到你时响一声（点一下关掉）' : '轮到你时不响（点一下打开）'}
+              className="text-xs rounded-full bg-white/15 px-2 py-1">{alerts ? '🔔 提醒' : '🔕 提醒'}</button>
             {canEnter && <button onClick={enter} className="text-xs rounded-full bg-white/15 px-2 py-1">⛶ 全屏</button>}
           </div>
           {t && (
@@ -172,6 +192,7 @@ export default function GuandanView({ active }) {
           )}
           <div className="flex flex-wrap items-center gap-2 mt-4 gd-controls">{controls()}</div>
           <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 gd-msg">{msg}</p>
+          </div>
         </TableFrame>
         <ReactionBar send={send} seated={!!st?.you} />
         <PointsBoard title="掼蛋豆子榜" rows={st?.board || []}>

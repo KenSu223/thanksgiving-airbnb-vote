@@ -14,7 +14,7 @@ import { wall, shuffle, sortTiles, counts, take, suitOf, SUITS, idx } from './ti
 import { isWin, fan, waits, holdsSuit } from './hand.js';
 import { chooseSwap, chooseLack, chooseDiscard, wantPong, wantKong, wantAddKong } from './bot.js';
 
-export const MJ = { base: 5, hua: 16, startPoints: 1000, swapMs: 25000, lackMs: 15000, turnMs: 20000, claimMs: 10000, botMs: 800, idleMs: 10 * 60 * 1000 };
+export const MJ = { base: 5, hua: 16, startPoints: 1000, swapMs: 25000, lackMs: 15000, turnMs: 60000, claimMs: 10000, botMs: 800, idleMs: 10 * 60 * 1000 };
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑', '🤖 大橘'];
 const next = i => (i + 1) % 4;
 

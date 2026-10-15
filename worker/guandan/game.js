@@ -10,7 +10,7 @@
 import { deck, shuffle, sortHand, takeFrom, legalPlay, rankOf, BJ, value } from './cards.js';
 import { choosePlay, hintPlay, tributeCard, returnCard, canReturn } from './bot.js';
 
-export const GD = { base: 10, matchBonus: 60, startPoints: 1000, turnMs: 30000, tributeMs: 20000, botMs: 900, idleMs: 10 * 60 * 1000 };
+export const GD = { base: 10, matchBonus: 60, startPoints: 1000, turnMs: 60000, tributeMs: 20000, botMs: 900, idleMs: 10 * 60 * 1000 };
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑', '🤖 大橘'];
 const next = i => (i + 1) % 4;
 const team = i => i % 2;
