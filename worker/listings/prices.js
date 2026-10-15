@@ -2,6 +2,7 @@ import { j } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
 import { SCRAPE_UA } from './scrape.js';
 import { getState, updateState } from './state.js';
+import { fetchGooglePrice } from './google.js';
 
 // ---------- live prices ----------
 // Airbnb's listing page fetches its price box from this persisted GraphQL
@@ -77,11 +78,25 @@ export async function handlePrices(req, env) {
   for (let i = 0; i < todo.length; i += 4) { // a few at a time, to be gentle with Airbnb
     await Promise.all(todo.slice(i, i + 4).map(async l => { const p = await fetchLivePrice(l, trip); if (p) results[l.id] = p; }));
   }
+  // Google hotels refresh through the same door: stale gPrice snapshots
+  // are re-pulled for the trip's dates (per-room totals; see google.js).
+  const gFresh = l => l.gPrice && l.gPrice.at > Date.now() - PRICE_TTL_MS && l.gPrice.checkIn === trip.checkIn && l.gPrice.checkOut === trip.checkOut;
+  const gTodo = peek.listings.filter(l => l.source === 'google' && (body.id ? l.id === body.id : true) && (body.force || !gFresh(l))).slice(0, 12);
+  const gResults = {};
+  for (let i = 0; i < gTodo.length; i += 4) {
+    await Promise.all(gTodo.slice(i, i + 4).map(async l => { const p = await fetchGooglePrice(l.roomId.slice(2), trip); if (p) gResults[l.id] = p; }));
+  }
   // Apply the fetched prices onto the freshest state in a transaction —
-  // only the `live` field is written, so concurrent votes/adds survive.
+  // only the price fields are written, so concurrent votes/adds survive.
   const live = await updateState(env, trip, state => {
-    for (const l of state.listings) if (results[l.id]) l.live = results[l.id];
+    for (const l of state.listings) {
+      if (results[l.id]) l.live = results[l.id];
+      if (gResults[l.id]) {
+        l.gPrice = gResults[l.id];
+        l.priceUSD = gResults[l.id].total; l.priceNights = gResults[l.id].nights; l.priceAt = gResults[l.id].at;
+      }
+    }
     return Object.fromEntries(state.listings.filter(l => l.live).map(l => [l.id, l.live]));
   });
-  return j({ ok: true, updated: Object.keys(results).length, tried: todo.length, live });
+  return j({ ok: true, updated: Object.keys(results).length, googleUpdated: Object.keys(gResults).length, tried: todo.length, live });
 }

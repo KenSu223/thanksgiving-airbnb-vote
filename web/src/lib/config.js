@@ -2,8 +2,10 @@
 // areas：固定显示的区域标签页（按这个顺序）。每个区域的中心和范围在 worker/config/trips.js 的 zones 里，名字要一致；
 // 不在这些范围里的房源，后端会按位置自动起新区域，标签页也会自动多出来（features/hunt/zones.js）
 export const TRIPS = {
-  nov25: { date: '11月25–26', people: 9, nights: 1, checkIn: '2026-11-25', checkOut: '2026-11-26', areas: ['Denver 市区', 'Denver 周边'] },
-  nov26: { date: '11月26–29', people: 14, nights: 3, checkIn: '2026-11-26', checkOut: '2026-11-29', areas: ['大沙丘区域', '落基山 · Estes Park'] },
+  nov25: { date: '11月25–26', people: 9, nights: 1, checkIn: '2026-11-25', checkOut: '2026-11-26', areas: ['Denver 市区', 'Denver 周边'],
+    googleTs: 'CAEaIAoCGgASGhIUCgcI6g8QCxgZEgcI6g8QCxgaGAEyAggBKgkKBToDVVNEGgA' },
+  nov26: { date: '11月26–29', people: 14, nights: 3, checkIn: '2026-11-26', checkOut: '2026-11-29', areas: ['大沙丘区域', '落基山 · Estes Park'],
+    googleTs: 'CAEaIAoCGgASGhIUCgcI6g8QCxgaEgcI6g8QCxgdGAMyAggBKgkKBToDVVNEGgA' },
 };
 export const DEFAULT_TRIP = 'nov25';
 

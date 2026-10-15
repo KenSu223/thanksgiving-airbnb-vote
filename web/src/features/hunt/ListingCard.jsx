@@ -40,7 +40,10 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
             : <button onClick={e => onVote(l, e.currentTarget)} className={'vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2' + (voted ? ' voted' : '') + (pop ? ' vote-pop' : '')}>
                 {(voted ? '❤️ 已投 · ' : '🤍 投票 · ') + votes.length}
               </button>}
-          {l.kind === 'hotel'
+          {l.kind === 'hotel' && l.source === 'google'
+            ? <a href={'https://www.google.com/travel/hotels/entity/' + l.roomId.slice(2) + '/prices?hl=en' + (T.googleTs ? '&ts=' + T.googleTs : '')} target="_blank" rel="noopener" title={'在 Google 上按 ' + T.date + ' 查看这家酒店的各家报价'}
+                className="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-emerald-400">去 Google ↗</a>
+            : l.kind === 'hotel'
             ? <a href={l.url} target="_blank" rel="noopener" title="在 Booking.com 打开这家酒店"
                 className="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-sky-400">去 Booking ↗</a>
             : <a href={airbnbLink(l, T)} target="_blank" rel="noopener" title={'按 ' + T.date + ' · ' + T.people + '人查看实时价格'}

@@ -89,8 +89,11 @@ try {
     // And the Booking-hotels suite.
     const hotelsPath = new URL('hotels.mjs', import.meta.url).pathname;
     const hotels = existsSync(hotelsPath) ? await runSuite('hotels.mjs') : true;
+    // And the Google Hotels pull suite.
+    const googlePath = new URL('google.mjs', import.meta.url).pathname;
+    const google = existsSync(googlePath) ? await runSuite('google.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && polls && hotels && storms;
+    ok = fuzz && email && users && polls && hotels && google && storms;
   }
 } finally {
   stopServer();

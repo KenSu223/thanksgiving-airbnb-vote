@@ -24,6 +24,22 @@ export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
     const u = url.trim();
     if (!u) return;
     setBusy(true);
+    // Google 酒店链接（旅行/地图）：服务器能直接读 Google 的酒店页，
+    // 名称、照片、评分和行程日期的最低价都当场拉回来建卡。
+    if (/google\.[a-z.]+\/(travel|maps)/i.test(u) || /maps\.app\.goo\.gl|goo\.gl\/maps/i.test(u)) {
+      setMsg({ text: '正在从 Google 拉取酒店信息…', tone: 'text-slate-500' });
+      try {
+        const r = await api('/api/add-google', 'POST', { trip, url: u, addedBy: name });
+        if (r.ok) {
+          setUrl('');
+          setMsg({ text: r.updated ? '这家酒店的价格和信息已刷新 🏨' : '酒店已加入清单 🏨 名称、照片和行程日期的最低价都拉好了', tone: 'text-green-600' });
+          await onAdded();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else setMsg({ text: '加入失败：' + (r.error || '未知错误'), tone: 'text-amber-600' });
+      } catch (e) { setMsg({ text: '网络有点问题，稍后再试', tone: 'text-red-500' }); }
+      setBusy(false);
+      return;
+    }
     // Booking.com 酒店链接：Booking 挡服务器抓取，页面读不到，先用链接里的
     // 酒店名建卡；评分/照片/价格由后续从 Booking 拉取时补齐刷新。
     const bk = u.match(/booking\.com\/hotel\/[a-z]{2}\/([a-z0-9-]+)/i);
@@ -78,7 +94,7 @@ export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
       <h2 className="font-bold text-lg mb-3">➕ 添加候选房源</h2>
       <div className="flex flex-col md:flex-row gap-3">
         <input type="url" value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()}
-          placeholder="粘贴 Airbnb 房源链接，或 Booking.com 酒店链接"
+          placeholder="粘贴 Airbnb 链接，或 Google / Booking 酒店链接"
           className="flex-1 border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <button onClick={add} disabled={busy} className="btn-primary font-bold rounded-xl px-6 py-3">{busy ? '抓取中…' : '加入清单'}</button>
       </div>

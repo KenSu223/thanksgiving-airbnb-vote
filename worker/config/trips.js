@@ -9,12 +9,17 @@ import { SEED } from './seed.js';
 // `areas` in web/src/lib/config.js, which sets their tab order.
 export const TRIPS = {
   nov25: { kvKey: 'state:nov25:v1', seed: [], checkIn: '2026-11-25', checkOut: '2026-11-26', people: 9,
+    // Google Hotels search context (dates + 2 guests/1 room + USD) for the
+    // price pull; captured from a real browser session — Google rejects
+    // hand-assembled ones. See listings/google.js.
+    googleTs: 'CAEaIAoCGgASGhIUCgcI6g8QCxgZEgcI6g8QCxgaGAEyAggBKgkKBToDVVNEGgA',
     voteEndsAt: '2026-10-15T07:00:00Z', // 10/15 00:00 PDT
     zones: [
       { name: 'Denver 市区', lat: 39.7392, lng: -104.9903, km: 10 },
       { name: 'Denver 周边', lat: 39.7392, lng: -104.9903, km: 50 },
     ], },
   nov26: { kvKey: 'state:v1', seed: SEED, checkIn: '2026-11-26', checkOut: '2026-11-29', people: 14,
+    googleTs: 'CAEaIAoCGgASGhIUCgcI6g8QCxgaEgcI6g8QCxgdGAMyAggBKgkKBToDVVNEGgA',
     voteEndsAt: '2026-10-18T07:00:00Z', // 10/18 00:00 PDT
     zones: [
       { name: '大沙丘区域', lat: 37.7326, lng: -105.5122, km: 60 },

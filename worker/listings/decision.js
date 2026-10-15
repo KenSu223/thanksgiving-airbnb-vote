@@ -15,9 +15,14 @@ export const closedError = () => j({ ok: false, error: '投票已经截止，房
 const liveFor = (l, trip) => (l.live && l.live.checkIn === trip.checkIn && l.live.checkOut === trip.checkOut ? l.live : null);
 const unavailable = (l, trip) => { const v = liveFor(l, trip); return !!(v && !v.available); };
 
+// A Google hotel's pulled price is per room (2 guests); scale it to a
+// whole-group estimate so it ranks fairly against whole-house totals.
+const googleTotal = (l, trip) => (l.gPrice && l.gPrice.checkIn === trip.checkIn && l.gPrice.checkOut === trip.checkOut
+  ? l.gPrice.total * Math.ceil(trip.people / 2) : undefined);
+
 // Listings in decision order; unavailable ones last.
 export function ranking(state, trip) {
-  const total = l => liveFor(l, trip)?.total ?? l.priceUSD ?? Infinity;
+  const total = l => liveFor(l, trip)?.total ?? googleTotal(l, trip) ?? l.priceUSD ?? Infinity;
   return state.listings.slice().sort((a, b) =>
     unavailable(a, trip) - unavailable(b, trip)
     || (b.votes || []).length - (a.votes || []).length
