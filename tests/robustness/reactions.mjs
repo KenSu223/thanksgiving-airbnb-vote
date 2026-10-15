@@ -92,6 +92,25 @@ const selfHit = await b.waitFor(s => reactsOf(s).some(r => r.v === '💣' && r.b
 ck('seated player reacts without identify', !!selfHit, JSON.stringify(b.latest()?.reactions));
 a.close(); b.close(); c.close();
 
+// ---------- Guandan: bots are valid targets ----------
+// Bots sit with keys 'bot0'… but display names '🤖 小黑' — and the client
+// addresses seats by display name. A reaction dropped on a bot must land.
+const G = await mkUser('ReactGdG'), H = await mkUser('ReactGdH');
+const g = await connect('/api/guandan?room=1');
+g.send({ type: 'sit', room: 1, name: G.name, token: G.token });
+await g.waitFor(s => s.you === G.name.toLowerCase(), 'G seated at guandan');
+g.send({ type: 'start' });
+const withBots = await g.waitFor(s => (s.table?.seats || []).some(x => x && x.bot), 'bots filled the table').catch(() => null);
+ck('guandan table filled with bots', !!withBots, JSON.stringify(withBots?.table?.seats));
+const botName = withBots?.table?.seats.find(x => x && x.bot)?.name || '';
+const h = await connect('/api/guandan?room=1');
+h.send({ type: 'identify', name: H.name, token: H.token });
+await new Promise(s => setTimeout(s, 250));
+h.send({ type: 'react', value: '🐢', target: botName.toLowerCase() });
+const botHit = await h.waitFor(s => reactsOf(s).some(r => r.v === '🐢' && r.to === botName.toLowerCase() && r.byName === H.name), 'reaction lands on the bot').catch(() => null);
+ck('reaction lands on a bot seat, signed', !!botHit, 'bot=' + botName + ' reactions=' + JSON.stringify(h.latest()?.reactions));
+g.close(); h.close();
+
 // ---------- Blackjack ----------
 const D = await mkUser('ReactSeatD'), E = await mkUser('ReactWatchE');
 const dKey = D.name.toLowerCase();

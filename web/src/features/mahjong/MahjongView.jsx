@@ -71,6 +71,32 @@ function Opp({ s, idx, t, timer, className = '', reacts, rel }) {
   );
 }
 
+// 我自己的座位框：和对面三家一样的框（名牌/豆子/状态/表情气泡），
+// 坐在桌上时一直有 — 别人拖给我的表情要落在这个框上，我自己也是落点。
+function MySeatBox({ s, idx, t, timer, reacts }) {
+  if (!s) return null;
+  const turn = t.turn === idx && t.phase === 'playing' && t.stage === 'act';
+  return (
+    <div data-react-to={s.name.toLowerCase()} className={'gt-seat' + (turn ? ' turn' : '') + (s.connected ? '' : ' away')}>
+      <ReactBubbles list={reacts} />
+      <div className="mj-head">
+        <span className="font-bold truncate">{s.name}（你）</span>
+        {t.dealer === idx && <span className="gt-role gold">庄</span>}
+        {s.lack && <span className="mj-lack">缺{SUIT[s.lack]}</span>}
+        <WonTag won={s.won} />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 text-xs mt-1 text-emerald-50/90">
+        <span>🀫 {s.count} 张{t.phase === 'swap' || t.phase === 'lack' ? (s.picked ? ' · 选好了' : ' · 在选') : ''}</span>
+        {t.ledger[idx] ? <span className={t.ledger[idx] > 0 ? 'text-amber-200' : ''}>本局 {sign(t.ledger[idx])}</span> : null}
+        {s.points != null && <span className="tabular-nums">🫘 {s.points.toLocaleString()}</span>}
+      </div>
+      <div className="mj-extra text-xs mt-0.5 min-h-[1rem] text-amber-200">
+        {turn ? '出牌中' + (timer ? ' · ' + timer : '…') : t.said[idx] || (s.auto ? '托管中' : '')}
+      </div>
+    </div>
+  );
+}
+
 export default function MahjongView({ active }) {
   const { st, live, msg, flash, room, watch, send, sit, standUp } = useTable(active, { path: '/api/mahjong', roomKey: 'mjRoom' });
   const timer = useCountdown(st, active && live);
@@ -280,15 +306,8 @@ export default function MahjongView({ active }) {
               </div>
               {/* 全屏时中间那块会滚动，自己碰杠的、打过的牌放在手牌正上方，一直看得见 */}
               {full && minePiles && <div className="mj-mine-strip">{minePiles}</div>}
-              {!full && mySeat && (
-                <div className="mt-2 text-sm flex flex-wrap items-center gap-2">
-                  <span className="font-bold">{mySeat.name}（你）</span>
-                  {t.dealer === me && <span className="gt-role gold">庄</span>}
-                  {mySeat.lack && <span className="mj-lack">缺{SUIT[mySeat.lack]}</span>}
-                  <WonTag won={mySeat.won} />
-                  {t.ledger[me] ? <span className="text-amber-200">本局 {sign(t.ledger[me])}</span> : null}
-                  <span className="ml-auto tabular-nums">🫘 {mySeat.points?.toLocaleString()}</span>
-                </div>
+              {mySeat && (
+                <div className="mt-2"><MySeatBox s={mySeat} idx={me} t={t} timer={timer} reacts={reactionsFor(st?.reactions, mySeat.name.toLowerCase())} /></div>
               )}
               {mySeat ? (
                 <div className="mj-hand">

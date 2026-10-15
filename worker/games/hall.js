@@ -103,7 +103,15 @@ export class TableHall {
       else {
         const to = String(m.target || '').toLowerCase();
         const table = this.tables[info.room - 1];
-        if (!to || !table || !table.has(to)) err = '把表情拖到一个在座的人身上';
+        // Clients address a seat by its display name (that's all the
+        // view exposes). Humans' keys happen to equal that, but bots
+        // sit under keys like 'bot0' while their display names are
+        // '🤖 小黑' — and has()/seatOf() deliberately skip bots, so a
+        // name-or-key lookup against has() could never land on a bot.
+        // Resolve against the seat list directly; bots are people too.
+        const bare = s => String(s || '').replace(/^🤖\s*/, '').toLowerCase();
+        const seat = table?.seats?.find(s => s && (s.key === to || bare(s.name) === bare(to)));
+        if (!to || !seat) err = '把表情拖到一个在座的人身上';
         else {
           let list = this.reactions.get(info.room);
           if (!list) { list = []; this.reactions.set(info.room, list); }
