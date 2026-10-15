@@ -50,11 +50,24 @@ export function ReactBubbles({ list }) {
   );
 }
 
-// 找手指/鼠标底下那个座位（座位根元素带 data-react-to=玩家 key）
+// 找手指/鼠标底下那个座位（座位根元素带 data-react-to=玩家 key）。
+// 直接命中最好；没命中时就近认领：出牌摆在座位框外面（掼蛋/斗地主的
+// Said 区），用户往"这个人"身上拖、落在他的牌上也应算 — 取 120px 内
+// 离得最近的座位。隐藏面板里的座位是 0 尺寸矩形，跳过。
 const seatAt = (x, y) => {
   const el = document.elementFromPoint(x, y);
   const seat = el && el.closest ? el.closest('[data-react-to]') : null;
-  return seat ? { el: seat, key: seat.getAttribute('data-react-to') } : null;
+  if (seat) return { el: seat, key: seat.getAttribute('data-react-to') };
+  let best = null, bestD = 120;
+  document.querySelectorAll('[data-react-to]').forEach(s => {
+    const r = s.getBoundingClientRect();
+    if (!r.width) return;
+    const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+    const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+    const d = Math.hypot(dx, dy);
+    if (d < bestD) { bestD = d; best = s; }
+  });
+  return best ? { el: best, key: best.getAttribute('data-react-to') } : null;
 };
 
 // 文字太长，塞进小圆钮里只放前三个字（全文本在面板里和气泡里都是全的）
