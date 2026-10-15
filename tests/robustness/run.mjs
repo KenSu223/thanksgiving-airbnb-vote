@@ -83,6 +83,9 @@ try {
     // Same for the user-management suite (PM-only deletion).
     const usersPath = new URL('users.mjs', import.meta.url).pathname;
     const users = existsSync(usersPath) ? await runSuite('users.mjs') : true;
+    // Leaderboard rules (躲技能 top-3 replays, 21 点 net chips) — after users.mjs,
+    // whose victim's dodge replay has to be in the top 3 when it looks.
+    const leaderboards = await runSuite('leaderboards.mjs');
     // And the quick-polls suite.
     const pollsPath = new URL('polls.mjs', import.meta.url).pathname;
     const polls = existsSync(pollsPath) ? await runSuite('polls.mjs') : true;
@@ -99,7 +102,7 @@ try {
     const todosPath = new URL('todos.mjs', import.meta.url).pathname;
     const todos = existsSync(todosPath) ? await runSuite('todos.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && polls && google && cars && reactions && todos && storms;
+    ok = fuzz && email && users && leaderboards && polls && google && cars && reactions && todos && storms;
   }
 } finally {
   stopServer();
