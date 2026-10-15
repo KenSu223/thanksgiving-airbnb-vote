@@ -94,34 +94,36 @@ function clearanceAt(threats, tick, px, py, x, y, tau) {
 const wallRoom = (x, y) => Math.min(x, W - x, y, H - y, 220);
 
 // 从 (sx, sy) 以英雄移速走向 (tx, ty) 并逐步查碰撞：
-// { survive: 第一个会挨打的 tick（走完窗口都没事 = HORIZON+1）, clear: 全程最小余量 }
-function evalWalk(g, threats, sx, sy, tx, ty) {
+// { survive: 第一个会挨打的 tick（走完窗口都没事 = horizon+1）, clear: 全程最小余量 }
+function evalWalk(g, threats, sx, sy, tx, ty, horizon = HORIZON) {
   let x = sx, y = sy, clear = Infinity;
-  for (let tau = 1; tau <= HORIZON; tau++) {
+  // 威胁的弹头投影只算到 HORIZON — 窗口外改用最后一个已知弹头位
+  // 置的静态判定（对复评足够了：要看的是落点在窗口外会不会立刻变陷阱）
+  for (let tau = 1; tau <= horizon; tau++) {
     const px = x, py = y;
     const dx = tx - x, dy = ty - y, d = Math.hypot(dx, dy);
     if (d > 0) { const s = Math.min(HERO.speed, d); x += dx / d * s; y += dy / d * s; }
-    const c = clearanceAt(threats, g.tick, px, py, x, y, tau);
+    const c = clearanceAt(threats, g.tick, px, py, x, y, Math.min(tau, HORIZON));
     if (c < clear) clear = c;
     if (c <= MARGIN) return { survive: tau, clear };
   }
-  return { survive: HORIZON + 1, clear };
+  return { survive: horizon + 1, clear };
 }
 
 // 匀速直线走 (vx, vy) 并逐步查碰撞（贴墙时和模拟一样沿墙滑）。
 // 躲横扫的大鸟/火球墙靠的是顺着弹道跑、贴着间隙穿 — 固定落点的
 // 直线走位表达不了，所以候选路径里要有这一族。
-function evalVelocity(g, threats, sx, sy, vx, vy) {
+function evalVelocity(g, threats, sx, sy, vx, vy, horizon = HORIZON) {
   let x = sx, y = sy, clear = Infinity;
-  for (let tau = 1; tau <= HORIZON; tau++) {
+  for (let tau = 1; tau <= horizon; tau++) {
     const px = x, py = y;
     x = clamp(x + vx, HERO.r, W - HERO.r);
     y = clamp(y + vy, HERO.r, H - HERO.r);
-    const c = clearanceAt(threats, g.tick, px, py, x, y, tau);
+    const c = clearanceAt(threats, g.tick, px, py, x, y, Math.min(tau, HORIZON));
     if (c < clear) clear = c;
     if (c <= MARGIN) return { survive: tau, clear };
   }
-  return { survive: HORIZON + 1, clear };
+  return { survive: horizon + 1, clear };
 }
 
 // 一 tick 的决策：{ move: [x, y] } 或 { flash: k } 或 {}（原地安全）。
@@ -141,22 +143,38 @@ export function planBot(g) {
   // 墙角（实测三颗种子全死在墙边）。开阔度把机器人往场中间留。
   const score = r => Math.min(r.clear, 300) + wallRoom(r.x, r.y) * 0.5;
   let best = null;
-  const consider = (r, x, y, dist) => {
-    const cand = { ...r, x, y, dist };
+  const top = []; // 前几名候选（带可重演的路径描述），给第二轮深看用
+  const consider = (r, x, y, dist, redo) => {
+    const cand = { ...r, x, y, dist, redo };
     if (!best || cand.survive > best.survive
       || (cand.survive === best.survive && (score(cand) > score(best) + 4 || (Math.abs(score(cand) - score(best)) <= 4 && dist < best.dist)))) {
       best = cand;
     }
+    top.push(cand);
+    top.sort((a, b) => (b.survive - a.survive) || (score(b) - score(a)));
+    if (top.length > 5) top.length = 5;
   };
   for (const [cx, cy] of cands) {
-    consider(evalWalk(g, threats, h.x, h.y, cx, cy), cx, cy, Math.hypot(cx - h.x, cy - h.y));
+    consider(evalWalk(g, threats, h.x, h.y, cx, cy), cx, cy, Math.hypot(cx - h.x, cy - h.y),
+      horizon => evalWalk(g, threats, h.x, h.y, cx, cy, horizon));
   }
   // 匀速方向族：胜出时朝那个方向发一个 220 外的落点当移动目标
   //（每 tick 重规划，实际轨迹就是持续匀速）
   for (let k = 0; k < 24; k++) {
     const a = (k / 24) * Math.PI * 2, co = Math.cos(a), si = Math.sin(a);
     const tx = clamp(h.x + co * 220, HERO.r, W - HERO.r), ty = clamp(h.y + si * 220, HERO.r, H - HERO.r);
-    consider(evalVelocity(g, threats, h.x, h.y, co * HERO.speed, si * HERO.speed), tx, ty, 220);
+    consider(evalVelocity(g, threats, h.x, h.y, co * HERO.speed, si * HERO.speed), tx, ty, 220,
+      horizon => evalVelocity(g, threats, h.x, h.y, co * HERO.speed, si * HERO.speed, horizon));
+  }
+  // 第二轮深看：60 tick 窗口里活满的候选彼此只差"余量+开阔"，但新一
+  // 波技能是冲着你站的位置锁定的 — 窗口内最安全的地方，窗口外可能
+  // 正是陷阱。把前几名按 96 tick 重演一遍：只有深窗里比当前赢家多
+  // 活 6 tick 以上的候选才能翻盘（差不多就维持第一轮选择，不横跳）。
+  if (best.survive > HORIZON) {
+    const pool = top.includes(best) ? top : [...top, best];
+    for (const cand of pool) cand.deep = cand.redo(HORIZON + 36).survive;
+    const champ = pool.reduce((a, b) => (b.deep > a.deep ? b : a), best);
+    if (champ !== best && champ.deep > best.deep + 12) best = champ;
   }
   // 走位快活不下去了才交闪现：落点不光当下安全，还要接着能走 —
   // 对每个方向推演"落在那儿再往最有活路的方向走"能活多久。
