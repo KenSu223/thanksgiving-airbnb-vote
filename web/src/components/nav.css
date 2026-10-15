@@ -15,6 +15,19 @@
 @media (prefers-reduced-transparency: reduce) {
   #sidebar { background:rgba(247,249,255,.96); -webkit-backdrop-filter:none; backdrop-filter:none; }
 }
+/* 侧栏比屏幕高时（手机横过来、很矮的窗口）自己上下滑，滑到头也不带着页面跑；
+   高度按真正看得见的那块屏幕算（dvh 不算浏览器的地址栏和工具栏，不然底下几项被工具栏挡住） */
+#sidebar { overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+@supports (height: 100dvh) { #sidebar { height:calc(100dvh - 28px); } }
+/* 矮屏幕（手机横屏）：收紧一点，少滑几下——去掉图标和两行小字，项目矮一点 */
+@media (max-height: 540px) {
+  #sidebar { top:8px; height:calc(100vh - 16px); padding-top:.85rem; padding-bottom:.85rem; }
+  @supports (height: 100dvh) { #sidebar { height:calc(100dvh - 16px); } }
+  #sidebar .side-brand { margin-bottom:.7rem; }
+  #sidebar .side-brand img, #sidebar .side-tag, #sidebar .side-foot { display:none; }
+  #sidebar .nav-group + .nav-group { margin-top:.45rem; }
+  #sidebar .nav-item { padding-top:.4rem; padding-bottom:.4rem; }
+}
 /* 导航项：线条图标 + 英文名，中文名靠右淡淡地跟着。安静为主：
    没有图标砖、不晃动；选中项是一片亮玻璃，左边一道细的品牌色 */
 .nav-group + .nav-group { margin-top:1.1rem; }

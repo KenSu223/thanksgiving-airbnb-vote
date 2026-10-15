@@ -5,14 +5,15 @@ import NavIcon from './NavIcon.jsx';
 import { reduceMotion } from '../lib/motion.js';
 import './nav.css';
 
-// 左侧导航（md 以上）：按 config 里的分组和顺序全摆出来，每组上面一个小组名
+// 左侧导航（md 以上，也包括横过来的手机）：按 config 里的分组和顺序全摆出来，每组上面一个小组名。
+// 比屏幕高时侧栏自己上下滑；矮屏幕上收紧（nav.css）
 export function Sidebar({ view, onView }) {
   return (
     <aside id="sidebar" className="hidden md:flex flex-col w-64 shrink-0 h-screen sticky top-0 px-4 py-6">
-      <div className="px-2 mb-8">
+      <div className="side-brand px-2 mb-8">
         <img src="/icon.svg" alt="" width="40" height="40" className="w-10 h-10 rounded-xl mb-3 shadow-md" />
         <div className="font-extrabold text-lg leading-tight">Denver 感恩节之旅</div>
-        <div className="text-xs text-slate-500 mt-1">Thanksgiving 2026 · 大家一起</div>
+        <div className="side-tag text-xs text-slate-500 mt-1">Thanksgiving 2026 · 大家一起</div>
       </div>
       <nav className="flex flex-col" aria-label="主导航">
         {NAV_GROUPS.map(([g, label]) => (
@@ -28,7 +29,7 @@ export function Sidebar({ view, onView }) {
           </div>
         ))}
       </nav>
-      <p className="mt-auto px-2 text-xs text-slate-500 leading-relaxed">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
+      <p className="side-foot mt-auto px-2 text-xs text-slate-500 leading-relaxed">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
     </aside>
   );
 }
