@@ -27,10 +27,11 @@ button.mj-tile { cursor:pointer; touch-action:manipulation; transition:transform
 .mj-tile.sel { transform:translateY(-12px); box-shadow:0 0 0 2px #facc15, 0 4px 10px rgba(0,0,0,.4); }
 
 /* the hand: one row on a wide screen (tiles shrink a little rather than wrap), rows on a phone held upright;
-   a small gap between suits; the tile just drawn stands apart, with a glowing ring around it (a picked tile keeps its yellow ring) */
+   a small gap between suits; the tile just drawn stands apart, outlined in thick orange — a colour nothing else on
+   the table uses (yellow is picked, blue 新, red 缺); picking it switches to the yellow ring */
 .mj-hand { display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-end; gap:.2rem; padding-top:1rem; }
 .mj-hand .drawn { margin-left:.6rem; }
-.mj-hand button.mj-tile.drawn:not(.sel) { box-shadow:0 0 0 2px #fff, 0 0 12px 3px rgba(255,255,255,.7), 0 2px 0 #d6cfb8, 0 3px 6px rgba(0,0,0,.35); }
+.mj-hand button.mj-tile.drawn:not(.sel) { box-shadow:0 0 0 3px #f97316, 0 2px 0 3px #c2410c, 0 4px 8px rgba(0,0,0,.4); }
 .mj-gap { flex:none; width:.45rem; }
 @media (min-width:641px) {
   .mj-hand { flex-wrap:nowrap; }
