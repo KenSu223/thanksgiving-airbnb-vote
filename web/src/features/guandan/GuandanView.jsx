@@ -173,7 +173,7 @@ export default function GuandanView({ active }) {
           <div className="flex flex-wrap items-center gap-2 mt-4 gd-controls">{controls()}</div>
           <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 gd-msg">{msg}</p>
         </TableFrame>
-        <ReactionBar send={send} />
+        <ReactionBar send={send} active={active} />
         <PointsBoard title="掼蛋豆子榜" rows={st?.board || []}>
           规则：两副牌 108 张，四人各 27 张，对面是队友。从 2 打起，打几就是级牌（比 A 大），红心级牌是「配」，能当任何牌（王除外）。
           牌型：单张、对子、三张、三带二、顺子（5 张）、三连对、钢板；炸弹 4–10 张，同花顺比 5 炸大、比 6 炸小，四个王最大。

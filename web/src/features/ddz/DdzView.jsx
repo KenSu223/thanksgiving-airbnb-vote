@@ -166,7 +166,7 @@ export default function DdzView({ active }) {
           <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 dz-msg">{msg}</p>
           </div>
         </TableFrame>
-        <ReactionBar send={send} />
+        <ReactionBar send={send} active={active} />
         <PointsBoard title="斗地主豆子榜" rows={st?.board || []}>
           规则：一副牌 54 张，三人各 17 张，留 3 张底牌。叫地主 / 抢地主，每抢一次 ×2；炸弹、王炸各 ×2；春天 / 反春 ×2。底分 10 豆，地主一人对两家，输赢都算两份。
           叫地主超时算不叫（抢地主超时算不抢），三家都不叫就重新洗牌。提示：点一次给一种管得上的出法，再点换下一种。
