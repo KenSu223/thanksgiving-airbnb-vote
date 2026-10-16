@@ -159,7 +159,7 @@ export default function UndercoverView({ active }) {
           <ReactionBar send={send} active={active} />
         </PartyFrame>
       </div>
-      <WinsBoard title="谁是卧底 胜场榜" rows={st?.board || []}>
+      <WinsBoard title="谁是卧底 胜场榜" rows={st?.board || []} me={st?.boardMe}>
         <p><b>怎么玩：</b>先有一个人坐主持位当主持人（不算玩家）。主持人自己想一对像但不一样的词，写进来，定几个卧底、几个白板（随机，或者点座位指定），点「发词」。</p>
         <p className="mt-1">每个人点开看自己的词（别给旁边的人看）。卧底的词和大家的很像但不一样，白板没有词，谁也不知道自己是不是卧底。大家当面轮流描述、讨论、投票，投出去的人由主持人点一下，app 显示他是平民、卧底还是白板。</p>
         <p className="mt-1">卧底（和白板）全出局平民赢；卧底人数追上平民，或者只剩 3 个人时卧底还在，卧底赢——app 会提醒主持人，由主持人点结束。</p>

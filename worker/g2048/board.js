@@ -16,6 +16,7 @@
 // Messages out: { type: 'state', you, game, best, board?, spawn?, error? }
 import { getUsers, sameName, cleanName } from '../users/users.js';
 import { j } from '../lib/http.js';
+import { topFor } from '../lib/board.js';
 import { DIRS, GOAL, move, spawn, fresh, canMove, maxTile } from '../../web/src/features/g2048/logic.js';
 
 const FLUSH_MS = 2000;
@@ -52,7 +53,7 @@ export class Board2048 {
     server.addEventListener('message', e => this.onMessage(server, e.data));
     server.addEventListener('close', () => this.onClose(server));
     server.addEventListener('error', () => this.onClose(server));
-    this.send(server, { board: this.top() });
+    this.send(server, { board: true });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -84,7 +85,7 @@ export class Board2048 {
       this.sockets.set(ws, { key, name: user.name });
       const game = await this.gameOf(key, user.name);
       if (!this.sockets.has(ws)) return;
-      return this.send(ws, { game, best: this.bestOf(key), board: this.top() });
+      return this.send(ws, { game, best: this.bestOf(key), board: true });
     }
     const who = this.sockets.get(ws);
     if (!who) return this.send(ws, { error: '先登录再玩' });
@@ -93,7 +94,7 @@ export class Board2048 {
     if (m.type === 'new') {
       const g = this.newGame(who.key, who.name);
       this.flush(who.key);
-      return this.sendTo(who.key, { game: g, best: this.bestOf(who.key), board: this.top() });
+      return this.sendTo(who.key, { game: g, best: this.bestOf(who.key), board: true });
     }
     if (m.type === 'keep') { game.keep = true; this.touch(who.key); return this.sendTo(who.key, { game }); }
     if (m.type !== 'move') return;
@@ -153,9 +154,10 @@ export class Board2048 {
     return tile > b.tile ? 'tile' : 'score';
   }
   bestOf(key) { const b = this.best.get(key); return b ? { tile: b.tile, score: b.score, games: b.games } : null; }
-  top() {
-    return [...this.best.values()].sort((a, b) => b.tile - a.tile || b.score - a.score || a.at - b.at).slice(0, 50)
-      .map(b => ({ name: b.name, tile: b.tile, score: b.score, games: b.games }));
+  // Everyone, best first: [key, row]. Only the top 3 go out, plus each viewer's own place (lib/board.js).
+  ranking() {
+    return [...this.best].sort(([, a], [, b]) => b.tile - a.tile || b.score - a.score || a.at - b.at)
+      .map(([k, b]) => [k, { name: b.name, tile: b.tile, score: b.score, games: b.games }]);
   }
 
   // Writes: a couple of seconds after a change, or right away (flush).
@@ -172,8 +174,10 @@ export class Board2048 {
     if (Object.keys(put).length) this.state.storage.put(put);
   }
 
+  // extra.board: true = this viewer's board (the top 3 and their own place)
   send(ws, extra) {
     const who = this.sockets.get(ws);
+    if (extra.board) extra = { ...extra, ...topFor(this.ranking(), who?.key) };
     try { ws.send(JSON.stringify({ type: 'state', you: who?.key || null, ...extra })); }
     catch (e) { /* socket already gone; its close handler cleans up */ }
   }
@@ -182,8 +186,7 @@ export class Board2048 {
   // The board changed: everyone watching gets it (the mover already has their own state)
   broadcastBoard() {
     clearTimeout(this.boardTimer); this.boardTimer = null;
-    const board = this.top();
-    for (const ws of this.sockets.keys()) this.send(ws, { board });
+    for (const ws of this.sockets.keys()) this.send(ws, { board: true });
   }
   boardSoon() { if (!this.boardTimer) this.boardTimer = setTimeout(() => this.broadcastBoard(), 5000); }
 }

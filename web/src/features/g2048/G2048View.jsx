@@ -4,6 +4,7 @@ import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useG2048 } from './useG2048.js';
 import { GOAL, SIZE, move } from './logic.js';
+import { BoardRows, place, TOP_NOTE } from '../games/TopBoard.jsx';
 import './g2048.css';
 
 // 2048：盘面在服务器上（新砖是服务器出的），离开、刷新、换设备都接着玩。
@@ -25,7 +26,8 @@ export default function G2048View({ active }) {
   const [tiles, setTiles] = useState([]);
   const [game, setGame] = useState(null); // 服务器的这局：{ grid, score, moves, over, won, keep }
   const [best, setBest] = useState(null);
-  const [board, setBoard] = useState([]);
+  const [board, setBoard] = useState([]); // the top 3
+  const [boardMe, setBoardMe] = useState(null); // your own place when you're below them
   const [msg, setMsg] = useState('');
   const nextId = useRef(1), tilesRef = useRef([]), gameRef = useRef(null);
   const inflight = useRef(null), queue = useRef([]), sweepTimer = useRef(null);
@@ -61,7 +63,7 @@ export default function G2048View({ active }) {
 
   const go = useRef(null);
   const onState = useCallback(m => {
-    if (m.board) setBoard(m.board);
+    if (m.board) { setBoard(m.board); setBoardMe(m.boardMe || null); }
     if (m.best) setBest(m.best);
     if (m.error) { setMsg(m.error); setTimeout(() => setMsg(''), 3000); }
     if (!m.game) return;
@@ -181,16 +183,16 @@ export default function G2048View({ active }) {
       </section>
       <aside className="glass-card rounded-2xl p-5 self-start">
         <h2 className="font-bold text-lg mb-1">🏆 2048 排行榜</h2>
-        <p className="text-xs text-slate-500 mb-3">每人拼出过的最大一块 · 一样大比最高分 · 新砖是服务器出的，改不了</p>
-        {board.length ? board.map((r, i) => (
-          <div key={r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (mine && r.name === mine.name ? ' font-bold text-indigo-700' : '')}>
-            <span className="truncate">{i < 3 ? ['🥇', '🥈', '🥉'][i] : (i + 1) + '.'} {r.name}</span>
+        <p className="text-xs text-slate-500 mb-3">每人拼出过的最大一块 · 一样大比最高分 · 新砖是服务器出的，改不了 · {TOP_NOTE}</p>
+        <BoardRows rows={board} me={boardMe} empty="还没人玩过，来当第一" row={(r, i, isMe) => (
+          <div key={isMe ? 'me' : r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (isMe || (mine && r.name === mine.name) ? ' font-bold text-indigo-700' : '')}>
+            <span className="truncate">{place(i)} {r.name}</span>
             <span className="flex items-center gap-1.5 whitespace-nowrap">
               <span className={'g48-chip g48-v' + Math.min(r.tile, 4096)}>{r.tile}</span>
               <span className="text-xs font-normal text-slate-400 tabular-nums">{r.score.toLocaleString()} 分 · {r.games} 局</span>
             </span>
           </div>
-        )) : <p className="text-sm text-slate-400">还没人玩过，来当第一</p>}
+        )} />
       </aside>
     </div>
   );

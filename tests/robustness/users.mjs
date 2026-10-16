@@ -62,7 +62,8 @@ const sc = await J('POST', '/api/dodge/score', { name: VICTIM, token: vic.token,
 ck('retiree dodge score recorded', sc.ok === true, JSON.stringify(sc).slice(0, 160));
 const scrubDoor = await J('POST', '/api/dodge/scrub-user', { target: VICTIM });
 ck('the dodge board has no public scrub door', !scrubDoor || scrubDoor.ok !== true, JSON.stringify(scrubDoor));
-ck('retiree still on the dodge board', (await J('GET', '/api/dodge/board')).board.some(r => isVictim(r.name)));
+const vicBoard = await J('GET', `/api/dodge/board?name=${VICTIM}&token=${vic.token}`);
+ck('retiree still on the dodge board', [...vicBoard.board, vicBoard.boardMe].some(r => r && isVictim(r.name)), JSON.stringify(vicBoard));
 
 // the chat room: the retiree says something, and Aster @s them
 const chat = who => new Promise((resolve, reject) => {

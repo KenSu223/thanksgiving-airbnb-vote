@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { BoardRows, place, TOP_NOTE } from './TopBoard.jsx';
 import './table.css';
 
 // 牌桌外框（斗地主、掼蛋、川麻）。手机横过来、又坐在桌上时，桌子铺满整个屏幕：
@@ -52,19 +53,19 @@ export function RoomPicker({ st, room, watch, phases, rooms = 3 }) {
 }
 
 // 每个游戏自己的豆子榜
-export function PointsBoard({ title, rows, children }) {
+export function PointsBoard({ title, rows, me, children }) {
   return (
     <aside className="glass-card rounded-2xl p-5 self-start">
       <h2 className="font-bold text-lg mb-1">🏆 {title}</h2>
-      <p className="text-xs text-slate-500 mb-3">站起来时才保存豆子 · 初始 1000，输光了自动补给</p>
-      {rows.length ? rows.map((r, i) => (
-        <div key={r.name} className="flex items-center justify-between gap-2 border-b py-1.5 text-sm">
-          <span className="truncate">{i < 3 ? ['🥇', '🥈', '🥉'][i] : (i + 1) + '.'} {r.name}{r.seated && <span className="text-xs text-emerald-600"> 在桌上</span>}</span>
+      <p className="text-xs text-slate-500 mb-3">站起来时才保存豆子 · 初始 1000，输光了自动补给 · {TOP_NOTE}</p>
+      <BoardRows rows={rows} me={me} row={(r, i, isMe) => (
+        <div key={isMe ? 'me' : r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (isMe ? ' font-bold text-indigo-700' : '')}>
+          <span className="truncate">{place(i)} {r.name}{r.seated && <span className="text-xs text-emerald-600"> 在桌上</span>}</span>
           <span className="font-bold tabular-nums whitespace-nowrap">{r.points.toLocaleString()}
             <span className="text-xs font-normal text-slate-400"> {r.games ? r.wins + '胜/' + r.games + '局' : ''}{r.refills ? ' 补给×' + r.refills : ''}</span>
           </span>
         </div>
-      )) : <p className="text-sm text-slate-400">还没人玩过</p>}
+      )} />
       <div className="text-xs text-slate-400 mt-4 leading-relaxed">{children}</div>
     </aside>
   );

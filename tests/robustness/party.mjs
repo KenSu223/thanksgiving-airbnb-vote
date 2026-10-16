@@ -65,8 +65,14 @@ await all(cs, t => t.phase === 'result', 'result');
 const r = cs[0].t().result;
 ck('the host ends it: 平民 win, the 卧底 is not a winner', r.side === 'civ' && r.winners.length === 4 && !r.winners.includes(spy), JSON.stringify(r).slice(0, 200));
 ck('everyone sees every role and the two words once it is over', cs[1].t().reveal.roles.filter(Boolean).length === 5 && cs[1].t().reveal.civWord === '火锅');
-const board = cs[0].st.board;
-ck('the board counts the players, not the host', names.every((n, i) => board.some(b => b.name === n && b.games >= 1 && b.wins === (i === spy ? 0 : 1))) && !board.some(b => b.name === hostUser.name), JSON.stringify(board).slice(0, 300));
+// the boards show only the top 3; everyone below gets their own place, nobody else's
+const placeOf = (c, n) => [...(c.st.board || []), c.st.boardMe].find(b => b && b.name === n);
+ck('the board counts the players (each sees their own place), not the host',
+  names.every((n, i) => { const b = placeOf(cs[i], n); return b && b.games >= 1 && b.wins === (i === spy ? 0 : 1); }) && !placeOf(host, hostUser.name),
+  JSON.stringify(cs.map(c => [c.st.board.map(b => b.name), c.st.boardMe])).slice(0, 400));
+ck('only the top 3 are on the board', [...cs, host, watcher].every(c => c.st.board.length <= 3), JSON.stringify(cs.map(c => c.st.board.length)));
+ck('a player below the top 3 sees their own place, ranked', cs.some(c => c.st.boardMe?.rank >= 4) && cs.every(c => !c.st.boardMe || (c.st.boardMe.rank >= 4 && c.st.boardMe.name === c.user.name)), JSON.stringify(cs.map(c => c.st.boardMe)));
+ck('a signed-in watcher who never played gets no place', !watcher.st.boardMe);
 await Promise.all([...cs, watcher, host].map(c => c.close()));
 
 // ---- 阿瓦隆 ----
@@ -124,7 +130,7 @@ await all(av, t => t.phase === 'result', 'avalon result');
 const ar = av[0].t().result;
 ck('the 刺客 misses 梅林: good win', ar.good === true && ar.winners.length === 3 && !ar.winners.includes(assassinIdx), JSON.stringify(ar).slice(0, 200));
 ck('every role shown at the end', av[2].t().reveal.roles.filter(Boolean).length === 5);
-ck('the avalon board counts it', an.every((n, i) => av[0].st.board.some(b => b.name === n && b.wins === (role[i].evil ? 0 : 1))));
+ck('the avalon board counts it (each sees their own place)', an.every((n, i) => placeOf(av[i], n)?.wins === (role[i].evil ? 0 : 1)) && av.every(c => c.st.board.length <= 3));
 await Promise.all(av.map(c => c.close()));
 
 // ---- 狼人杀 (the runner sets PARTY_SPEED so the 上帝's deliberate pauses fly by) ----
@@ -184,7 +190,7 @@ const wres = ww[0].t().result;
 ck('night 2 kills the last 村民: wolves win (屠边)', wres.good === false && /村民全部出局/.test(wres.title), JSON.stringify(wres).slice(0, 160));
 ck('the winners are the two wolves', JSON.stringify([...wres.winners].sort()) === JSON.stringify(wolves));
 ck('every role and each night are shown at the end', ww[3].t().reveal.roles.filter(Boolean).length === 6 && ww[3].t().reveal.history.length === 2);
-ck('the werewolf board counts it', wn.every((n, i) => ww[0].st.board.some(b => b.name === n && b.wins === (wolves.includes(i) ? 1 : 0))));
+ck('the werewolf board counts it (each sees their own place)', wn.every((n, i) => placeOf(ww[i], n)?.wins === (wolves.includes(i) ? 1 : 0)) && ww.every(c => c.st.board.length <= 3));
 await Promise.all(ww.map(c => c.close()));
 
 done('PARTY');
