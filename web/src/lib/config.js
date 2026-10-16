@@ -19,7 +19,7 @@ const views = {
   flights: { nav: 'Flights', navSub: '航班', icon: 'flights', group: 'trip',
     sub: '大家填上到达和离开的航班 · 看航线地图，自动排接机和送机' },
   cars: { nav: 'Cars', navSub: '用车', icon: 'cars', group: 'trip',
-    sub: '三辆 2026 BMW X5 M60，每辆 5 个座 · 先到先得选座位，再告诉大家你带几件什么行李' },
+    sub: '每辆车挑个车型（几个座、后备箱多大），先到先得选座位，再告诉大家你带几件什么行李' },
   calendar: { nav: 'Schedule', navSub: '日程', icon: 'schedule', group: 'trip',
     sub: '按天看每个人的安排：住哪、航班、接送机' },
   todos: { nav: 'Tasks', navSub: '待办', icon: 'tasks', group: 'trip',

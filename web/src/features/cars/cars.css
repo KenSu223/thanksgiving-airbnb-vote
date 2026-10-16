@@ -31,3 +31,26 @@ span.trunk-ok { color:#64748b; } span.trunk-tight { color:#b45309; } span.trunk-
 .stepper button:disabled { opacity:.35; }
 .stepper span { min-width:1rem; font-weight:700; }
 @media (max-width: 640px) { .car-top { width:min(100%, 190px); } }
+/* 面包车一排四个座：座位按钮小一号 */
+.car-top.dense { width:min(100%, 250px); }
+.car-top.dense .seat { width:2.9rem; }
+.car-top.dense .seat-dot { width:2.15rem; height:2.15rem; border-radius:.75rem; font-size:.7rem; }
+.car-top.dense .seat-name { font-size:.62rem; }
+
+/* 加一辆车：虚线框的卡片 */
+.car-add { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.4rem; min-height:12rem; padding:1.5rem; text-align:center;
+  color:#4f46e5; border:2px dashed rgba(99,102,241,.35); background:rgba(255,255,255,.35); transition: background .2s, border-color .2s; }
+.car-add:hover { background:rgba(255,255,255,.7); border-color:#6366f1; }
+
+/* 挑车型 */
+.mp-cls { margin:0 0 .35rem .1rem; font-size:.78rem; font-weight:800; color:#64748b; letter-spacing:.02em; }
+.mp-row { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.55rem .7rem; border-radius:.9rem; background:rgba(255,255,255,.6); }
+.mp-row + .mp-row { margin-top:.35rem; }
+.mp-opts { display:flex; gap:.35rem; flex-shrink:0; }
+.mp-opt { display:inline-flex; flex-direction:column; align-items:center; padding:.3rem .65rem; border-radius:.7rem; font-size:.82rem; font-weight:700; line-height:1.2;
+  color:#4338ca; background:#eef2ff; border:1px solid transparent; transition: background .15s, color .15s; }
+.mp-opt small { font-size:.65rem; font-weight:600; color:#818cf8; }
+.mp-opt:hover { background:#e0e7ff; }
+.mp-opt.on { background:#4f46e5; color:#fff; }
+.mp-opt.on small { color:#c7d2fe; }
+.mp-custom { padding:.75rem; border-radius:.9rem; background:rgba(255,255,255,.6); }
