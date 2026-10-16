@@ -1,7 +1,7 @@
 // The 掼蛋 room: one Durable Object (/api/guandan) holding three tables of
-// four. Sockets, seats, saving 豆子 and the leaderboard live in the shared
-// TableHall; this only says which game it runs and which messages a seated
-// player can send.
+// four. Sockets, seats, saving (豆子, and the tables themselves — 掼蛋 is the
+// game that opts in) and the leaderboard live in the shared TableHall; this
+// only says which game it runs and which messages a seated player can send.
 import { TableHall } from '../games/hall.js';
 import { GuandanGame, GD } from './game.js';
 
@@ -14,6 +14,7 @@ const ACTIONS = {
   back: (t, key, m) => t.giveBack(key, String(m.card || '')), // 还贡
   hint: (t, key) => ({ reply: { hint: t.hint(key) || [] } }),
   auto: (t, key, m) => { t.setAuto(key, m.on); },
+  end: (t, key) => t.endMatch(key), // 结束比赛
 };
 
 // One-time corrections by hand. Each keeps its flags in this object's storage,
