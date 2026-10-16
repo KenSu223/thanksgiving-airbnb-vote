@@ -37,6 +37,22 @@ function Piles({ melds, river, lastHere, mine }) {
     {river?.length ? <div className="mj-row"><span className="mj-cap">{mine ? '我打的' : '打出'}</span><River tiles={river} lastHere={lastHere} /></div> : null}
   </>;
 }
+// 听牌提示：胡哪几张、各几番、还剩几张（别人手里的看不到，按桌上看得见的算）
+function TingBar({ head, waits }) {
+  const total = waits.reduce((a, w) => a + w.left, 0);
+  return (
+    <div className="mj-ting" role="status">
+      <span className="mj-ting-head">{head}</span>
+      {waits.map(w => (
+        <span key={w.kind} className={'mj-ting-item' + (w.left ? '' : ' dead')}>
+          <MjTile kind={w.kind} size="xs" inline />
+          <span>{w.fan ? w.fan + '番' : '平胡'} · 剩{w.left}</span>
+        </span>
+      ))}
+      <span className="mj-ting-total">共剩 {total} 张</span>
+    </div>
+  );
+}
 function WonTag({ won }) {
   if (!won) return null;
   return <span className="mj-won">第{won.order}胡 · {won.self ? '自摸' : '点炮'} {won.fan}番</span>;
@@ -165,9 +181,11 @@ export default function MahjongView({ active }) {
   if (acting) {
     if (t.phase === 'swap') ask = { head: '🔄 换三张：选同一门的 3 张换出去', sub: '选好点「换这三张」· 往哪家传，大家选完随机定', soon: '超时自动帮你选' };
     else if (t.phase === 'lack') ask = { head: '🎯 定缺：选一门不要', sub: `这门的牌要先打完，手里还有就不能胡 · 建议缺${SUIT[lackPick]}（只有 ${suitCount(lackPick)} 张）`, soon: '超时自动帮你定' };
+    // 碰杠胡：提示小一点（一行），按钮在下面放大、会闪
     else if (claim) ask = {
-      head: <>🀄 {name(t.claimOn.from)} {t.claimOn.rob ? '补杠' : '打出'} <MjTile kind={claimTile} size="sm" inline lit />，你可以{[claim.hu && '胡', claim.kong && '杠', claim.pong && '碰'].filter(Boolean).join(' / ')}</>,
-      sub: '不要就点「过」· 手里一样的牌已经抬起来了', soon: '超时由电脑替你决定（能胡一定胡）' };
+      compact: true,
+      head: <>{name(t.claimOn.from)} {t.claimOn.rob ? '补杠' : '打出'} <MjTile kind={claimTile} size="xs" inline lit />，可以{[claim.hu && '胡', claim.kong && '杠', claim.pong && '碰'].filter(Boolean).join(' / ')}</>,
+      soon: '超时由电脑替你决定（能胡一定胡）' };
   }
   const bell = acting && !ask && (
     <span className={'gt-bell' + (hurry ? ' hurry' : '')} role="status" aria-label={'轮到你出牌' + (hurry ? '，快没时间了，超时自动帮你打一张' : '')}
@@ -175,10 +193,10 @@ export default function MahjongView({ active }) {
   );
   const clock = <span className={'text-sm tabular-nums ' + (hurry ? 'gt-timer-hurry' : 'text-amber-200')}>{timer}</span>;
   const banner = ask && (
-    <div className={'gt-yourturn' + (hurry ? ' hurry' : '')} role="status">
+    <div className={'gt-yourturn' + (ask.compact ? ' compact' : '') + (hurry ? ' hurry' : '')} role="status">
       <span>{hurry ? '⏰ 快没时间了 · ' : ''}{ask.head}</span>
       {secs != null && <b className="tabular-nums">{secs}s</b>}
-      <small>{hurry ? ask.soon : ask.sub}</small>
+      {(hurry || ask.sub) && <small>{hurry ? ask.soon : ask.sub}</small>}
     </div>
   );
 
@@ -211,9 +229,9 @@ export default function MahjongView({ active }) {
       ))}{auto}{stand}</>;
     }
     if (claim) return <>
-      {claim.hu && <button onClick={() => send({ type: 'claim', choice: 'hu' })} className="gt-btn bg-rose-500 text-white">胡！<MjTile kind={claimTile} size="xs" inline /></button>}
-      {claim.kong && <button onClick={() => send({ type: 'claim', choice: 'kong' })} className="gt-btn bg-amber-400 text-slate-900">杠 <MjTile kind={claimTile} size="xs" inline /></button>}
-      {claim.pong && <button onClick={() => send({ type: 'claim', choice: 'pong' })} className="gt-btn bg-amber-400 text-slate-900">碰 <MjTile kind={claimTile} size="xs" inline /></button>}
+      {claim.hu && <button onClick={() => send({ type: 'claim', choice: 'hu' })} className="gt-btn mj-claim hu bg-rose-500 text-white">胡！<MjTile kind={claimTile} size="sm" inline /></button>}
+      {claim.kong && <button onClick={() => send({ type: 'claim', choice: 'kong' })} className="gt-btn mj-claim bg-amber-400 text-slate-900">杠 <MjTile kind={claimTile} size="sm" inline /></button>}
+      {claim.pong && <button onClick={() => send({ type: 'claim', choice: 'pong' })} className="gt-btn mj-claim bg-amber-400 text-slate-900">碰 <MjTile kind={claimTile} size="sm" inline /></button>}
       <button onClick={() => send({ type: 'claim', choice: 'pass' })} className="gt-btn bg-white text-emerald-800">过</button>{stand}
     </>;
     if (mySeat.won) return <><span className="text-sm text-emerald-100">你已经胡了，看他们血战到底</span>{stand}</>;
@@ -249,6 +267,18 @@ export default function MahjongView({ active }) {
     const need = [...mySeat.received];
     hand.forEach((k, i) => { const j = need.indexOf(k); if (j >= 0) { fresh.add(i); need.splice(j, 1); } });
   }
+  // 手牌顺序：服务器排好了（万条筒、从小到大，缺的那门在最后）；刚摸的那张像真打麻将一样单独放最右边
+  const drawnAt = mySeat?.drawn && opts ? hand.lastIndexOf(mySeat.drawn) : -1;
+  const order = hand.map((_, i) => i).filter(i => i !== drawnAt).concat(drawnAt >= 0 ? [drawnAt] : []);
+  // 听牌提示：手里 13 张时一直显示胡什么；轮到你出牌时，打了就能听的牌标「听」，选中那张就显示打了胡什么
+  const ting = t?.ting;
+  const tingIf = opts && ting?.ifDiscard;
+  const selKind = sel.size === 1 ? hand[[...sel][0]] : null;
+  const tingBar = !mySeat || mySeat.won ? null
+    : ting?.now ? <TingBar head="听牌：胡" waits={ting.now} />
+    : tingIf && selKind && tingIf[selKind] ? <TingBar head={<>打 <MjTile kind={selKind} size="xs" inline /> 就听：胡</>} waits={tingIf[selKind]} />
+    : tingIf ? <div className="mj-ting" role="status"><span className="mj-ting-head">打标「听」的牌就听牌了，点一下看胡什么</span></div>
+    : null;
   const minePiles = mySeat && (mySeat.melds.length || mySeat.river.length) ? <Piles mine melds={mySeat.melds} river={mySeat.river} lastHere={t.last?.seat === me && t.phase === 'playing'} /> : null;
   const seat = (k, d, cls) => <Opp key={k} s={t.seats[k]} idx={k} t={t} timer={timer} className={cls} rel={rel(d)} reacts={reactionsFor(st?.reactions, t.seats[k]?.name?.toLowerCase())} />;
   const center = t && (
@@ -309,17 +339,18 @@ export default function MahjongView({ active }) {
               {mySeat && (
                 <div className="mt-2"><MySeatBox s={mySeat} idx={me} t={t} timer={timer} reacts={reactionsFor(st?.reactions, mySeat.name.toLowerCase())} /></div>
               )}
+              {mySeat && tingBar}
               {mySeat ? (
                 <div className="mj-hand">
-                  {hand.map((k, i) => {
-                    const drawn = mySeat.drawn && i === hand.lastIndexOf(mySeat.drawn) && opts;
+                  {order.map((i, n) => {
+                    const k = hand[i], drawn = i === drawnAt;
                     const pickable = (t.phase === 'swap' && !mySeat.swap) || !!opts;
                     const lackTile = mySeat.lack && k[0] === mySeat.lack && t.phase === 'playing';
                     const cls = [drawn && 'drawn', lackTile && 'lackt', fresh.has(i) && 'fresh', claimTile === k && 'match'].filter(Boolean).join(' ');
                     return (
                       <Fragment key={i}>
-                        {i > 0 && hand[i - 1][0] !== k[0] && !drawn && <span className="mj-gap" aria-hidden="true" />}
-                        <MjTile kind={k} selected={sel.has(i)} onClick={pickable ? () => tap(i) : undefined} className={cls} />
+                        {n > 0 && hand[order[n - 1]][0] !== k[0] && !drawn && <span className="mj-gap" aria-hidden="true" />}
+                        <MjTile kind={k} selected={sel.has(i)} onClick={pickable ? () => tap(i) : undefined} className={cls} badge={tingIf?.[k] ? '听' : null} />
                       </Fragment>
                     );
                   })}
