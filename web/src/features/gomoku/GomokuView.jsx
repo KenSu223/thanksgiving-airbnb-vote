@@ -5,6 +5,7 @@ import { useTable, useCountdown, secondsLeft } from '../games/useTable.js';
 import { alertsOn, setAlertsOn, unlock, useTurnAlert } from '../games/turnAlert.js';
 import { BoardRows, place, TOP_NOTE } from '../games/TopBoard.jsx';
 import { ReactionBar, ReactBubbles, reactionsFor } from '../games/Reactions.jsx';
+import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import '../games/table.css';
 import './gomoku.css';
 
@@ -17,6 +18,7 @@ const STARS = [3 * SIZE + 3, 3 * SIZE + 11, 7 * SIZE + 7, 11 * SIZE + 3, 11 * SI
 const PHASE = { waiting: '等人开始', playing: '对局中', over: '这局结束' };
 const COLOR = ['黑', '白'];
 const STONE = ['⚫', '⚪'];
+const UNDOS = 3; // 每局能悔几次（和服务器 worker/gomoku/game.js 的 GOMOKU.undos 一样）
 
 // 选桌：每张桌坐了谁、有没有 🤖、几个人在看
 function Rooms({ st, room, watch }) {
@@ -58,6 +60,7 @@ function Seat({ s, k, t, timer, reacts, action }) {
 
 export default function GomokuView({ active }) {
   const { st, live, msg, room, watch, send, sit, standUp } = useTable(active, { path: '/api/gomoku', roomKey: 'gmRoom' });
+  const confirm = useConfirm();
   const timer = useCountdown(st, active && live);
   const t = st?.table;
   const shown = st?.room || room;
@@ -129,12 +132,16 @@ export default function GomokuView({ active }) {
   const vsBot = t?.vsBot;
   const seatedElsewhere = st?.seatedAt && st.seatedAt !== shown;
   const people = t ? t.seats.filter(s => s && !s.bot).length : 0;
-  const leave = () => {
-    if (t.phase === 'playing' && !vsBot && !window.confirm('现在站起来算认输，确定吗？')) return;
+  const leave = async () => {
+    if (t.phase === 'playing' && !vsBot && !await confirm({ title: '现在站起来？', message: '这局还在下，站起来算你认输。', confirmText: '站起来', danger: true })) return;
     standUp();
   };
-  const resign = () => { if (window.confirm('确定认输？')) send({ type: 'resign' }); };
-  const fresh = () => { if (window.confirm('不下上次那局了，重新开一局？（上次那局不算输赢）')) send({ type: 'fresh' }); };
+  const resign = async () => { if (await confirm({ title: '确定认输？', message: '这局算你输。', confirmText: '认输', danger: true })) send({ type: 'resign' }); };
+  // 重新开一局：这局你已经落过子，就算认输（不然输棋的局可以直接扔掉）
+  const fresh = async () => {
+    const played = moves.some((_, i) => i % 2 === me);
+    if (await confirm({ title: '重新开一局？', message: played ? '不下这局了，这局算你认输。' : '换一局新的。', confirmText: '重新开一局', danger: played })) send({ type: 'fresh' });
+  };
   const btn = (label, onClick, cls = 'bg-white/15 text-white', disabled = false) => (
     <button onClick={onClick} disabled={disabled} className={'gt-btn ' + cls}>{label}</button>
   );
@@ -164,7 +171,7 @@ export default function GomokuView({ active }) {
     const mine = moves.filter((_, i) => i % 2 === me).length;
     return <>
       {canPlay && ghost?.touch && btn('落子', () => drop(ghost.at), 'bg-amber-400 text-slate-900')}
-      {vsBot && btn('悔棋', () => send({ type: 'undo' }), 'bg-white text-slate-800', !mine)}
+      {vsBot && btn('悔棋（还能 ' + Math.max(0, UNDOS - (t.undos || 0)) + ' 次）', () => send({ type: 'undo' }), 'bg-white text-slate-800', !mine || (t.undos || 0) >= UNDOS)}
       {btn('认输', resign)}
       {mySeat.auto ? btn('取消托管', () => send({ type: 'auto', on: false }), 'bg-fuchsia-500 text-white') : !vsBot && btn('托管', () => send({ type: 'auto', on: true }))}
       {stand}
@@ -255,7 +262,7 @@ export default function GomokuView({ active }) {
           )} />
           <div className="text-xs text-slate-400 mt-4 leading-relaxed">
             规则：15 × 15 的棋盘，黑先，横、竖、斜连成五个（或更多）就赢，没有禁手；下满了算和棋。每步 60 秒，超时 🤖 替你下一步，连着两次就托管。
-            一个人坐下就和 🤖 下：可以悔棋（退回你的上一步和它的回应）；站起来这局会存着，下次一个人坐下接着下。
+            一个人坐下就和 🤖 下：每局能悔 3 次棋（退回你的上一步和它的回应）；站起来这局会存着，下次一个人坐下接着下；下了子再「重新开一局」算认输。
             和人下：选座位就是选颜色，再来一局换先手；中途站起来算认输。谁都能来观战。
           </div>
         </aside>

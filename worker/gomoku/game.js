@@ -18,7 +18,8 @@
 import { CELLS, BLACK, WHITE, isPoint, winLine, replay, emptyBoard } from './rules.js';
 import { pickMove } from './bot.js';
 
-export const GOMOKU = { turnMs: 60000, botMs: 700, idleMs: 10 * 60 * 1000, awayMs: 2 * 60 * 1000 };
+// undos: 悔棋 per game against the bot (bot games count on the board, so they're not free)
+export const GOMOKU = { turnMs: 60000, botMs: 700, idleMs: 10 * 60 * 1000, awayMs: 2 * 60 * 1000, undos: 3 };
 export const BOT_NAME = '🤖 小五';
 const colorOf = seat => (seat === 0 ? BLACK : WHITE);
 
@@ -188,6 +189,7 @@ export class GomokuGame {
     if (i < 0) return '先坐下';
     if (!this.vsBot()) return '和人下不能悔棋';
     if (this.phase !== 'playing') return '这局已经结束了';
+    if (this.undos >= GOMOKU.undos) return '每局只能悔 ' + GOMOKU.undos + ' 次';
     const back = this.turn() === i ? 2 : 1; // the bot already answered / it's still thinking
     if (this.moves.length < back) return '还没有可以悔的棋';
     for (let k = 0; k < back; k++) this.stones[this.moves.pop()] = 0;
@@ -205,12 +207,14 @@ export class GomokuGame {
     this.end(1 - i, how, null, this.seats[i].name);
     return null;
   }
-  // Against the bot: throw this game away (not counted) and start a new one, same colours.
+  // Against the bot: start a new game, same colours. Once you've put a stone down
+  // the game in play counts as 认输 — otherwise a losing game could just be dropped.
   fresh(key) {
     const i = this.seatOf(key);
     if (i < 0) return '先坐下';
     if (!this.vsBot()) return '和人下不能重来';
     this.touch(i);
+    if (this.phase === 'playing' && this.moves.some((_, k) => k % 2 === i)) this.end(1 - i, 'resign', null, this.seats[i].name);
     this.begin();
     return null;
   }

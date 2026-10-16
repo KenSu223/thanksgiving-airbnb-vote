@@ -274,11 +274,34 @@ test('standing up from the bot pauses the game under your name; sitting alone ag
   assert.equal(g.seats[1].key, 'a');
   assert.deepEqual(g.moves, moves);
   assert.equal(g.turn(), 1);
-  // 重新开一局: thrown away, not counted
+  // 重新开一局 after A has put stones down: that game counts as A's 认输, then a new one
   assert.equal(g.fresh('a'), null);
   assert.equal(g.moves.length, 0);
   assert.equal(g.resumed, false);
-  assert.equal(log.records.length, 0);
+  assert.deepEqual(log.records, [['a', 'loss']]);
+  assert.equal(g.phase, 'playing');
+  // straight away again, before any stone of A's: nothing to count
+  assert.equal(g.fresh('a'), null);
+  assert.deepEqual(log.records, [['a', 'loss']]);
+});
+
+test('悔棋 against the bot: 3 per game', () => {
+  const { g, tick } = table();
+  g.sit('a', 'A');
+  g.start('a');
+  const spots = [CENTER, P(0, 0), P(14, 14), P(0, 14), P(14, 0)];
+  for (let k = 0; k < 3; k++) {
+    g.move('a', spots[k]); tick();
+    assert.equal(g.undo('a'), null);
+  }
+  g.move('a', spots[3]); tick();
+  assert.equal(g.undo('a'), '每局只能悔 3 次');
+  assert.equal(g.undos, 3);
+  g.start('a'); // still playing: refused, the count stays with this game
+  g.resign('a'); g.start('a'); // 再来一局 swaps colours: the bot opens this time
+  tick();
+  g.move('a', g.stones[CENTER] ? P(0, 0) : CENTER); tick();
+  assert.equal(g.undo('a'), null, 'a new game: 3 again');
 });
 
 test('standing up before your first stone keeps nothing (an old empty one is dropped too)', () => {
