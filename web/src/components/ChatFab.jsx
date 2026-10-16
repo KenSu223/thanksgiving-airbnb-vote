@@ -6,7 +6,8 @@ import './chat.css';
 
 // 聊天室：投票球上面的 💬。全组一个房间，服务器只留最近 100 条（worker/chat/room.js），
 // WebSocket 推过来（服务器那边空闲时会睡，连着不花钱），所以这页一直连着、红点灰点随时更新。
-// 没读的：普通消息是灰色的数字，有人 @我 就变红色（还会弹一句提示）。读到哪了记在这台设备上。
+// 没读的：普通消息是灰色的数字，有人 @我 就变红色（还会弹一句提示）；打开聊天室，别人没读的
+// 消息灰底、上面一条「以下是新消息」，@我 的红框。读到哪了记在这台设备上。
 // 输入 @ 会弹出成员列表，点一下就 @ 上；谁被 @ 了由服务器从文字里认出来。
 const time = at => {
   const d = new Date(at), today = new Date();
@@ -91,14 +92,27 @@ export default function ChatFab() {
   const unread = msgs.filter(m => m.at > readAt && m.byKey !== me);
   const atMe = unread.filter(m => (m.mentions || []).includes(me));
 
-  // 列表：新消息来了、刚打开时滚到底（往上翻着看的时候不打扰）。满 100 条后条数不变，
-  // 所以看最后一条的 id。
-  const list = useRef(null), nearBottom = useRef(true);
+  // 打开时记下哪些是没读的（上次读到 → 打开那一刻的最后一条）：别人的这些消息灰底标出来，
+  // 上面一条「以下是新消息」；@我 的照旧是红框。开着时新来的就是正在看的，不算没读。
+  const [fresh, setFresh] = useState(null); // { from, to }
+  const isNew = m => !!fresh && m.byKey !== me && m.at > fresh.from && m.at <= fresh.to;
+  const firstNew = msgs.findIndex(isNew);
+  const openChat = () => { setFresh({ from: readAt, to: lastAt }); nearBottom.current = true; setOpen(true); };
+
+  // 列表：刚打开时，没读的一屏放不下就停在「以下是新消息」，放得下就到底；新消息来了滚到底
+  // （往上翻着看的时候不打扰）。满 100 条后条数不变，所以看最后一条的 id。
+  const list = useRef(null), divider = useRef(null), nearBottom = useRef(true);
   const lastId = msgs.length ? msgs[msgs.length - 1].id : '';
   useEffect(() => {
+    const el = list.current, d = divider.current;
+    if (!el) return;
+    if (d && el.scrollHeight - d.offsetTop > el.clientHeight) el.scrollTop = d.offsetTop - 8;
+    else el.scrollTop = el.scrollHeight;
+  }, [open]);
+  useEffect(() => {
     const el = list.current;
-    if (el && (nearBottom.current || !open)) el.scrollTop = el.scrollHeight;
-  }, [lastId, open]);
+    if (el && nearBottom.current) el.scrollTop = el.scrollHeight;
+  }, [lastId]);
 
   // 输入：@ 后面的字用来筛成员
   const [text, setText] = useState('');
@@ -135,7 +149,7 @@ export default function ChatFab() {
   return (
     <>
       {/* 投票球正上方：手机在左下，电脑在右下 */}
-      <button onClick={() => setOpen(true)} aria-label={'聊天室' + (atMe.length ? '，' + atMe.length + ' 条 @你的' : unread.length ? '，' + unread.length + ' 条没读' : '')}
+      <button onClick={openChat} aria-label={'聊天室' + (atMe.length ? '，' + atMe.length + ' 条 @你的' : unread.length ? '，' + unread.length + ' 条没读' : '')}
         className="glass-pill fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] left-3 z-40 flex items-center gap-1.5 rounded-full py-2.5 pl-3.5 pr-4 font-bold shadow-[0_10px_28px_-8px_rgba(30,27,75,.45)] transition hover:scale-[1.04] active:scale-95 md:bottom-[5.25rem] md:left-auto md:right-4">
         <span className="text-lg leading-none">💬</span> 聊天
         {atMe.length > 0
@@ -156,11 +170,12 @@ export default function ChatFab() {
               {!msgs.length && <p className="py-10 text-center text-sm text-slate-400">{live ? '还没有人说话，打个招呼吧 👋' : '连接中…'}</p>}
               {msgs.map((m, i) => {
                 const mine = m.byKey === me, tagged = (m.mentions || []).includes(me);
-                const showName = !mine && (i === 0 || msgs[i - 1].byKey !== m.byKey || m.at - msgs[i - 1].at > 5 * 60000);
+                const showName = !mine && (i === 0 || i === firstNew || msgs[i - 1].byKey !== m.byKey || m.at - msgs[i - 1].at > 5 * 60000);
                 return (
                   <div key={m.id} className={'ch-row' + (mine ? ' mine' : '')}>
+                    {i === firstNew && <div ref={divider} className="ch-new">以下是新消息</div>}
                     {showName && <div className="ch-name">{m.by} <span>{time(m.at)}</span></div>}
-                    <div className={'ch-bubble' + (mine ? ' mine' : '') + (tagged ? ' tagged' : '')} title={time(m.at)}>
+                    <div className={'ch-bubble' + (mine ? ' mine' : '') + (tagged ? ' tagged' : isNew(m) ? ' unread' : '')} title={time(m.at)}>
                       <Text msg={m} names={names} me={me} />
                     </div>
                   </div>
