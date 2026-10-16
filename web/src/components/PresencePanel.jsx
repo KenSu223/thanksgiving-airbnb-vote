@@ -10,7 +10,7 @@ import './presence.css';
 // 重算一次「多久以前」，页面开着放着数字也会往前走。
 // showGame（游戏 tab 的那份名单）：在线的人要是在玩游戏，右边用小
 // 灰字写「在玩 X」——key 和 GamesView 的 GAMES 对齐，服务器只认这几个。
-const GAME_LABELS = { bj: 'Blackjack', ddz: '斗地主', gd: '掼蛋', mj: '川麻', dodge: '鲁班躲技能', 2048: '2048', uc: '谁是卧底', av: '阿瓦隆', ww: '狼人杀' };
+const GAME_LABELS = { bj: 'Blackjack', ddz: '斗地主', gd: '掼蛋', mj: '川麻', dodge: '鲁班躲技能', 2048: '2048', uc: '谁是卧底', av: '阿瓦隆', ww: '狼人杀', gomoku: '五子棋' };
 export function agoText(lastSeen, now) {
   if (!lastSeen) return '还没来过';
   const s = Math.max(0, Math.floor((now - lastSeen) / 1000));

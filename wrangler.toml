@@ -126,3 +126,12 @@ class_name = "ChatRoom"
 [[migrations]]
 tag = "v11"
 new_sqlite_classes = ["ChatRoom"]
+
+# 五子棋: one Durable Object, three tables of two, saved after every move.
+[[durable_objects.bindings]]
+name = "GM_HALL"
+class_name = "GomokuHall"
+
+[[migrations]]
+tag = "v12"
+new_sqlite_classes = ["GomokuHall"]

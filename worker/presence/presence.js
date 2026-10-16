@@ -30,7 +30,7 @@ import { j } from '../lib/http.js';
 const SEEN_WRITE_MS = 30000;
 // The Gameroom's game keys (web/src/features/games/GamesView.jsx GAMES) —
 // the only values a roster entry's game can take.
-const GAME_KEYS = new Set(['bj', 'ddz', 'gd', 'mj', 'dodge', '2048', 'uc', 'av', 'ww']);
+const GAME_KEYS = new Set(['bj', 'ddz', 'gd', 'mj', 'dodge', '2048', 'uc', 'av', 'ww', 'gomoku']);
 const cleanGame = g => (GAME_KEYS.has(g) ? g : null);
 
 export class PresenceDO {
