@@ -12,7 +12,7 @@ import './presence.css';
 // 点谁就登谁。在线状态来自 PresenceContext：在在线的只有一个绿点，
 // 不在线的是小灰字（3 分钟前 / 还没来过）。
 export default function LoginModal() {
-  const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, bindIntent } = useSession();
+  const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, deleteUser, bindIntent } = useSession();
   const { users: presenceUsers } = usePresence();
   const presOf = n => presenceUsers.find(u => u.name === n);
   const [now, setNow] = useState(() => Date.now());
@@ -29,6 +29,7 @@ export default function LoginModal() {
   const [bindEmail, setBindEmail] = useState('');
   const [bindOpen, setBindOpen] = useState(false);
   const [code, setCode] = useState('');
+  const [confirmDel, setConfirmDel] = useState('');
   const [sent, setSent] = useState(false);
   const [devCode, setDevCode] = useState('');
   const [cool, setCool] = useState(0);
@@ -36,7 +37,7 @@ export default function LoginModal() {
 
   useEffect(() => {
     if (!loginOpen) return;
-    setNewName(''); setNewEmail(''); setMsg(''); setBindOpen(false); setBindEmail('');
+    setNewName(''); setNewEmail(''); setMsg(''); setBindOpen(false); setBindEmail(''); setConfirmDel('');
     setSel(users.some(u => u.name === name) ? name : '');
     // 从绑邮箱提醒进来：选中本人并直接展开绑邮箱输入框
     if (bindIntent && name) { setSel(name); setBindOpen(true); }
@@ -87,6 +88,15 @@ export default function LoginModal() {
     const r = await sendAuthCode({ name: challenge.name, token: t, email: challenge.email, purpose: challenge.kind });
     if (typeof r === 'string') { setMsg(r); return; }
     setSent(true); if (r.devCode) setDevCode(r.devCode); setCool(60);
+  };
+  // 成员管理只对 PM 显示（服务器还会按 token 再验一次）。两段确认防误删。
+  const isAdmin = !!name && name.toLowerCase() === 'pm';
+  const doDelete = async target => {
+    setMsg('');
+    const err = await deleteUser(target);
+    if (err) { setMsg(err); return; }
+    setConfirmDel('');
+    if (sel === target) setSel('');
   };
   const verify = async () => {
     setMsg('');
@@ -186,6 +196,28 @@ export default function LoginModal() {
             <input value={newEmail} onChange={e => setNewEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && join()}
               className={field + ' mt-2 w-full'} placeholder="邮箱（可选）：绑上后换设备登录要验证码" inputMode="email" maxLength={120} />
             {msg && <p className="mt-2.5 text-sm font-medium text-rose-600">{msg}</p>}
+            {isAdmin && users.some(u => u.name.toLowerCase() !== 'pm') && (
+              <div className="mt-4 border-t border-white/60 pt-3">
+                <p className="mb-2 text-xs font-bold tracking-wide text-slate-500">成员管理（只有 PM 能删）</p>
+                <div className="max-h-44 space-y-1 overflow-y-auto pr-0.5">
+                  {users.filter(u => u.name.toLowerCase() !== 'pm').map(u => (
+                    <div key={u.name} className="flex items-center gap-2 rounded-lg bg-white/45 px-2.5 py-1.5">
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">{u.name}{u.emailBound ? ' 🔒' : ''}</span>
+                      {confirmDel === u.name ? (
+                        <>
+                          <span className="shrink-0 text-xs font-medium text-rose-600">确认删？</span>
+                          <button onClick={() => doDelete(u.name)} className="shrink-0 rounded-lg bg-rose-500 px-2.5 py-1 text-xs font-bold text-white transition hover:bg-rose-600 active:scale-[.97]">删除</button>
+                          <button onClick={() => setConfirmDel('')} className="shrink-0 rounded-lg bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-white">取消</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setConfirmDel(u.name)} className="shrink-0 rounded-lg bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-rose-50 hover:text-rose-600">删除</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[11px] leading-snug text-slate-400">彻底删除：账号连同 ta 的投票、航班、分账、Secret Angel 记录一起清掉，不可恢复。</p>
+              </div>
+            )}
             <button onClick={closeLogin} className="mt-4 w-full text-center text-sm font-medium text-slate-400 transition hover:text-slate-600">先随便看看 →</button>
           </div>
         )}
