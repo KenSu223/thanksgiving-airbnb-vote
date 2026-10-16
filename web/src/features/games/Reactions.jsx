@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSession } from '../../session/SessionContext.jsx';
+import { useSeated } from '../../lib/seated.js';
 
 // 牌桌表情 + 快捷嘲讽（清单和服务器 worker/games/reactions.js 一致）：
 // 登录了就能用，不用坐下。先在面板里选一个（钮变成选中的样子），再
@@ -79,6 +80,7 @@ const abbr = v => v.replace(/\s*[^\p{L}\p{N}？?！!。]+$/u, '').slice(0, 3);
 // 座位旁、带着发送者名字。选中不消耗，想再发直接再拖。
 export function ReactionBar({ send, active }) {
   const { name, token } = useSession();
+  const seated = useSeated();
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState(REACTION_EMOJIS[0]); // 当前选中的表情/文字
   const [ghost, setGhost] = useState(null); // 拖动中的 { v, x, y }
@@ -139,8 +141,10 @@ export function ReactionBar({ send, active }) {
   if (!name || !token || !active) return null; // 没登录发不了（服务器也要验身份）；不在当前游戏里就不出现
   // 挂到 body 上：牌桌全屏时桌面是 portal 出去的浮层（z-60），按钮留在
   // 页面树里会被祖先的层叠上下文压在浮层下面（桌面端全屏时就看不见）。
+  // 电脑、平板上投票和聊天的球也在右下（投票 1.5rem、聊天 5.25rem 起）：没坐下时它们在，
+  // 这个钮就摞在聊天上面；坐下了它们收起来，钮就留在原处。手机上那两个球在左下，不挡。
   return createPortal(
-    <div className="fixed right-3 z-[65] flex flex-col items-end gap-2" style={{ bottom: 'calc(6.5rem + env(safe-area-inset-bottom))' }}>
+    <div className={'fixed right-3 z-[65] flex flex-col items-end gap-2 bottom-[calc(6.5rem+env(safe-area-inset-bottom))]' + (seated ? '' : ' md:bottom-[9rem]')}>
       {ghost && <div className={'gt-ghost' + (isPhrase(ghost.v) ? ' phrase' : '')} style={{ left: ghost.x, top: ghost.y }}>{ghost.v}</div>}
       {open && (
         <div className="glass-sheet rounded-3xl p-3 w-[19rem] max-w-[86vw]">
