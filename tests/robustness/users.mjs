@@ -102,8 +102,12 @@ ck('there is no admin to hand over', !transfer || transfer.ok !== true, JSON.str
 const users = await J('GET', '/api/users');
 ck('retiree gone from the member list', !users.users.some(u => isVictim(u.name)));
 const pmt = await login('PM Test');
-ck('PM Test logs in (would be on the list)', !!pmt?.token);
-ck('PM Test is retired on the next list load', !(await J('GET', '/api/users')).users.some(u => u.name === 'PM Test'));
+ck('PM Test logs in', !!pmt?.token);
+// The name sat on the hardcoded RETIRED list for a day (2026-10-15):
+// login created the account and the next list load scrubbed it again,
+// so signing up as PM Test looked broken. The name is free again —
+// the account now stays on the list like any other.
+ck('PM Test stays on the list', (await J('GET', '/api/users')).users.some(u => u.name === 'PM Test'));
 
 const stEnd = await J('GET', '/api/state?trip=nov26');
 ck('no listing votes by retiree remain', stEnd.listings.every(l => (l.votes || []).every(v => !isVictim(v.name) && v.token !== vic.token)));

@@ -23,8 +23,12 @@ import { scrubUserFromPolls } from '../polls/routes.js';
 import { scrubUserFromCars } from '../cars/routes.js';
 import { scrubUserFromTodos } from '../todos/routes.js';
 
-// 2026-10-15: PM's test account, off the member list on request.
-const RETIRED = ['PM Test'];
+// Nobody is retired by name right now. (2026-10-15 → 2026-10-16: a
+// test account named "PM Test" sat here; PM wanted the name back, and
+// with the entry in place any new account of that name was created by
+// login and then scrubbed again by the next member-list load — the
+// name is free again.)
+const RETIRED = [];
 const retiredNames = env => [...RETIRED, ...String(env.RETIRE || '').split(',').map(s => s.trim()).filter(Boolean)];
 
 // Remove one account and everything recorded under it.
