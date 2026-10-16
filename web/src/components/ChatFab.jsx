@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../session/SessionContext.jsx';
 import { useToast } from './Toast.jsx';
 import { load, save } from '../lib/storage.js';
+import { useSeated } from '../lib/seated.js';
 import './chat.css';
 
 // 聊天室：投票球上面的 💬。全组一个房间，服务器只留最近 100 条（worker/chat/room.js），
@@ -70,6 +71,7 @@ function Text({ msg, names, me }) {
 
 export default function ChatFab() {
   const { name, token, users } = useSession();
+  const seated = useSeated(); // 坐在游戏桌上：球先收起来
   const toast = useToast();
   const me = name ? name.toLowerCase() : '';
   const [open, setOpen] = useState(false);
@@ -148,14 +150,14 @@ export default function ChatFab() {
   if (!name) return null;
   return (
     <>
-      {/* 投票球正上方：手机在左下，电脑在右下 */}
-      <button onClick={openChat} aria-label={'聊天室' + (atMe.length ? '，' + atMe.length + ' 条 @你的' : unread.length ? '，' + unread.length + ' 条没读' : '')}
+      {/* 投票球正上方：手机在左下，电脑在右下；坐在游戏桌上时收起来（不挡出牌的按钮），聊天照样连着、@你照样提示 */}
+      {!seated && <button onClick={openChat} aria-label={'聊天室' + (atMe.length ? '，' + atMe.length + ' 条 @你的' : unread.length ? '，' + unread.length + ' 条没读' : '')}
         className="glass-pill fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] left-3 z-40 flex items-center gap-1.5 rounded-full py-2.5 pl-3.5 pr-4 font-bold shadow-[0_10px_28px_-8px_rgba(30,27,75,.45)] transition hover:scale-[1.04] active:scale-95 md:bottom-[5.25rem] md:left-auto md:right-4">
         <span className="text-lg leading-none">💬</span> 聊天
         {atMe.length > 0
           ? <span className="ch-badge red">@{atMe.length}</span>
           : unread.length > 0 && <span className="ch-badge gray">{unread.length > 99 ? '99+' : unread.length}</span>}
-      </button>
+      </button>}
 
       {open && (
         <div className="login-fade fixed inset-0 z-[66] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-[3px]"

@@ -1,9 +1,15 @@
 // One 斗地主 table: three seats (people or bots), 叫地主 / 抢地主 bidding,
-// play and scoring. Kept apart from sockets and storage so it can be tested
-// on its own. hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat) }.
+// play and scoring. Saved like 掼蛋 (games/saving.js): the room writes the
+// table on every change, so a deploy carries the hand on; 豆子 are saved after
+// every hand; someone alone with bots who leaves mid-hand has the table parked
+// under them, and it comes back when they next press 开始 alone (or 不打这把了
+// throws it away). Kept apart from sockets and storage so it can be tested on
+// its own. hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat),
+// park?(key, snapshot), unpark?(key), peek?(key) }.
 import { deck, isBombish, legalPlay, shuffle, sortHand, takeFrom } from './cards.js';
 import { choosePlay, wantsCall, wantsGrab } from './bot.js';
 import { beatOptions, leadOptions } from './hints.js';
+import { snapshotOf, restoreInto, parkOut, unparkInto } from '../games/saving.js';
 
 export const DDZ = { base: 10, startPoints: 1000, bidMs: 15000, turnMs: 30000, botMs: 900, idleMs: 10 * 60 * 1000 };
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑'];
@@ -56,6 +62,7 @@ export class DdzGame {
     if (!this.has(key)) return '先坐下';
     const i = this.seatOf(key);
     if (i >= 0) this.touch(i);
+    if (this.phase === 'waiting' && this.solo(key) && unparkInto(this, key)) return null; // the hand they left alone with bots
     if (this.phase === 'waiting') this.deal();
     else if (this.phase === 'result') this.nextHand();
     return null;
@@ -63,6 +70,7 @@ export class DdzGame {
 
   deal() {
     this.clearTimer();
+    this.resumedRound = null;
     for (const w of this.waitlist.splice(0)) { const i = this.seats.findIndex(s => !s || s.bot); if (i >= 0) this.seats[i] = w; }
     this.seats = this.seats.map((s, i) => s || this.bot(i));
     this.reset();
@@ -233,6 +241,7 @@ export class DdzGame {
     this.result = { winner, landlordWin, deltas, spring, factor, multiplier: this.multiplier, bombs: this.bombs, names: this.seats.map(s => s.name) };
     this.phase = 'result';
     this.turn = -1;
+    for (const s of this.seats) if (!s.bot && !s.leaving && s.connected) this.h.save(s); // 豆子 saved after every hand
     this.release();
   }
   // Let go of people who stood up or dropped during the hand. The result stays
@@ -241,7 +250,7 @@ export class DdzGame {
     this.seats.forEach((s, k) => { if (s && !s.bot && (s.leaving || !s.connected)) { this.h.save(s); this.seats[k] = null; } });
     if (!this.humans().length && !this.waitlist.length) this.clear();
   }
-  clear() { this.clearTimer(); this.reset(); this.seats = [null, null, null]; this.phase = 'waiting'; this.turn = -1; }
+  clear() { this.clearTimer(); this.reset(); this.seats = [null, null, null]; this.phase = 'waiting'; this.turn = -1; this.resumedRound = null; }
   // 再来一局: refill anyone broke and deal again.
   nextHand() {
     this.release();
@@ -251,13 +260,19 @@ export class DdzGame {
     this.deal();
   }
 
-  // Stand up. Mid-hand, 托管 plays your cards to the end, then you're saved.
+  // Stand up. Mid-hand, 托管 plays your cards to the end, then you're saved —
+  // or, alone with bots, the table is parked under you (nothing plays on) and
+  // comes back when you next press 开始 alone. Returns a notice, if any.
   leave(key) {
     const w = this.waitlist.findIndex(x => x.key === key);
     if (w >= 0) { this.waitlist.splice(w, 1); return; }
     const i = this.seatOf(key);
     if (i < 0) return;
     const s = this.seats[i];
+    if (this.h.park && this.inHand() && this.solo(key)) {
+      parkOut(this, s);
+      return '这把存好了，下次一个人坐下点「开始」就接着打';
+    }
     if (this.inHand()) {
       s.leaving = true; s.auto = true;
       if (this.turn === i) this.setTurn(i);
@@ -285,9 +300,25 @@ export class DdzGame {
     return idle;
   }
 
+  solo(key) { return this.humans().length === 1 && !this.waitlist.length && this.seatOf(key) >= 0; }
+  // 不打这把了: alone at the table, throw away the hand parked under you.
+  endMatch(key) {
+    const i = this.seatOf(key);
+    if (i < 0) return '先坐下';
+    if (this.phase === 'waiting' && this.solo(key) && this.h.unpark?.(key)) return null;
+    return '没有存着的牌局';
+  }
+
+  // ---- saving (games/saving.js) ----
+  snapshot() { return snapshotOf(this); }
+  restore(snap) { return restoreInto(this, snap); }
+  // After a restore: start the clock that was running, from the top.
+  resume() { if (this.inHand() && this.turn >= 0) this.setTurn(this.turn); }
+
   // What one viewer sees: their own cards, everyone's counts, all hands once it's over.
   view(key) {
     const me = this.seatOf(key), over = this.phase === 'result';
+    const parked = this.phase === 'waiting' && this.solo(key) ? this.h.peek?.(key) || null : null;
     return {
       phase: this.phase, round: this.round, turn: this.turn, deadline: this.deadline, now: this.h.now(), redealtAt: this.redealtAt || 0,
       landlord: this.landlord, multiplier: this.multiplier, bombs: this.bombs, base: DDZ.base,
@@ -303,6 +334,8 @@ export class DdzGame {
       waiting: this.waitlist.some(w => w.key === key),
       you: me,
       result: this.result,
+      parked, // a hand this viewer left alone with bots, waiting for 开始
+      resumed: this.resumedRound != null && this.resumedRound === this.round,
     };
   }
 }

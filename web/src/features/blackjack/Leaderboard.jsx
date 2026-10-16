@@ -7,7 +7,7 @@ export default function Leaderboard({ rows, me }) {
   return (
     <aside className="glass-card rounded-2xl p-5 self-start">
       <h2 className="font-bold text-lg mb-1">🏆 筹码榜</h2>
-      <p className="text-xs text-slate-500 mb-3">按净赢排：现在的筹码 − 1000 ×（1 + 补给次数），输多了是负数，补给再多也不会往上排 · 站起来时才保存筹码 · 初始 1000，输光了自动补给 · {TOP_NOTE}</p>
+      <p className="text-xs text-slate-500 mb-3">按净赢排：现在的筹码 − 1000 ×（1 + 补给次数），输多了是负数，补给再多也不会往上排 · 每打完一手就保存筹码 · 初始 1000，输光了自动补给 · {TOP_NOTE}</p>
       <BoardRows rows={rows} me={me} row={(r, i, isMe) => (
         <div key={isMe ? 'me' : r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (isMe ? ' font-bold text-indigo-700' : '')}>
           <span className="truncate">{place(i)} {r.name}{r.seated && <span className="text-xs text-emerald-600"> 在桌上</span>}</span>

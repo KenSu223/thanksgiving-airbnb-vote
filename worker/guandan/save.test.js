@@ -80,7 +80,8 @@ test('alone with bots: standing up mid-hand parks the match; sitting down alone 
   const u = h.tables[2];
   u.sit('ken', 'Ken', h.board.get('ken'));
   assert.equal(u.phase, 'waiting', 'sitting down alone doesn’t bring it back yet');
-  assert.deepEqual(u.view('ken').parked, { us: i % 2 ? 4 : 9, them: i % 2 ? 9 : 4, inHand: true });
+  const pk = u.view('ken').parked;
+  assert.deepEqual([pk.us, pk.them, pk.inHand], [i % 2 ? 4 : 9, i % 2 ? 9 : 4, true]);
   assert.equal(u.view('ken').canEnd, true);
   assert.equal(u.start('ken'), null);
   assert.equal(u.seatOf('ken'), i);

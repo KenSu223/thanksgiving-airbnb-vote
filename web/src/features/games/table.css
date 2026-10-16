@@ -61,3 +61,5 @@ html.gt-lock, html.gt-lock body { overflow:hidden; overscroll-behavior:none; }
 /* card tables are for tapping, not selecting: no text selection or long-press copy menu */
 .gt-felt { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
 html.gt-lock, html.gt-lock body { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+/* 存着的那把 / 接着上次那把 */
+.gt-saved-note { margin:.6rem auto 0; max-width:36rem; text-align:center; font-size:.8rem; color:#fef3c7; background:rgba(0,0,0,.22); border-radius:.8rem; padding:.35rem .8rem; }

@@ -17,11 +17,11 @@
 // hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat), park?(key, snapshot), unpark?(key), peek?(key) }.
 import { deck, shuffle, sortHand, takeFrom, legalPlay, rankOf, BJ, value } from './cards.js';
 import { choosePlay, tributeCard, returnCard, canReturn } from './bot.js';
+import { snapshotOf, restoreInto, parkOut, unparkInto } from '../games/saving.js';
 import { beatOptions, leadOptions } from './hints.js';
 
 // aceBonus: 过 A (winning the match) — on top of the 60, each person on the winning team gets this from the house
 export const GD = { base: 10, matchBonus: 60, aceBonus: 100, startPoints: 1000, turnMs: 60000, tributeMs: 20000, botMs: 900, idleMs: 10 * 60 * 1000 };
-const SNAPSHOT_V = 1;
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑', '🤖 大橘'];
 const next = i => (i + 1) % 4;
 const team = i => i % 2;
@@ -86,19 +86,7 @@ export class GuandanGame {
     return null;
   }
   solo(key) { return this.humans().length === 1 && !this.waitlist.length && this.seatOf(key) >= 0; }
-  // Put back the table someone parked: their seat as it was, their 豆子 as saved since (another
-  // table may have moved them), the clock running again.
-  unpark(key) {
-    const me = this.seats[this.seatOf(key)];
-    const snap = this.h.unpark?.(key);
-    if (!snap?.seats?.some(x => x && !x.bot && x.key === key) || !this.restore(snap)) return false;
-    const s = this.seats.find(x => x && !x.bot && x.key === key);
-    const { name, points, refills, games, wins, aces } = me;
-    Object.assign(s, { name, points, refills, games, wins, aces, connected: true, leaving: false, auto: false, timeouts: 0, activeAt: this.h.now() });
-    this.resumedRound = this.round;
-    this.resume();
-    return true;
-  }
+  unpark(key) { return unparkInto(this, key); }
 
   deal() {
     this.clearTimer();
@@ -348,9 +336,7 @@ export class GuandanGame {
     if (i < 0) return;
     const s = this.seats[i];
     if (this.h.park && this.humans().length === 1 && !this.waitlist.length && this.matchOn()) {
-      this.h.save(s);
-      this.h.park(key, this.snapshot());
-      this.clear();
+      parkOut(this, s);
       return '这局存好了，下次一个人坐下点「开始」就接着打';
     }
     if (this.inHand()) {
@@ -403,17 +389,8 @@ export class GuandanGame {
 
   // ---- saving ----
   // Everything but the hooks and the running timer, as plain data.
-  snapshot() {
-    const { h, timer, deadline, ...rest } = this;
-    return JSON.parse(JSON.stringify({ ...rest, v: SNAPSHOT_V }));
-  }
-  restore(snap) {
-    if (!snap || snap.v !== SNAPSHOT_V) return false;
-    const { v, ...rest } = snap;
-    Object.assign(this, rest);
-    this.timer = null; this.deadline = 0;
-    return true;
-  }
+  snapshot() { return snapshotOf(this); }
+  restore(snap) { return restoreInto(this, snap); }
   // After a restore: start the clock that was running, from the top.
   resume() {
     if (this.phase === 'tribute') this.setTimer(GD.tributeMs, () => this.finishReturns());

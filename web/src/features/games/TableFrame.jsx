@@ -52,8 +52,15 @@ export function RoomPicker({ st, room, watch, phases, rooms = 3 }) {
   );
 }
 
+// 存着的那把（一个人带机器人打、打到一半站起来时存下的）：坐下时提示，点「接着打」原样接着；刚接上时也说一声
+export function SavedNote({ t }) {
+  if (t?.parked) return <div className="gt-saved-note">你上次一个人打的这把还存着{t.parked.inHand ? '，打到一半' : ''}。点「▶ 接着打」继续，不想打了就点「不打这把了」</div>;
+  if (t?.resumed) return <div className="gt-saved-note">接着上次那把</div>;
+  return null;
+}
+
 // 每个游戏自己的豆子榜（saveNote：什么时候存豆子，掼蛋是每手都存）；过 A 的次数（掼蛋）写在胜局后面
-export function PointsBoard({ title, rows, me, saveNote = '站起来时才保存豆子', children }) {
+export function PointsBoard({ title, rows, me, saveNote = '每打完一把就保存豆子', children }) {
   return (
     <aside className="glass-card rounded-2xl p-5 self-start">
       <h2 className="font-bold text-lg mb-1">🏆 {title}</h2>
