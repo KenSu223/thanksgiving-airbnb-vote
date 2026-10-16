@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { NAV_GROUPS, VIEWS } from '../lib/config.js';
 import { load, save } from '../lib/storage.js';
 import NavIcon from './NavIcon.jsx';
+import PresencePanel from './PresencePanel.jsx';
 import { reduceMotion } from '../lib/motion.js';
 import './nav.css';
 
@@ -29,7 +30,10 @@ export function Sidebar({ view, onView }) {
           </div>
         ))}
       </nav>
-      <p className="side-foot mt-auto px-2 text-xs text-slate-500 leading-relaxed">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
+      <div className="mt-auto">
+        <PresencePanel />
+        <p className="side-foot px-2 text-xs text-slate-500 leading-relaxed">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
+      </div>
     </aside>
   );
 }

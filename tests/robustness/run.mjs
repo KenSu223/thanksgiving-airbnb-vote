@@ -105,13 +105,16 @@ try {
     const todos = existsSync(todosPath) ? await runSuite('todos.mjs') : true;
     // 2048: the server-owned board, resume, the best-tile board.
     const g2048 = await runSuite('g2048.mjs');
+    // Presence: who has the app open, and when everyone else last did.
+    const presencePath = new URL('presence.mjs', import.meta.url).pathname;
+    const presence = existsSync(presencePath) ? await runSuite('presence.mjs') : true;
     // Party games (谁是卧底 / 阿瓦隆 / 狼人杀): whole games over real sockets.
     const party = await runSuite('party.mjs');
     // And the dodge autopilot-grants suite.
     const dodgePath = new URL('dodge.mjs', import.meta.url).pathname;
     const dodge = existsSync(dodgePath) ? await runSuite('dodge.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && leaderboards && polls && google && cars && reactions && todos && g2048 && party && dodge && storms;
+    ok = fuzz && email && users && leaderboards && polls && google && cars && reactions && todos && g2048 && presence && party && dodge && storms;
   }
 } finally {
   stopServer();
