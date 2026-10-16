@@ -5,12 +5,12 @@ import { dueLabel, overdue } from './phases.js';
 
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 
-// 一条待办：圆圈打勾、标题、备注、截止日期、谁在做；「我来」/「不做了」；加的人和管理员可以指派、改、删
-export default function TodoItem({ t, me, isAdmin, people, today, busy, act }) {
+// 一条待办：圆圈打勾、标题、备注、截止日期、谁在做；「我来」/「不做了」；加的人可以指派、改、删
+export default function TodoItem({ t, me, people, today, busy, act }) {
   const [mode, setMode] = useState(null); // 'assign' | 'edit'
   const [who, setWho] = useState(t.assignees);
   const mine = !!me && t.assignees.some(n => same(n, me));
-  const owner = !!me && (same(t.by, me) || isAdmin);
+  const owner = !!me && same(t.by, me);
   const late = overdue(t, today);
   if (mode === 'edit') {
     return (

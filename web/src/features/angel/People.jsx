@@ -1,6 +1,5 @@
-// 谁选好了。管理员带 👑 标记（抽签、重抽、排除都归管理员管，
-// 大家得先知道管理员是谁）。管理员还能把不参加的人排除掉。
-export default function People({ people, isAdmin, onExclude }) {
+// 谁选好了。谁都可以把不参加的人排除掉（或者加回来），点之前会确认。
+export default function People({ people, onExclude }) {
   const inPeople = people.filter(p => !p.excluded);
   const done = inPeople.filter(p => p.submitted).length;
   return (
@@ -16,8 +15,8 @@ export default function People({ people, isAdmin, onExclude }) {
         {people.map(p => (
           <span key={p.name} className={'inline-flex items-center gap-1.5 rounded-full pl-1 pr-3 py-1 text-sm ' + (p.excluded ? 'bg-slate-100 text-slate-400 line-through' : p.submitted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')}>
             <span className="avatar w-6 h-6 text-[11px]">{Array.from(p.name)[0].toUpperCase()}</span>
-            {p.name}{p.isAdmin ? ' 👑' : ''} {p.excluded ? '' : p.submitted ? '✓' : '…'}
-            {isAdmin && (
+            {p.name} {p.excluded ? '' : p.submitted ? '✓' : '…'}
+            {onExclude && (
               <button onClick={() => onExclude(p.name, !p.excluded)} title={p.excluded ? '加回来' : '不参加'}
                 className="ml-1 text-xs text-slate-400 hover:text-rose-600 no-underline">{p.excluded ? '↺' : '✕'}</button>
             )}

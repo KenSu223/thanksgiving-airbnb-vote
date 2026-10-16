@@ -6,7 +6,7 @@ import './login.css';
 // 绑了邮箱的账号在新设备上登录要邮箱验证码（challenge 视图）；
 // 没绑的可以从这里绑（选人 → 绑邮箱 → 收到码 → 验证完成）。
 export default function LoginModal() {
-  const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, deleteUser, bindIntent } = useSession();
+  const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, bindIntent } = useSession();
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [sel, setSel] = useState('');
@@ -14,7 +14,6 @@ export default function LoginModal() {
   const [bindEmail, setBindEmail] = useState('');
   const [bindOpen, setBindOpen] = useState(false);
   const [code, setCode] = useState('');
-  const [confirmDel, setConfirmDel] = useState('');
   const [sent, setSent] = useState(false);
   const [devCode, setDevCode] = useState('');
   const [cool, setCool] = useState(0);
@@ -22,7 +21,7 @@ export default function LoginModal() {
 
   useEffect(() => {
     if (!loginOpen) return;
-    setNewName(''); setNewEmail(''); setMsg(''); setBindOpen(false); setBindEmail(''); setConfirmDel('');
+    setNewName(''); setNewEmail(''); setMsg(''); setBindOpen(false); setBindEmail('');
     setSel(users.some(u => u.name === name) ? name : '');
     // 从绑邮箱提醒进来：选中本人并直接展开绑邮箱输入框
     if (bindIntent && name) { setSel(name); setBindOpen(true); }
@@ -78,16 +77,6 @@ export default function LoginModal() {
     const err = await verifyAuthCode(code.trim());
     if (err) setMsg(err);
   };
-  // 成员管理只对 PM 显示（服务器还会按 token 再验一次）。两段确认防误删。
-  const isAdmin = !!name && name.toLowerCase() === 'pm';
-  const doDelete = async target => {
-    setMsg('');
-    const err = await deleteUser(target);
-    if (err) { setMsg(err); return; }
-    setConfirmDel('');
-    if (sel === target) setSel('');
-  };
-
   return (
     <div className="login-fade fixed inset-0 bg-slate-950/45 backdrop-blur-[3px] flex items-center justify-center z-50 px-4"
       onClick={e => { if (e.target === e.currentTarget) closeLogin(); }}>
@@ -172,28 +161,6 @@ export default function LoginModal() {
             <input value={newEmail} onChange={e => setNewEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && join()}
               className={field + ' mt-2 w-full'} placeholder="邮箱（可选）：绑上后换设备登录要验证码" inputMode="email" maxLength={120} />
             {msg && <p className="mt-2.5 text-sm font-medium text-rose-600">{msg}</p>}
-            {isAdmin && users.some(u => u.name.toLowerCase() !== 'pm') && (
-              <div className="mt-4 border-t border-white/60 pt-3">
-                <p className="mb-2 text-xs font-bold tracking-wide text-slate-500">成员管理（只有 PM 能删）</p>
-                <div className="max-h-44 space-y-1 overflow-y-auto pr-0.5">
-                  {users.filter(u => u.name.toLowerCase() !== 'pm').map(u => (
-                    <div key={u.name} className="flex items-center gap-2 rounded-lg bg-white/45 px-2.5 py-1.5">
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">{u.name}{u.emailBound ? ' 🔒' : ''}</span>
-                      {confirmDel === u.name ? (
-                        <>
-                          <span className="shrink-0 text-xs font-medium text-rose-600">确认删？</span>
-                          <button onClick={() => doDelete(u.name)} className="shrink-0 rounded-lg bg-rose-500 px-2.5 py-1 text-xs font-bold text-white transition hover:bg-rose-600 active:scale-[.97]">删除</button>
-                          <button onClick={() => setConfirmDel('')} className="shrink-0 rounded-lg bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-white">取消</button>
-                        </>
-                      ) : (
-                        <button onClick={() => setConfirmDel(u.name)} className="shrink-0 rounded-lg bg-white/70 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:bg-rose-50 hover:text-rose-600">删除</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-1.5 text-[11px] leading-snug text-slate-400">彻底删除：账号连同 ta 的投票、航班、分账、Secret Angel 记录一起清掉，不可恢复。</p>
-              </div>
-            )}
             <button onClick={closeLogin} className="mt-4 w-full text-center text-sm font-medium text-slate-400 transition hover:text-slate-600">先随便看看 →</button>
           </div>
         )}

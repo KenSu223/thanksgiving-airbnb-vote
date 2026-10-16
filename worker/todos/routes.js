@@ -1,7 +1,7 @@
 // To-dos: anything the group needs done — before the trip, during it, or
 // after. Anyone signed in can add one and assign people to it; anyone can
 // pick up a task themselves (我来) or drop out of one, and tick it done.
-// Editing and deleting is for whoever added it, and the admin.
+// Editing, assigning and deleting is for whoever added it (everyone has the same rights).
 //
 // Stored in the store (worker/store) under todos:v1:
 //   { items: [{ id, title, note, phase, due, assignees: [userKey], byKey, at,
@@ -13,7 +13,6 @@ import { readDoc, transact } from '../lib/store.js';
 import { cleanName, getUsers, sameName } from '../users/users.js';
 
 const KEY = 'todos:v1';
-const ADMIN = 'aster';
 export const PHASES = ['pre', 'during', 'post'];
 const MAX_ITEMS = 300;
 
@@ -107,7 +106,7 @@ async function onItem(req, env, fn) {
   });
   return reply(env, users, out);
 }
-const canEdit = (t, key) => key === t.byKey || key === ADMIN;
+const canEdit = (t, key) => key === t.byKey;
 
 // Pick up a task (我来) or drop out of it.
 const handleClaim = (req, env) => onItem(req, env, (t, key, b) => {
@@ -116,7 +115,7 @@ const handleClaim = (req, env) => onItem(req, env, (t, key, b) => {
   t.assignees = [...set];
 });
 
-// Set who's on it (whoever added it, or the admin).
+// Set who's on it (whoever added it).
 const handleAssign = (req, env) => onItem(req, env, (t, key, b, users) => {
   if (!canEdit(t, key)) return { error: '只有加这条的人能指派' };
   t.assignees = readAssignees(users, b.assignees);
@@ -140,7 +139,7 @@ const handleDelete = (req, env) => onItem(req, env, (t, key, b, users, d) => {
   d.items = d.items.filter(x => x.id !== t.id);
 });
 
-// Account deletion (users/admin.js): off every task; tasks they added stay.
+// A retired account (users/retire.js): off every task; tasks they added stay.
 export async function scrubUserFromTodos(env, user) {
   const key = user.name.toLowerCase();
   await update(env, d => {

@@ -5,7 +5,7 @@
 import { routes as listingRoutes } from './listings/routes.js';
 import { routes as userRoutes } from './users/users.js';
 import { routes as authRoutes } from './users/auth.js';
-import { routes as adminRoutes } from './users/admin.js';
+import { routes as retireRoutes } from './users/retire.js';
 import { routes as splitRoutes } from './split/routes.js';
 import { routes as foodRoutes } from './food/routes.js';
 import { routes as angelRoutes } from './angel/routes.js';
@@ -26,7 +26,7 @@ export { DodgeBoard } from './dodge/board.js';
 export { Board2048 } from './g2048/board.js';
 export { UndercoverHall, AvalonHall, WerewolfHall } from './party/halls.js';
 
-const ROUTES = { ...listingRoutes, ...userRoutes, ...authRoutes, ...adminRoutes, ...splitRoutes, ...foodRoutes, ...angelRoutes, ...weatherRoutes, ...activityRoutes, ...flightRoutes, ...pollRoutes, ...carRoutes, ...todoRoutes };
+const ROUTES = { ...listingRoutes, ...userRoutes, ...authRoutes, ...retireRoutes, ...splitRoutes, ...foodRoutes, ...angelRoutes, ...weatherRoutes, ...activityRoutes, ...flightRoutes, ...pollRoutes, ...carRoutes, ...todoRoutes };
 
 export default {
   async fetch(request, env) {
@@ -40,8 +40,7 @@ export default {
     // 鲁班七号躲技能: one leaderboard object checks and keeps everyone's best run.
     if (url.pathname.startsWith('/api/dodge/')) return env.DODGE.get(env.DODGE.idFromName('board')).fetch(request);
     // 2048: one WebSocket endpoint; the object keeps everyone's board.
-    // /api/2048/grants is its HTTP side door for the autopilot grants (PM).
-    if (url.pathname === '/api/2048' || url.pathname === '/api/2048/grants') return env.G2048.get(env.G2048.idFromName('board')).fetch(request);
+    if (url.pathname === '/api/2048') return env.G2048.get(env.G2048.idFromName('board')).fetch(request);
     // 谁是卧底 / 阿瓦隆 / 狼人杀: one WebSocket endpoint per game, its hall holds two tables.
     if (url.pathname === '/api/undercover') return env.UC_HALL.get(env.UC_HALL.idFromName('hall')).fetch(request);
     if (url.pathname === '/api/avalon') return env.AV_HALL.get(env.AV_HALL.idFromName('hall')).fetch(request);

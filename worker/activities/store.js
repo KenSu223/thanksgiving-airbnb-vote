@@ -60,7 +60,7 @@ export async function updateActivities(env, fn) {
 export const isSeedId = id => SEED.some(s => s.id === id);
 
 // Remove one person's activity votes (thorough user deletion,
-// users/admin.js). Cards they added stay — the group may have voted on
+// users/retire.js). Cards they added stay — the group may have voted on
 // them; only their own votes go. Returns votes removed.
 export async function scrubUserFromActivities(env, user) {
   const key = user.name.toLowerCase();

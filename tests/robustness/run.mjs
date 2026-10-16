@@ -27,7 +27,9 @@ const persist = mkdtempSync(join(tmpdir(), 'robustness-state-'));
 // suite can run end to end. Local test instance only — never production.
 // PARTY_SPEED=20 runs the party games' clocks (狼人杀 nights, speaking turns) 20x
 // faster so whole games fit in the suite (worker/games/hall.js).
-const server = spawn('npx', ['wrangler', 'dev', '--port', PORT, '--local', '--compatibility-date', '2026-05-03', '--persist-to', persist, '--var', 'EMAIL_DEV_MODE:1', '--var', 'PARTY_SPEED:20'], {
+// RETIRE=Retiree puts a test account on the retired list (worker/users/retire.js),
+// so users.mjs can check an account comes off cleanly.
+const server = spawn('npx', ['wrangler', 'dev', '--port', PORT, '--local', '--compatibility-date', '2026-05-03', '--persist-to', persist, '--var', 'EMAIL_DEV_MODE:1', '--var', 'PARTY_SPEED:20', '--var', 'RETIRE:Retiree'], {
   detached: true, stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverLog = '';
@@ -107,11 +109,8 @@ try {
     const g2048 = await runSuite('g2048.mjs');
     // Party games (谁是卧底 / 阿瓦隆 / 狼人杀): whole games over real sockets.
     const party = await runSuite('party.mjs');
-    // And the dodge autopilot-grants suite.
-    const dodgePath = new URL('dodge.mjs', import.meta.url).pathname;
-    const dodge = existsSync(dodgePath) ? await runSuite('dodge.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && leaderboards && polls && google && cars && reactions && todos && g2048 && party && dodge && storms;
+    ok = fuzz && email && users && leaderboards && polls && google && cars && reactions && todos && g2048 && party && storms;
   }
 } finally {
   stopServer();

@@ -150,7 +150,7 @@ async function handleDelete(req, env) {
 }
 
 // Remove one person's votes everywhere (thorough user deletion,
-// users/admin.js). Polls they started stay — others have voted in
+// users/retire.js). Polls they started stay — others have voted in
 // them, same as cards they added stay in the other features.
 export async function scrubUserFromPolls(env, user) {
   const key = user.name.toLowerCase();

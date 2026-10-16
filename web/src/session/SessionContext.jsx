@@ -138,17 +138,6 @@ export function SessionProvider({ children }) {
     return null;
   }, [token, sendAuthCode]);
 
-  // 删用户：只有 PM 的会话能成功（服务器按 token 验调用者身份），其他人
-  // 调用只会拿到错误文字。成功返回 null，失败返回错误文字。
-  const deleteUser = useCallback(async target => {
-    let r;
-    try { r = await api('/api/users/delete', 'POST', { name: target, token }); }
-    catch (e) { return '网络有点问题，稍后再试'; }
-    if (!r.ok) return r.error || '删不掉';
-    if (r.users) setUsers(r.users);
-    return null;
-  }, [token]);
-
-  const value = { name, token, users, setUsers, loadUsers, loginOpen, openLogin, closeLogin, ensureName, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, deleteUser, loginTick, bindIntent, openBind };
+  const value = { name, token, users, setUsers, loadUsers, loginOpen, openLogin, closeLogin, ensureName, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, loginTick, bindIntent, openBind };
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
