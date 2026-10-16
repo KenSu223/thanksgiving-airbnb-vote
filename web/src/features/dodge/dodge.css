@@ -41,7 +41,11 @@
 .dg-flash.big { width:5.2rem; height:5.2rem; right:max(1.6rem, env(safe-area-inset-right)); bottom:max(1.6rem, env(safe-area-inset-bottom)); font-size:1rem; }
 .dg-joyzone { position:absolute; left:0; top:0; bottom:0; width:50%; touch-action:none; }
 .dg-joy { position:absolute; width:7rem; height:7rem; margin:-3.5rem 0 0 -3.5rem; border-radius:9999px; background:#37677b44; box-shadow:inset 0 0 0 2px #9bc7d780,0 0 0 5px #18334266; pointer-events:none; }
-.dg-joy-rest { position:absolute; bottom:2rem; left:2rem; width:6rem; height:6rem; border:2px solid #b4d7e033; border-radius:50%; background:#17394e22; pointer-events:none; display:grid; place-items:center; }.dg-joy-rest span { width:2.5rem; height:2.5rem; border-radius:50%; background:#aac9d333; border:1px solid #d7f6ff44; }
+/* no fixed joystick: a hint in the middle of the left half until the first touch */
+.dg-joy-hint { position:absolute; left:25%; top:56%; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:.3rem; color:#d7f1f6; font-size:.8rem; font-weight:700; line-height:1.35; text-align:center; text-shadow:0 2px 6px #000; opacity:.8; pointer-events:none; animation:dg-hint-pulse 2.2s ease-in-out infinite; }
+.dg-joy-hint span { font-size:1.6rem; }
+@keyframes dg-hint-pulse { 0%,100% { opacity:.45; } 50% { opacity:.9; } }
+@media (prefers-reduced-motion: reduce) { .dg-joy-hint { animation:none; } }
 .dg-knob { position:absolute; left:50%; top:50%; width:3rem; height:3rem; margin:-1.5rem 0 0 -1.5rem; border-radius:9999px; background:rgba(255,255,255,.75);
   transform:translate(var(--kx, 0), var(--ky, 0)); box-shadow:0 3px 8px rgba(0,0,0,.35); }
 .dg-count { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:5rem; font-weight:900; color:#fde6ad; text-shadow:0 4px 16px #0009; pointer-events:none; background:#0b263333; }
@@ -62,7 +66,7 @@ html.dg-lock, html.dg-lock body { overflow:hidden; overscroll-behavior:none; }
 .dg-hero-hud { position:absolute; top:.6rem; left:.75rem; display:flex; align-items:center; gap:.6rem; pointer-events:none; color:#f5e5be; font-size:.75rem; text-shadow:0 2px 4px #000; }.dg-hero-hud .dg-hero-avatar { display:block; width:2.5rem; height:2.5rem; border-radius:50%; border:2px solid #cdbf90; background:#123a3f url('/dodge/luban-directions.webp') no-repeat; background-size:314px 209px; background-position:-177px -24px; }
 .dg-bolt { width:52%; height:52%; fill:#fffbe6; filter:drop-shadow(0 0 6px #ffe08a); }.dg-hero-hud small { display:block; font-size:.55rem; color:#aabfc4; margin-top:.15rem; }
 @media(max-width:640px) { .dg-roster { grid-template-columns:repeat(2,minmax(0,1fr)); }.dg-preview { right:-22%; opacity:.6; }.dg-intro::after { background:linear-gradient(90deg,#0c252bf5,#102a3099); } }
-@media(max-height:450px) { .dg-flash.big { width:4.2rem; height:4.2rem; bottom:1.4rem; }.dg-joy-rest { width:5rem; height:5rem; bottom:1.5rem; }.dg-hud { top:.15rem; }.dg-count { font-size:3rem; } }
+@media(max-height:450px) { .dg-flash.big { width:4.2rem; height:4.2rem; bottom:1.4rem; }.dg-hud { top:.15rem; }.dg-count { font-size:3rem; } }
 /* nothing in the game is for selecting or copying: a long-press on iPhone would otherwise select text and pop up 拷贝 */
 .dg-full, .dg-stage, .dg-over, .dg-box { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
 html.dg-lock, html.dg-lock body { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }

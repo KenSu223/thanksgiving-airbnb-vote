@@ -11,7 +11,7 @@ import * as sfx from './sfx.js';
 // watched again. With `replay` (a recorded input list) it plays those back
 // instead of taking input, at 1×, 2× or 4×.
 // PC: right-click (or hold it) to move, F / D for 闪现 toward the mouse.
-// Phone: joystick on the left, 闪现 button on the right.
+// Touch: a joystick wherever the left thumb lands (no fixed spot), 闪现 button on the right.
 const dirOf = (dx, dy) => ((Math.round(Math.atan2(dy, dx) / (2 * Math.PI) * DIRS) % DIRS) + DIRS) % DIRS;
 const ASPECT = VIEW.width / VIEW.height;
 const SPEEDS = [1, 2, 4];
@@ -29,6 +29,7 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, re
   const toggleSound = () => { const m = !sfx.isMuted(); sfx.setMuted(m); setSoundOff(m); };
   const [speed, setSpeed] = useState(1);
   speedRef.current = speed;
+  const [stickUsed, setStickUsed] = useState(false); // the "press anywhere on the left" hint goes after the first touch
   const doneRef = useRef(false), deathAt = useRef(null), beeped = useRef(null);
   if (!g.current) g.current = newGame(seed);
   inputEnabled.current = !replay && count <= 0 && !hold && !g.current.over;
@@ -161,19 +162,25 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, re
     return () => window.removeEventListener('keydown', key);
   }, []);
 
-  // phone: a floating joystick wherever the left thumb lands
+  // Touch: no fixed joystick. Wherever a thumb lands on the left half is the
+  // joystick's centre, and dragged well past the ring the centre follows the
+  // thumb, so it never has to reach back (on an iPad the old corner spot sat
+  // right at the edge).
   const joyDown = e => {
     e.preventDefault();
     if (!inputEnabled.current || joy.current) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     joy.current = { id: e.pointerId, x: e.clientX, y: e.clientY, k: -1 };
+    setStickUsed(true);
     paintJoy(0, 0);
   };
   const joyMove = e => {
     const j = joy.current;
     if (!inputEnabled.current || !j || j.id !== e.pointerId) return;
     let dx = e.clientX - j.x, dy = e.clientY - j.y;
-    const d = Math.sqrt(dx * dx + dy * dy), R = 48;
+    let d = Math.sqrt(dx * dx + dy * dy);
+    const R = 48, FOLLOW = 72;
+    if (d > FOLLOW) { j.x = e.clientX - dx / d * FOLLOW; j.y = e.clientY - dy / d * FOLLOW; dx = e.clientX - j.x; dy = e.clientY - j.y; d = FOLLOW; }
     if (d > R) { dx = dx / d * R; dy = dy / d * R; }
     const k = d > 10 ? dirOf(dx, dy) : -1;
     if (k !== j.k) { j.k = k; pending.current.dir = k; }
@@ -229,11 +236,11 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, re
       <button className="dg-sound" onClick={toggleSound} aria-pressed={!soundOff} aria-label={(soundOff ? '打开音效' : '关闭音效') + (touch ? '' : '（M）')}>{soundOff ? '🔇' : '🔊'}</button>
       {replay && <button className="dg-speed" onClick={() => setSpeed(s => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])} aria-label={`回放速度 ${speed} 倍，点一下换`}>{speed}×</button>}
       {touch && !replay && <>
-        <div className="dg-joy-rest" aria-hidden="true"><span /></div>
+        {!stickUsed && <div className="dg-joy-hint" aria-hidden="true"><span>👆</span>左半边任意位置<br />按住就是摇杆</div>}
         <div className="dg-joyzone" onPointerDown={joyDown} onPointerMove={joyMove} onPointerUp={joyUp} onPointerCancel={joyUp} onLostPointerCapture={joyUp} />
         <div className="dg-joy" ref={joyEl} hidden><div className="dg-knob" /></div>
       </>}
-      <div className="dg-control-hint">{replay ? '回放：操作和原来那局一模一样' : touch ? '左侧移动 · 拖动闪现瞄准 · 拖远取消' : '右键移动 · F / D 闪现 · Esc 暂停 · M 音效'}</div>
+      <div className="dg-control-hint">{replay ? '回放：操作和原来那局一模一样' : touch ? '左半边任意位置按住移动 · 拖动闪现瞄准 · 拖远取消' : '右键移动 · F / D 闪现 · Esc 暂停 · M 音效'}</div>
       <button ref={cdBtn} className={'dg-flash' + (touch ? ' big' : '')}
         onPointerDown={flashDown} onPointerMove={flashMove} onPointerUp={flashUp}
         onPointerCancel={() => { aim.current = null; }} onLostPointerCapture={() => { aim.current = null; }}
