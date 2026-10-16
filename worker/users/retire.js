@@ -1,8 +1,11 @@
 // Retired accounts: names that come off the member list for good, with
-// everything recorded under them. Nobody can delete accounts from the app
-// (everyone has the same rights); a name goes on RETIRED here instead, and
-// the next time anyone loads the member list (GET /api/users — every page
-// load does) the account is removed thoroughly: listing/food/activity votes,
+// everything recorded under them. Two doors, same room (removeUser
+// below): a name goes on RETIRED here and the next time anyone loads the
+// member list (GET /api/users — every page load does) it is removed; or
+// PM deletes the account in the app (POST /api/users/delete, the one
+// admin power that came back — the caller is proven by token, and PM's
+// token is not in the public list because PM is email-bound). Either
+// way the removal is thorough: listing/food/activity votes,
 // saved flights, split expenses and shares, car seats and luggage, to-do
 // assignments and comments, Secret Angel prefs and draw seat (each feature's
 // scrubUserFrom* does its own part), plus the game records and chat messages
@@ -12,7 +15,7 @@
 // RETIRE (comma-separated names) adds to the list — only the robustness
 // suite's local server sets it, to check the removal end to end.
 import { j } from '../lib/http.js';
-import { getUsers, updateUsers, publicUsers, sameName } from './users.js';
+import { cleanName, getUsers, updateUsers, publicUsers, sameName, USER_ADMIN } from './users.js';
 import { scrubUserFromTrips } from '../listings/state.js';
 import { scrubUserFromFood } from '../food/store.js';
 import { scrubUserFromActivities } from '../activities/store.js';
@@ -74,6 +77,26 @@ async function handleList(req, env) {
   return j({ ok: true, users: publicUsers(users) });
 }
 
+// PM deletes an account, in the app. The caller is whoever owns the
+// presented token (the pre-#145 wire shape: { name: target, token });
+// only PM's token unlocks it, PM can't delete PM, and the removal is
+// removeUser — the same thorough scrub as a retirement.
+async function handleDelete(req, env) {
+  let body = {};
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
+  const targetName = cleanName(body.name);
+  if (!targetName) return j({ ok: false, error: '先选要删的人' });
+  const users = await getUsers(env);
+  const presented = String(body.token || '');
+  const caller = presented ? users.find(u => u.token === presented) : null;
+  if (!caller || !sameName(caller.name, USER_ADMIN)) return j({ ok: false, error: '只有 PM 能删用户' }, 403);
+  if (sameName(targetName, USER_ADMIN)) return j({ ok: false, error: '不能删 PM 自己' });
+  const target = users.find(u => sameName(u.name, targetName));
+  if (!target) return j({ ok: false, error: '没这个用户' }, 404);
+  await removeUser(env, target);
+  return j({ ok: true, users: publicUsers(await getUsers(env)) });
+}
+
 // Admin-only endpoints that no longer exist (everyone has the same rights). A page
 // still open from before may call them: read the request and say so plainly.
 const gone = async req => {
@@ -83,7 +106,7 @@ const gone = async req => {
 
 export const routes = {
   'GET /api/users': handleList,
-  'POST /api/users/delete': gone,
+  'POST /api/users/delete': handleDelete,
   'POST /api/angel/admin': gone,
   'POST /api/cars/clear': gone,
 };
