@@ -3,7 +3,7 @@
 // and sit down with their login (name + token from the user list). Each viewer
 // gets their own view of the table after every change. Points (豆子) are saved
 // in this object's storage under p:<name> when a player stands up or
-// disconnects, never per hand, so a game never touches the KV write budget.
+// disconnects (掼蛋 also after every hand); it never touches the KV write budget.
 // Every game has its own hall, so its leaderboard is its own; only its top 3
 // go out, plus each viewer's own place (lib/board.js).
 //
@@ -17,12 +17,22 @@
 // page reload must not cost anyone their seat mid-game, so a socket that proves
 // who it is (identify) goes straight back to that person's seat, and several
 // tabs of one person can all hold it. `boardSort` orders their leaderboard (by wins).
+//
+// Saving (a game opts in by having snapshot() / restore(snap) / resume(), so
+// far 掼蛋): every table is written to t:<room> whenever it changes and read
+// back when the object starts, so a deploy carries on the hand; the people who
+// were seated get RECONNECT_MS to come back (the page re-sits by itself)
+// before they count as gone. A game may also park one person's table
+// (m:<name>, see hooks.park / unpark) to give it back later.
+//
+// Watching: anyone can watch a table; each state says who else is watching it.
 import { getUsers, sameName, cleanName } from '../users/users.js';
 import { noteReaction, freshReactions } from './reactions.js';
 import { j } from '../lib/http.js';
 import { topFor } from '../lib/board.js';
 
 const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
+const RECONNECT_MS = 90 * 1000;
 
 export class TableHall {
   constructor(state, env, { Game, rooms, actions, idleNotice, rejoin = false, boardSort = null }) {
@@ -32,6 +42,8 @@ export class TableHall {
     this.sockets = new Map(); // socket -> { key (seated/queued player, or null), room (1..rooms being watched) }
     this.reactions = new Map(); // room -> [{ v, at, by, byName, to }] — addressed emoji/taunt popups, see reactions.js
     this.board = new Map();   // saved points by player key
+    this.parked = new Map();  // player key -> a table snapshot they left alone with bots
+    this.written = [];        // last snapshot written per table (JSON), so unchanged tables aren't rewritten
     this.loaded = null; this.sweeper = null;
     // Party games run their clocks this many times faster when PARTY_SPEED is set — only
     // the robustness suite sets it (a 狼人杀 night is ~40 s of deliberate waiting otherwise).
@@ -42,14 +54,57 @@ export class TableHall {
       schedule: (fn, ms) => setTimeout(() => { fn(); this.broadcast(); }, ms / speed),
       cancel: t => clearTimeout(t),
       save: s => this.save(s),
+      park: (key, snap) => { this.parked.set(key, snap); this.state.storage.put('m:' + key, snap); },
+      unpark: key => {
+        const snap = this.parked.get(key);
+        if (snap) { this.parked.delete(key); this.state.storage.delete('m:' + key); }
+        return snap || null;
+      },
+      // a parked match, in short: that person's team level and the other team's
+      peek: key => {
+        const snap = this.parked.get(key);
+        const i = snap?.seats?.findIndex(s => s && !s.bot && s.key === key);
+        return i >= 0 ? { us: snap.levels[i % 2], them: snap.levels[1 - (i % 2)], inHand: snap.phase === 'playing' || snap.phase === 'tribute' } : null;
+      },
     }));
+    this.saving = typeof this.tables[0].snapshot === 'function';
   }
   load() {
-    return this.loaded ||= this.state.storage.list({ prefix: 'p:' })
-      .then(m => { for (const [k, v] of m) this.board.set(k.slice(2), v); });
+    return this.loaded ||= (async () => {
+      for (const [k, v] of await this.state.storage.list({ prefix: 'p:' })) this.board.set(k.slice(2), v);
+      if (!this.saving) return;
+      for (const [k, v] of await this.state.storage.list({ prefix: 'm:' })) this.parked.set(k.slice(2), v);
+      let back = false;
+      for (const [i, t] of this.tables.entries()) {
+        const json = await this.state.storage.get('t:' + (i + 1));
+        if (!json) continue;
+        this.written[i] = json;
+        if (!t.restore(JSON.parse(json))) continue;
+        for (const s of t.humans()) s.connected = true; // until RECONNECT_MS says otherwise
+        t.resume();
+        back = true;
+      }
+      if (back) this.ghostTimer = setTimeout(() => this.dropGhosts(), RECONNECT_MS);
+    })();
+  }
+  // After a restart: whoever hasn't come back counts as gone (托管 / parked, as when a page closes).
+  dropGhosts() {
+    const here = new Set([...this.sockets.values()].map(o => o.key).filter(Boolean));
+    for (const t of this.tables) for (const s of t.humans()) if (!here.has(s.key)) t.disconnect(s.key);
+    this.broadcast();
+  }
+  // Write every table that changed since it was last written.
+  persist() {
+    if (!this.saving) return;
+    this.tables.forEach((t, i) => {
+      const json = JSON.stringify(t.snapshot());
+      if (json === this.written[i]) return;
+      this.written[i] = json;
+      this.state.storage.put('t:' + (i + 1), json);
+    });
   }
   save(s) {
-    const rec = { name: s.name, points: s.points, refills: s.refills, games: s.games, wins: s.wins, updatedAt: Date.now() };
+    const rec = { name: s.name, points: s.points, refills: s.refills, games: s.games, wins: s.wins, ...(s.aces ? { aces: s.aces } : {}), updatedAt: Date.now() };
     this.board.set(s.key, rec);
     this.state.storage.put('p:' + s.key, rec);
   }
@@ -66,7 +121,8 @@ export class TableHall {
     if (t?.forget) t.forget(key); // party games: drop the seat without ever saving it again
     else t?.leave(key); // a seated ghost leaves first; the save that lands is deleted next
     const removed = this.board.delete(key) ? 1 : 0;
-    await this.state.storage.delete('p:' + key);
+    this.parked.delete(key);
+    await this.state.storage.delete(['p:' + key, 'm:' + key]);
     this.broadcast();
     return j({ ok: true, removed });
   }
@@ -157,7 +213,11 @@ export class TableHall {
     } else {
       const t = this.tableOf(info.key), act = this.actions[m.type];
       if (!t) err = '先坐下';
-      else if (m.type === 'leave') { t.leave(info.key); info.key = null; }
+      else if (m.type === 'leave') {
+        const note = t.leave(info.key); // a game may say what happened (掼蛋: "存好了")
+        info.key = null;
+        if (typeof note === 'string') extra = { notice: note };
+      }
       else if (act) {
         const r = act(t, info.key, m);
         if (typeof r === 'string') err = r;
@@ -186,17 +246,29 @@ export class TableHall {
     this.broadcast();
   }
 
+  // Who's watching room r (sockets on it, not seated there): signed-in names, and how many in all.
+  watchers(r) {
+    const t = this.tables[r - 1], names = new Set();
+    let count = 0;
+    for (const o of this.sockets.values()) {
+      if (o.room !== r || (o.key && t.has(o.key))) continue;
+      count++;
+      if (o.as) names.add(o.as.name);
+    }
+    return { count, names: [...names] };
+  }
   lobby() {
     return this.tables.map((t, i) => ({
       room: i + 1, phase: t.phase,
       people: t.seats.filter(s => s && !s.bot).map(s => s.name).concat(t.waitlist.map(w => w.name)),
       bots: t.seats.filter(s => s && s.bot).length,
+      watching: this.watchers(i + 1).count,
     }));
   }
   // Everyone, best first: [key, row]
   ranking() {
     const rows = new Map(this.board);
-    for (const t of this.tables) for (const s of t.humans().concat(t.waitlist)) rows.set(s.key, { name: s.name, points: s.points, refills: s.refills, games: s.games, wins: s.wins, seated: true });
+    for (const t of this.tables) for (const s of t.humans().concat(t.waitlist)) rows.set(s.key, { name: s.name, points: s.points, refills: s.refills, games: s.games, wins: s.wins, ...(s.aces ? { aces: s.aces } : {}), seated: true });
     const sort = this.boardSort || ((a, b) => b.points - a.points);
     return [...rows].sort(([, a], [, b]) => sort(a, b));
   }
@@ -207,8 +279,13 @@ export class TableHall {
     try {
       ws.send(JSON.stringify({ type: 'state', room: info.room, seatedAt, you: info.key,
         reactions: freshReactions(this.reactions.get(info.room) || [], Date.now()),
-        table: this.tables[info.room - 1].view(info.key), lobby: this.lobby(), ...topFor(this.ranking(), info.as?.key || info.key), ...extra }));
+        table: this.tables[info.room - 1].view(info.key), lobby: this.lobby(), watchers: this.watchers(info.room),
+        ...topFor(this.ranking(), info.as?.key || info.key), ...extra }));
     } catch (e) { /* socket already gone; its close handler cleans up */ }
   }
-  broadcast(skip) { for (const ws of this.sockets.keys()) if (ws !== skip) this.send(ws); }
+  // Every change ends here, so it's also where the tables get written.
+  broadcast(skip) {
+    this.persist();
+    for (const ws of this.sockets.keys()) if (ws !== skip) this.send(ws);
+  }
 }

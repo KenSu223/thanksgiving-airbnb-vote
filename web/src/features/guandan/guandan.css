@@ -20,3 +20,6 @@
 .gt-full .gd-side .gt-seat.compact, .gt-full .gd-top .gt-seat.compact { width:auto; max-width:9.5rem; }
 .gt-full .gd-controls { margin-top:.35rem; }
 .gt-full .gd-msg { margin-top:.15rem; min-height:1rem; font-size:.75rem; }
+/* 过 A 奖励：结算里金色的一行 */
+.gd-ace { margin-top:.35rem; display:inline-block; padding:.2rem .7rem; border-radius:999px; font-size:.85rem; font-weight:800; color:#422006;
+  background:linear-gradient(90deg,#fde68a,#fbbf24,#fde68a); box-shadow:0 0 0 2px rgba(251,191,36,.35); }

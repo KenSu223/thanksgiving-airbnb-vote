@@ -1,8 +1,7 @@
-// Accounts (worker/users/retire.js): PM — and only PM, proven by token —
-// can delete an account in the app again (POST /api/users/delete), and a
-// retired name (RETIRED, plus the RETIRE var this suite's server sets:
-// "Retiree") comes off the member list the next time anyone loads it.
-// Both doors run the same removal, with everything recorded under it:
+// Accounts (worker/users/retire.js): nobody can delete accounts from the app —
+// everyone has the same rights, PM included — and a retired name (RETIRED,
+// plus the RETIRE var this suite's server sets: "Retiree") comes off the member
+// list the next time anyone loads it, with everything recorded under it:
 // votes, flights, split entries, Secret Angel prefs and draw seat, car seat
 // and luggage, to-do assignments and comments, chat messages (and @mentions
 // of them), and the game records (the dodge board).
@@ -28,29 +27,10 @@ const pm = await login('PM');
 const ast = await login('Aster');
 ck('PM and Aster log in like anyone', !!pm?.token && !!ast?.token);
 
-// ---- only PM can delete an account ----
-// A throwaway test account carries the whole check: it joins with a split
-// expense (so the scrub has something to bite on), a non-PM delete is
-// refused and changes nothing, PM can't delete PM, an unknown name fails,
-// and PM's real delete takes the account and its expense off for good.
-const testee = await login('DeleteMe');
-ck('test account created', !!testee?.token);
-const tex = await J('POST', '/api/expense', { paidBy: 'DeleteMe', amountUSD: 12, splitAmong: ['DeleteMe', 'PM'], description: 'delete-me test expense' });
-ck('test account expense recorded', tex.ok === true, JSON.stringify(tex));
-const delByAst = await J('POST', '/api/users/delete', { name: 'DeleteMe', token: ast.token });
-ck('a non-PM delete is refused', delByAst?.ok !== true, JSON.stringify(delByAst).slice(0, 120));
-ck('and the test account is still on the list', (await J('GET', '/api/users')).users.some(u => u.name === 'DeleteMe'));
-const delSelf = await J('POST', '/api/users/delete', { name: 'PM', token: pm.token });
-ck('PM cannot delete PM', delSelf?.ok !== true, JSON.stringify(delSelf).slice(0, 120));
-const delGhost = await J('POST', '/api/users/delete', { name: 'NoSuchPerson', token: pm.token });
-ck('deleting an unknown name fails', delGhost?.ok !== true, JSON.stringify(delGhost).slice(0, 120));
-const delOk = await J('POST', '/api/users/delete', { name: 'DeleteMe', token: pm.token });
-ck('PM deletes the test account', delOk?.ok === true && !delOk.users.some(u => u.name === 'DeleteMe'), JSON.stringify(delOk).slice(0, 120));
-ck('and it stays off the list', !(await J('GET', '/api/users')).users.some(u => u.name === 'DeleteMe'));
-const splitDel = await J('GET', '/api/split');
-ck("the deleted account's expense is scrubbed too",
-  splitDel.expenses.every(e => e.paidBy !== 'DeleteMe' && !(e.splitAmong || []).includes('DeleteMe')) && !('DeleteMe' in (splitDel.balances || {})),
-  JSON.stringify(splitDel.balances));
+// ---- nobody can delete an account ----
+const del = await J('POST', '/api/users/delete', { name: 'Aster', token: pm.token });
+ck('there is no delete-account endpoint, not even for PM', !del || del.ok !== true, JSON.stringify(del).slice(0, 120));
+ck('Aster is still on the list', (await J('GET', '/api/users')).users.some(u => u.name === 'Aster'));
 
 // ---- give the retiree a footprint everywhere (no GET /api/users until it's all in) ----
 const vic = await login(VICTIM);
