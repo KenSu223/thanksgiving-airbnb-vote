@@ -30,11 +30,14 @@ export default function LoginModal() {
   const [sel, setSel] = useState('');
   const [msg, setMsg] = useState('');
   const [bindEmail, setBindEmail] = useState('');
-  const [bindOpen, setBindOpen] = useState(false);
   const [code, setCode] = useState('');
   const [pinCode, setPinCode] = useState('');
-  const [pinOpen, setPinOpen] = useState(false);
   const [pinVal, setPinVal] = useState('');
+  // 选好人之后名单收起（只剩本人 + 换个人），界面只留账号保护卡；
+  // listOpen 是「换个人」展开的完整名单。openRow 是保护卡里展开着的
+  // 那一行（'mail' / 'pin' / null）——两行互斥，不会再同时摊开两个输入框。
+  const [listOpen, setListOpen] = useState(false);
+  const [openRow, setOpenRow] = useState(null);
   const [sent, setSent] = useState(false);
   const [devCode, setDevCode] = useState('');
   const [cool, setCool] = useState(0);
@@ -42,10 +45,10 @@ export default function LoginModal() {
 
   useEffect(() => {
     if (!loginOpen) return;
-    setNewName(''); setNewEmail(''); setMsg(''); setBindOpen(false); setBindEmail(''); setPinOpen(false); setPinVal('');
+    setNewName(''); setNewEmail(''); setMsg(''); setBindEmail(''); setPinVal(''); setListOpen(false); setOpenRow(null);
     setSel(users.some(u => u.name === name) ? name : '');
-    // 从绑邮箱提醒进来：选中本人并直接展开绑邮箱输入框
-    if (bindIntent && name) { setSel(name); setBindOpen(true); }
+    // 从账号保护提醒进来：选中本人，保护卡就在下面（不替 ta 选哪种）
+    if (bindIntent && name) setSel(name);
     if (users.length) listRef.current?.querySelector('.sel, button')?.focus();
     else inputRef.current?.focus();
     const onKey = e => { if (e.key === 'Escape') closeLogin(); };
@@ -69,6 +72,8 @@ export default function LoginModal() {
   if (!loginOpen) return null;
   const field = 'flex-1 min-w-0 rounded-xl border border-white/70 bg-white/75 px-3.5 py-2.5 shadow-[inset_0_1px_3px_rgba(15,23,42,.06)] focus:outline-none focus:ring-2 focus:ring-indigo-400';
   const selUser = users.find(u => u.name === sel);
+  // 选好人又没展开「换个人」时，名单只剩本人这一行
+  const shownUsers = sel && !listOpen ? users.filter(u => u.name === sel) : users;
   const go = async n => { setMsg(''); const err = await login(n); if (err) setMsg(err); };
   const join = async () => {
     setMsg('');
@@ -112,7 +117,7 @@ export default function LoginModal() {
     if (!t) { setMsg('先登录这个账号再设 PIN'); return; }
     const err = await setAccountPin(sel, pinVal, t);
     if (err) { setMsg(err); return; }
-    setPinOpen(false); setPinVal('');
+    setOpenRow(null); setPinVal('');
   };
   const doRemovePin = async () => {
     setMsg('');
@@ -204,12 +209,12 @@ export default function LoginModal() {
               <div>
                 <div className="text-xs font-bold tracking-wide text-slate-500">我来过了</div>
                 <ul className="login-users mb-2 mt-1.5" ref={listRef}>
-                  {users.map(u => {
+                  {shownUsers.map(u => {
                     const p = presOf(u.name);
                     return (
                       <li key={u.name}>
                         <button type="button" className={'login-user' + (sel === u.name ? ' sel' : '')} aria-pressed={sel === u.name}
-                          onClick={() => { setSel(u.name); setBindOpen(false); go(u.name); }}>
+                          onClick={() => { setSel(u.name); setOpenRow(null); setListOpen(false); go(u.name); }}>
                           <span className="avatar login-user-av" aria-hidden="true">{Array.from(u.name)[0].toUpperCase()}</span>
                           <span className="login-user-name">{u.name}{(u.emailBound || u.pinBound) ? ' 🔒' : ''}</span>
                           {p && (p.online
@@ -220,48 +225,68 @@ export default function LoginModal() {
                     );
                   })}
                 </ul>
-                {selUser?.emailBound && <p className="mb-3 text-xs text-slate-400">🔒 {sel} 绑了邮箱（{selUser.emailHint}），在这台设备上第一次登录要收验证码；这台设备验过就不用了</p>}
-                {selUser?.pinBound && !selUser?.emailBound && <p className="mb-3 text-xs text-slate-400">🔑 {sel} 设了 PIN，在这台设备上第一次登录要输 PIN；这台设备验过就不用了</p>}
-                {selUser && !selUser.emailBound && (
-                  bindOpen ? (
-                    <div className="mb-3 flex gap-2">
-                      <input value={bindEmail} onChange={e => setBindEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && startBind()}
-                        className={field} placeholder={`给 ${sel} 绑的邮箱`} inputMode="email" maxLength={120} />
-                      <button onClick={startBind} className="shrink-0 rounded-xl bg-slate-900/90 px-4 py-2.5 font-bold text-white shadow-[0_8px_20px_-6px_rgba(15,23,42,.5)] transition hover:bg-slate-900 active:scale-[.98]">发验证码</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setBindOpen(true)} className="mb-3 text-xs font-medium text-indigo-500 transition hover:text-indigo-700">给 {sel} 绑邮箱（以后换设备登录更安全）→</button>
-                  )
+                {sel && !listOpen && (
+                  <button onClick={() => setListOpen(true)} className="mb-3 text-xs font-medium text-slate-400 transition hover:text-slate-600">换个人 ▾</button>
                 )}
                 {selUser && (
-                  pinOpen ? (
-                    <div className="mb-3 flex gap-2">
-                      <input value={pinVal} onChange={e => setPinVal(e.target.value.replace(/\D/g, '').slice(0, 4))} onKeyDown={e => e.key === 'Enter' && pinVal.length === 4 && startPinSet()}
-                        className={field} placeholder={selUser.pinBound ? `给 ${sel} 换个新 PIN` : `给 ${sel} 设个 4 位 PIN`} inputMode="numeric" maxLength={4} />
-                      <button onClick={startPinSet} disabled={pinVal.length !== 4} className="shrink-0 rounded-xl bg-slate-900/90 px-4 py-2.5 font-bold text-white shadow-[0_8px_20px_-6px_rgba(15,23,42,.5)] transition hover:bg-slate-900 active:scale-[.98] disabled:opacity-40">{selUser.pinBound ? '保存新 PIN' : '设置 PIN'}</button>
+                  <div className="mb-3 rounded-2xl border border-white/60 bg-white/45 px-3.5 py-2.5">
+                    <p className="mb-1 text-xs font-bold tracking-wide text-slate-500">账号保护 · 绑一个就行，两个都绑也可以</p>
+                    <div className="flex items-center gap-2 py-1.5">
+                      <span className="text-sm font-bold text-slate-700">📧 邮箱</span>
+                      {selUser.emailBound
+                        ? <span className="ml-auto text-xs text-slate-400">已绑 {selUser.emailHint}</span>
+                        : <button onClick={() => setOpenRow(openRow === 'mail' ? null : 'mail')} className="ml-auto shrink-0 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-bold text-indigo-600 shadow-[0_1px_3px_rgba(15,23,42,.06)] transition hover:bg-white">绑定</button>}
                     </div>
-                  ) : selUser.pinBound ? (
-                    sel === name ? (
-                      <p className="mb-3 flex items-center gap-2 text-xs text-slate-400">
-                        <span>🔑 {sel} 已设 PIN</span>
-                        <button onClick={() => setPinOpen(true)} className="font-medium text-indigo-500 transition hover:text-indigo-700">改 PIN</button>
-                        <button onClick={doRemovePin} className="font-medium text-slate-400 transition hover:text-rose-500">去掉 PIN</button>
-                      </p>
-                    ) : null
-                  ) : (
-                    <button onClick={() => setPinOpen(true)} className="mb-3 block text-xs font-medium text-indigo-500 transition hover:text-indigo-700">给 {sel} 设 4 位 PIN（换设备登录输 PIN 就行，不用等邮箱）→</button>
-                  )
+                    {openRow === 'mail' && !selUser.emailBound && (
+                      <div className="mb-1.5 flex gap-2">
+                        <input value={bindEmail} onChange={e => setBindEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && startBind()}
+                          className={field} placeholder={`给 ${sel} 绑的邮箱`} inputMode="email" maxLength={120} />
+                        <button onClick={startBind} className="shrink-0 rounded-xl bg-slate-900/90 px-4 py-2.5 font-bold text-white shadow-[0_8px_20px_-6px_rgba(15,23,42,.5)] transition hover:bg-slate-900 active:scale-[.98]">发验证码</button>
+                      </div>
+                    )}
+                    <div className="border-t border-white/60" />
+                    <div className="flex items-center gap-2 py-1.5">
+                      <span className="text-sm font-bold text-slate-700">🔑 PIN</span>
+                      {selUser.pinBound ? (
+                        <>
+                          <span className="ml-auto text-xs text-slate-400">已设置</span>
+                          {sel === name && (
+                            <>
+                              <button onClick={() => setOpenRow(openRow === 'pin' ? null : 'pin')} className="shrink-0 font-medium text-indigo-500 transition hover:text-indigo-700">改 PIN</button>
+                              <button onClick={doRemovePin} className="shrink-0 font-medium text-slate-400 transition hover:text-rose-500">去掉</button>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <button onClick={() => setOpenRow(openRow === 'pin' ? null : 'pin')} className="ml-auto shrink-0 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-bold text-indigo-600 shadow-[0_1px_3px_rgba(15,23,42,.06)] transition hover:bg-white">设置</button>
+                      )}
+                    </div>
+                    {openRow === 'pin' && (
+                      <div className="mb-1.5 flex gap-2">
+                        <input value={pinVal} onChange={e => setPinVal(e.target.value.replace(/\D/g, '').slice(0, 4))} onKeyDown={e => e.key === 'Enter' && pinVal.length === 4 && startPinSet()}
+                          className={field} placeholder={selUser.pinBound ? `给 ${sel} 换个新 PIN` : `给 ${sel} 设个 4 位 PIN`} inputMode="numeric" maxLength={4} />
+                        <button onClick={startPinSet} disabled={pinVal.length !== 4} className="shrink-0 rounded-xl bg-slate-900/90 px-4 py-2.5 font-bold text-white shadow-[0_8px_20px_-6px_rgba(15,23,42,.5)] transition hover:bg-slate-900 active:scale-[.98] disabled:opacity-40">{selUser.pinBound ? '保存新 PIN' : '设置 PIN'}</button>
+                      </div>
+                    )}
+                    <p className="mt-1.5 text-[11px] leading-snug text-slate-400">绑了以后，换设备登录要验一下是你本人；这台设备验过一次就不用再验了。</p>
+                  </div>
                 )}
-                <div className="mb-3.5 flex items-center gap-3 text-xs text-slate-400"><span className="flex-1 border-t border-white/60"></span>第一次来？<span className="flex-1 border-t border-white/60"></span></div>
+                {(!sel || listOpen) && (
+                  <div className="mb-3.5 flex items-center gap-3 text-xs text-slate-400"><span className="flex-1 border-t border-white/60"></span>第一次来？<span className="flex-1 border-t border-white/60"></span></div>
+                )}
               </div>
             )}
-            <div className="flex gap-2">
-              <input ref={inputRef} value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && join()}
-                className={field} placeholder="输入你的名字，比如 Ken" maxLength={20} />
-              <button onClick={join} className="shrink-0 rounded-xl bg-slate-900/90 px-5 py-2.5 font-bold text-white shadow-[0_8px_20px_-6px_rgba(15,23,42,.5)] transition hover:bg-slate-900 active:scale-[.98]">加入</button>
-            </div>
-            <input value={newEmail} onChange={e => setNewEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && join()}
-              className={field + ' mt-2 w-full'} placeholder="邮箱（可选）：绑上后换设备登录要验证码" inputMode="email" maxLength={120} />
+            {(!sel || listOpen) && (
+              <>
+                <div className="flex gap-2">
+                  <input ref={inputRef} value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && join()}
+                    className={field} placeholder="输入你的名字，比如 Ken" maxLength={20} />
+                  <button onClick={join} className="shrink-0 rounded-xl bg-slate-900/90 px-5 py-2.5 font-bold text-white shadow-[0_8px_20px_-6px_rgba(15,23,42,.5)] transition hover:bg-slate-900 active:scale-[.98]">加入</button>
+                </div>
+                <input value={newEmail} onChange={e => setNewEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && join()}
+                  className={field + ' mt-2 w-full'} placeholder="邮箱（可选）：绑上后换设备登录要验证码" inputMode="email" maxLength={120} />
+              </>
+            )}
             {msg && <p className="mt-2.5 text-sm font-medium text-rose-600">{msg}</p>}
             <button onClick={closeLogin} className="mt-4 w-full text-center text-sm font-medium text-slate-400 transition hover:text-slate-600">先随便看看 →</button>
           </div>

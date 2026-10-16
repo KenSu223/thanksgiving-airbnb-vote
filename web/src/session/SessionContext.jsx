@@ -38,7 +38,7 @@ export function SessionProvider({ children }) {
   // login = 选了绑邮箱的人但这台设备没有 ta 的 token；bind = 正在给某人绑邮箱。
   const [challenge, setChallenge] = useState(null);
   // 每次登录成功 +1：绑邮箱提醒靠它判断"这是一次新登录"（刷新页面恢复
-  // 会话不算登录，不弹）。bindIntent = 登录框打开后直达绑邮箱那一步。
+  // 会话不算登录，不弹）。bindIntent = 从保护提醒打开登录框（选中本人）。
   const [loginTick, setLoginTick] = useState(0);
   const [bindIntent, setBindIntent] = useState(false);
   const pending = useRef(null); // 登录后要接着做的事（比如投票），参数是 { name, token }
@@ -56,7 +56,8 @@ export function SessionProvider({ children }) {
 
   const closeLogin = useCallback(() => { pending.current = null; setChallenge(null); setBindIntent(false); setLoginOpen(false); }, []);
 
-  // 打开登录框并直达"给当前账号绑邮箱"那一步（绑邮箱提醒的按钮用）
+  // 打开登录框并选中当前账号（账号保护提醒的按钮用；保护卡就在名单
+  // 下面，绑邮箱还是设 PIN 由用户在卡里选）
   const openBind = useCallback(() => { setBindIntent(true); setLoginOpen(true); loadUsers(); }, [loadUsers]);
 
   // 已登录就直接做；没登录先弹登录框，登录后再做
