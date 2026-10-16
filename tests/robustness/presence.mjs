@@ -2,7 +2,9 @@
 // everyone else last did. Covers the roster starting offline/never-seen,
 // a hello with a bad token not putting anyone online, hello putting you
 // online (visible over plain GET too), two people online at once, and
-// leaving flipping you offline with a fresh lastSeen.
+// leaving flipping you offline with a fresh lastSeen. Also the current
+// game each online person is in: reported with activity (or carried on
+// a ping), unknown keys dropped, gone when you leave.
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/presence.mjs
 const B = process.env.TEST_BASE || 'http://localhost:8791';
 const WS = B.replace(/^http/, 'ws') + '/api/presence';
@@ -66,6 +68,19 @@ ck('online people sort ahead of offline ones', (await roster()).findIndex(u => u
 c2.send({ type: 'ping' });
 await new Promise(r => setTimeout(r, 300));
 ck('a ping keeps you online and does not break anything', entry(await roster(), b.name)?.online === true);
+ck('nobody is in a game until they say so', entry(await roster(), a.name)?.game === null && entry(await roster(), b.name)?.game === null);
+
+// ---- who is in which game ----
+c2.send({ type: 'activity', game: 'ddz' });
+const bGame = await c2.next(m => m.type === 'roster' && entry(m.users, b.name)?.game === 'ddz', 'B game broadcast');
+ck('activity shows up in the roster as the game you are in', entry(bGame.users, b.name)?.game === 'ddz', JSON.stringify(entry(bGame.users, b.name)));
+ck('...and over GET too', entry(await roster(), b.name)?.game === 'ddz');
+c2.send({ type: 'activity', game: 'not-a-game' });
+const bBogus = await c2.next(m => m.type === 'roster' && entry(m.users, b.name)?.online === true && entry(m.users, b.name)?.game === null, 'bogus game dropped');
+ck('a game key the server does not know becomes no game', !!bBogus);
+c2.send({ type: 'ping', game: 'ww' });
+const bPing = await c2.next(m => m.type === 'roster' && entry(m.users, b.name)?.game === 'ww', 'ping-carried game');
+ck('a ping can carry the game (and it heals a missed activity)', !!bPing);
 
 const t0 = Date.now();
 await c1.close();
@@ -73,6 +88,8 @@ const afterA = await roster();
 ck('closing flips you offline with lastSeen ≈ the moment you left', entry(afterA, a.name)?.online === false && (entry(afterA, a.name)?.lastSeen || 0) >= t0 - 5000 && (entry(afterA, a.name)?.lastSeen || Infinity) <= Date.now(), JSON.stringify(entry(afterA, a.name)));
 ck('the other person is still online', entry(afterA, b.name)?.online === true);
 await c2.close();
+const afterB = await roster();
+ck('leaving clears the game along with the online flag', entry(afterB, b.name)?.online === false && entry(afterB, b.name)?.game === null, JSON.stringify(entry(afterB, b.name)));
 
 console.log(`\nPRESENCE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

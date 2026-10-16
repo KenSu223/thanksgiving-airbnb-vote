@@ -8,6 +8,9 @@ import './presence.css';
 // N 小时前 / N 天前；从没来过就写「还没来过」）。
 // 名单是服务器排好的（在线的在前，再按最近在线排）。每 30 秒自己
 // 重算一次「多久以前」，页面开着放着数字也会往前走。
+// showGame（游戏 tab 的那份名单）：在线的人要是在玩游戏，右边用小
+// 灰字写「在玩 X」——key 和 GamesView 的 GAMES 对齐，服务器只认这几个。
+const GAME_LABELS = { bj: 'Blackjack', ddz: '斗地主', gd: '掼蛋', mj: '川麻', dodge: '鲁班躲技能', 2048: '2048', uc: '谁是卧底', av: '阿瓦隆', ww: '狼人杀' };
 export function agoText(lastSeen, now) {
   if (!lastSeen) return '还没来过';
   const s = Math.max(0, Math.floor((now - lastSeen) / 1000));
@@ -19,7 +22,7 @@ export function agoText(lastSeen, now) {
   return `${Math.floor(h / 24)} 天前`;
 }
 
-export default function PresencePanel({ fold = false }) {
+export default function PresencePanel({ fold = false, showGame = false }) {
   const { users } = usePresence();
   const { name } = useSession();
   const [now, setNow] = useState(() => Date.now());
@@ -52,7 +55,9 @@ export default function PresencePanel({ fold = false }) {
           <li key={u.name} className="presence-row">
             <span className={'presence-dot' + (u.online ? ' on' : '')} aria-hidden="true" />
             <span className="presence-name">{u.name}{u.name === name ? '（我）' : ''}</span>
-            {!u.online && <span className="presence-when">{agoText(u.lastSeen, now)}</span>}
+            {u.online
+              ? (showGame && u.game && <span className="presence-when">在玩{GAME_LABELS[u.game] || u.game}</span>)
+              : <span className="presence-when">{agoText(u.lastSeen, now)}</span>}
           </li>
         ))}
       </ul>

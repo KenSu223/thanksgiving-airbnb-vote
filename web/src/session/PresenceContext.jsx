@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useSession } from './SessionContext.jsx';
 
 // 在线状态：整个 App 就这一条连线（WebSocket /api/presence）。规矩和
@@ -7,7 +7,10 @@ import { useSession } from './SessionContext.jsx';
 // 连上之后：登录了就报名字（服务器核对 token，冒充不了别人），每
 // 25 秒 ping 一下刷新自己的 lastSeen；服务器在有人来 / 走时广播
 // 全员名单。没登录也能连，只能看名单，不能把自己挂上去。
-const Ctx = createContext({ users: [] });
+// 名单还带着每个人此刻在玩哪个游戏：GamesView 选中哪个游戏就通过
+// setActivity 报上来（hello / ping 也带着，activity 消息即时送），
+// 游戏 tab 的名单里显示成「在玩 X」。
+const Ctx = createContext({ users: [], setActivity: () => {} });
 export const usePresence = () => useContext(Ctx);
 
 const PING_MS = 25000;
@@ -18,6 +21,7 @@ export function PresenceProvider({ children }) {
   const ws = useRef(null), retry = useRef(0), ping = useRef(null);
   const cred = useRef({ name, token });
   cred.current = { name, token };
+  const activity = useRef(null); // 此刻在玩的游戏 key（不在游戏里就是 null）
 
   const send = m => {
     if (ws.current && ws.current.readyState === 1) { ws.current.send(JSON.stringify(m)); return true; }
@@ -25,8 +29,14 @@ export function PresenceProvider({ children }) {
   };
   const hello = () => {
     const c = cred.current;
-    if (c.name && c.token) send({ type: 'hello', name: c.name, token: c.token });
+    if (c.name && c.token) send({ type: 'hello', name: c.name, token: c.token, game: activity.current });
   };
+  const setActivity = useCallback(game => {
+    const g = game || null;
+    if (activity.current === g) return;
+    activity.current = g;
+    send({ type: 'activity', game: g });
+  }, []);
 
   const connect = useRef(null);
   connect.current = () => {
@@ -37,7 +47,7 @@ export function PresenceProvider({ children }) {
       retry.current = 0;
       hello();
       clearInterval(ping.current);
-      ping.current = setInterval(() => send({ type: 'ping' }), PING_MS);
+      ping.current = setInterval(() => send({ type: 'ping', game: activity.current }), PING_MS);
     };
     s.onmessage = e => {
       let m;
@@ -60,5 +70,5 @@ export function PresenceProvider({ children }) {
   // 登录 / 换了人：在同一条连线上重新报名字
   useEffect(() => { hello(); }, [name, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <Ctx.Provider value={{ users }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ users, setActivity }}>{children}</Ctx.Provider>;
 }
