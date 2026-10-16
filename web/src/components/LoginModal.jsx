@@ -8,11 +8,14 @@ import './presence.css';
 // 登录 sheet：玻璃面板 + 右上角关闭钮。点遮罩、按 Esc 也能关（和「先随便看看」一个效果）
 // 绑了邮箱的账号在新设备上登录要邮箱验证码（challenge 视图）；
 // 没绑的可以从这里绑（选人 → 绑邮箱 → 收到码 → 验证完成）。
+// 也可以给账号设 4 位 PIN（同样是 challenge 视图）：PIN 和邮箱是平行
+// 的两种保护，绑一个就行、两个都绑也行——新设备登录时自己选用哪个
+// 验证（视图里能互相切换）；PIN 在这里设 / 改 / 去掉。
 // 「我来过了」是一份能点的名单：一行一个人（头像 + 名字 + 在线状态），
 // 点谁就登谁。在线状态来自 PresenceContext：在在线的只有一个绿点，
 // 不在线的是小灰字（3 分钟前 / 还没来过）。
 export default function LoginModal() {
-  const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, bindIntent } = useSession();
+  const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, verifyPin, setAccountPin, removeAccountPin, joinWithEmail, bindIntent } = useSession();
   const { users: presenceUsers } = usePresence();
   const presOf = n => presenceUsers.find(u => u.name === n);
   const [now, setNow] = useState(() => Date.now());
@@ -29,14 +32,17 @@ export default function LoginModal() {
   const [bindEmail, setBindEmail] = useState('');
   const [bindOpen, setBindOpen] = useState(false);
   const [code, setCode] = useState('');
+  const [pinCode, setPinCode] = useState('');
+  const [pinOpen, setPinOpen] = useState(false);
+  const [pinVal, setPinVal] = useState('');
   const [sent, setSent] = useState(false);
   const [devCode, setDevCode] = useState('');
   const [cool, setCool] = useState(0);
-  const listRef = useRef(null), inputRef = useRef(null), codeRef = useRef(null);
+  const listRef = useRef(null), inputRef = useRef(null), codeRef = useRef(null), pinRef = useRef(null);
 
   useEffect(() => {
     if (!loginOpen) return;
-    setNewName(''); setNewEmail(''); setMsg(''); setBindOpen(false); setBindEmail('');
+    setNewName(''); setNewEmail(''); setMsg(''); setBindOpen(false); setBindEmail(''); setPinOpen(false); setPinVal('');
     setSel(users.some(u => u.name === name) ? name : '');
     // 从绑邮箱提醒进来：选中本人并直接展开绑邮箱输入框
     if (bindIntent && name) { setSel(name); setBindOpen(true); }
@@ -50,9 +56,9 @@ export default function LoginModal() {
   // 进入验证码视图时：挑战里带着「已发送」状态（绑定流程是先发码再进来，
   // 登录流程进来时还没发）；重发倒计时也在这里起步
   useEffect(() => {
-    setCode(''); setMsg('');
+    setCode(''); setPinCode(''); setMsg('');
     setSent(!!challenge?.sent); setDevCode(challenge?.devCode || ''); setCool(challenge?.sent ? 60 : 0);
-    if (challenge) setTimeout(() => codeRef.current?.focus(), 60);
+    if (challenge) setTimeout(() => (challenge.kind === 'pin' ? pinRef : codeRef).current?.focus(), 60);
   }, [challenge]);
   useEffect(() => {
     if (cool <= 0) return;
@@ -93,6 +99,26 @@ export default function LoginModal() {
     const err = await verifyAuthCode(code.trim());
     if (err) setMsg(err);
   };
+  const doVerifyPin = async () => {
+    setMsg('');
+    const err = await verifyPin(pinCode);
+    if (err) setMsg(err);
+  };
+  // 给选中的人设 / 改 PIN：和绑邮箱一样要出示 ta 当前的 token。设上之后
+  // token 会轮换，setAccountPin 会把新身份换上（选的人就是本人时）。
+  const startPinSet = async () => {
+    setMsg('');
+    const t = sel === name ? token : selUser?.token;
+    if (!t) { setMsg('先登录这个账号再设 PIN'); return; }
+    const err = await setAccountPin(sel, pinVal, t);
+    if (err) { setMsg(err); return; }
+    setPinOpen(false); setPinVal('');
+  };
+  const doRemovePin = async () => {
+    setMsg('');
+    const err = await removeAccountPin();
+    if (err) setMsg(err);
+  };
   return (
     <div className="login-fade fixed inset-0 bg-slate-950/45 backdrop-blur-[3px] flex items-center justify-center z-50 px-4"
       onClick={e => { if (e.target === e.currentTarget) closeLogin(); }}>
@@ -102,6 +128,32 @@ export default function LoginModal() {
           className="login-close absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full border border-white/70 bg-white/60 text-base leading-none text-slate-500 shadow-[0_2px_8px_rgba(15,23,42,.12),inset_0_1px_0_rgba(255,255,255,.9)] hover:bg-white/90 hover:text-slate-700">✕</button>
 
         {challenge ? (
+          challenge.kind === 'pin' ? (
+            <div>
+              <div className="mb-5 flex items-center gap-3.5 pr-8">
+                <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-[26px] shadow-[0_8px_20px_-6px_rgba(99,60,235,.6),inset_0_1px_0_rgba(255,255,255,.4)]">🔑</span>
+                <div>
+                  <h3 className="text-xl font-extrabold leading-tight">输入 PIN</h3>
+                  <p className="mt-0.5 text-sm leading-snug text-slate-500"><b>{challenge.name}</b> 设了 4 位 PIN，这个设备还没验过</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input ref={pinRef} value={pinCode} onChange={e => setPinCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  onKeyDown={e => e.key === 'Enter' && pinCode.length === 4 && doVerifyPin()}
+                  className={field + ' text-center text-xl font-bold tracking-[0.4em]'} placeholder="····" inputMode="numeric" autoComplete="off" />
+                <button onClick={doVerifyPin} disabled={pinCode.length !== 4} className="btn-primary shrink-0 rounded-xl px-5 py-2.5 font-bold disabled:opacity-40">验证</button>
+              </div>
+              <div className="mt-3 flex items-center justify-between text-sm">
+                <button onClick={() => setChallenge(null)} className="font-medium text-slate-400 transition hover:text-slate-600">← 换个人</button>
+                <span className="text-slate-400">连错 5 次会锁 10 分钟</span>
+              </div>
+              {challenge.canCode && (
+                <button onClick={() => setChallenge({ kind: 'login', name: challenge.name, emailHint: challenge.emailHint, canPin: true })}
+                  className="mt-2.5 w-full text-center text-sm font-medium text-indigo-500 transition hover:text-indigo-700">或者用邮箱验证码验证 →</button>
+              )}
+              {msg && <p className="mt-2.5 text-sm font-medium text-rose-600">{msg}</p>}
+            </div>
+          ) : (
           <div>
             <div className="mb-5 flex items-center gap-3.5 pr-8">
               <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-[26px] shadow-[0_8px_20px_-6px_rgba(99,60,235,.6),inset_0_1px_0_rgba(255,255,255,.4)]">✉️</span>
@@ -132,8 +184,13 @@ export default function LoginModal() {
                 ? <span className="text-slate-400">{cool} 秒后可重发</span>
                 : <button onClick={sendForChallenge} className="font-medium text-indigo-500 transition hover:text-indigo-700">重新发送</button>)}
             </div>
+            {challenge.kind === 'login' && challenge.canPin && (
+              <button onClick={() => setChallenge({ kind: 'pin', name: challenge.name, emailHint: challenge.emailHint, canCode: true })}
+                className="mt-2.5 w-full text-center text-sm font-medium text-indigo-500 transition hover:text-indigo-700">或者用 PIN 验证 →</button>
+            )}
             {msg && <p className="mt-2.5 text-sm font-medium text-rose-600">{msg}</p>}
           </div>
+          )
         ) : (
           <div>
             <div className="mb-5 flex items-center gap-3.5 pr-8">
@@ -154,7 +211,7 @@ export default function LoginModal() {
                         <button type="button" className={'login-user' + (sel === u.name ? ' sel' : '')} aria-pressed={sel === u.name}
                           onClick={() => { setSel(u.name); setBindOpen(false); go(u.name); }}>
                           <span className="avatar login-user-av" aria-hidden="true">{Array.from(u.name)[0].toUpperCase()}</span>
-                          <span className="login-user-name">{u.name}{u.emailBound ? ' 🔒' : ''}</span>
+                          <span className="login-user-name">{u.name}{(u.emailBound || u.pinBound) ? ' 🔒' : ''}</span>
                           {p && (p.online
                             ? <span className="presence-dot on" role="img" aria-label="在线" />
                             : <span className="presence-when">{agoText(p.lastSeen, now)}</span>)}
@@ -164,6 +221,7 @@ export default function LoginModal() {
                   })}
                 </ul>
                 {selUser?.emailBound && <p className="mb-3 text-xs text-slate-400">🔒 {sel} 绑了邮箱（{selUser.emailHint}），在这台设备上第一次登录要收验证码；这台设备验过就不用了</p>}
+                {selUser?.pinBound && !selUser?.emailBound && <p className="mb-3 text-xs text-slate-400">🔑 {sel} 设了 PIN，在这台设备上第一次登录要输 PIN；这台设备验过就不用了</p>}
                 {selUser && !selUser.emailBound && (
                   bindOpen ? (
                     <div className="mb-3 flex gap-2">
@@ -173,6 +231,25 @@ export default function LoginModal() {
                     </div>
                   ) : (
                     <button onClick={() => setBindOpen(true)} className="mb-3 text-xs font-medium text-indigo-500 transition hover:text-indigo-700">给 {sel} 绑邮箱（以后换设备登录更安全）→</button>
+                  )
+                )}
+                {selUser && (
+                  pinOpen ? (
+                    <div className="mb-3 flex gap-2">
+                      <input value={pinVal} onChange={e => setPinVal(e.target.value.replace(/\D/g, '').slice(0, 4))} onKeyDown={e => e.key === 'Enter' && pinVal.length === 4 && startPinSet()}
+                        className={field} placeholder={selUser.pinBound ? `给 ${sel} 换个新 PIN` : `给 ${sel} 设个 4 位 PIN`} inputMode="numeric" maxLength={4} />
+                      <button onClick={startPinSet} disabled={pinVal.length !== 4} className="shrink-0 rounded-xl bg-slate-900/90 px-4 py-2.5 font-bold text-white shadow-[0_8px_20px_-6px_rgba(15,23,42,.5)] transition hover:bg-slate-900 active:scale-[.98] disabled:opacity-40">{selUser.pinBound ? '保存新 PIN' : '设置 PIN'}</button>
+                    </div>
+                  ) : selUser.pinBound ? (
+                    sel === name ? (
+                      <p className="mb-3 flex items-center gap-2 text-xs text-slate-400">
+                        <span>🔑 {sel} 已设 PIN</span>
+                        <button onClick={() => setPinOpen(true)} className="font-medium text-indigo-500 transition hover:text-indigo-700">改 PIN</button>
+                        <button onClick={doRemovePin} className="font-medium text-slate-400 transition hover:text-rose-500">去掉 PIN</button>
+                      </p>
+                    ) : null
+                  ) : (
+                    <button onClick={() => setPinOpen(true)} className="mb-3 block text-xs font-medium text-indigo-500 transition hover:text-indigo-700">给 {sel} 设 4 位 PIN（换设备登录输 PIN 就行，不用等邮箱）→</button>
                   )
                 )}
                 <div className="mb-3.5 flex items-center gap-3 text-xs text-slate-400"><span className="flex-1 border-t border-white/60"></span>第一次来？<span className="flex-1 border-t border-white/60"></span></div>

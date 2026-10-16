@@ -1,4 +1,7 @@
-// Email binding + code-login flow, end to end. Requires the server to
+// Email binding + code-login flow, end to end, plus the PIN alternative
+// (set / verify / lockout / remove; the two are parallel — with both
+// set, login offers both and either one proves it's you).
+// Requires the server to
 // run with EMAIL_DEV_MODE=1 (codes come back in API responses instead of
 // being emailed — see worker/users/auth.js). run.mjs sets that variable
 // for the local test instance; production never has it.
@@ -92,6 +95,57 @@ const reAct = await J('POST', '/api/activity-vote', { id: aid, token: vTokB, nam
 ck('activity re-vote after rotation stays one vote', (reAct.votes || []).filter(v => v.name === V).length === 1, JSON.stringify(reAct.votes));
 const un = await J('POST', '/api/vote', { id: lid, token: vTokB, trip: 'nov26' });
 ck('unvote with rotated token clears the vote', (un.votes || []).filter(v => v.name === V).length === 0, JSON.stringify(un.votes));
+
+// ---- PIN protection: the 4-digit alternative to the email code ----
+// Same deal as binding an email: setting a PIN hides the token from the
+// public list and rotates it; a new device then proves itself with the
+// PIN instead of a code. Guessing is capped: 5 wrong tries lock PIN
+// login for 10 minutes.
+const P = 'Pin' + tag;
+const pLogin = await J('POST', '/api/login', { name: P, token: 'pin-tok-1' });
+const pTok = pLogin.user.token;
+ck('pin user created', !!pTok);
+const pinBadTok = await J('POST', '/api/auth/pin/set', { name: P, token: 'wrong-token', pin: '2468' });
+ck('pin set without the account token rejected', pinBadTok.ok === false, JSON.stringify(pinBadTok));
+const pinBadFmt = await J('POST', '/api/auth/pin/set', { name: P, token: pTok, pin: '123' });
+ck('pin must be exactly 4 digits', pinBadFmt.ok === false, JSON.stringify(pinBadFmt));
+const pinBadFmt2 = await J('POST', '/api/auth/pin/set', { name: P, token: pTok, pin: '12a4' });
+ck('pin must be digits only', pinBadFmt2.ok === false, JSON.stringify(pinBadFmt2));
+const pinSet = await J('POST', '/api/auth/pin/set', { name: P, token: pTok, pin: '2468' });
+ck('pin set ok', pinSet.ok === true, JSON.stringify(pinSet));
+ck('pin set rotated the token', !!pinSet.user?.token && pinSet.user.token !== pTok);
+const pListed = (await J('GET', '/api/users')).users.find(u => u.name === P);
+ck('pin-bound token hidden in list, pinBound shows', pListed && !('token' in pListed) && pListed.pinBound === true, JSON.stringify(pListed));
+const pNeed = await J('POST', '/api/login', { name: P, token: 'fresh-device' });
+ck('login from a new device -> needPin (not needCode)', pNeed.ok && pNeed.needPin === true && !pNeed.needCode, JSON.stringify(pNeed));
+const pDirect = await J('POST', '/api/login', { name: P, token: pinSet.user.token });
+ck('login with the real token -> no PIN needed', pDirect.ok && pDirect.user?.token === pinSet.user.token, JSON.stringify(pDirect));
+const pWrong = await J('POST', '/api/auth/pin/verify', { name: P, pin: '9999' });
+ck('wrong PIN rejected', pWrong.ok === false, JSON.stringify(pWrong));
+const pVer = await J('POST', '/api/auth/pin/verify', { name: P, pin: '2468', deviceToken: 'fresh-device' });
+ck('right PIN returns the token', pVer.ok && pVer.user.token === pinSet.user.token, JSON.stringify(pVer));
+// The two protections are parallel: one is enough, both is fine. With
+// both set, login offers both and either one proves it's you.
+const bothSet = await J('POST', '/api/auth/pin/set', { name: NAME, token: ver.user.token, pin: '1357' });
+ck('PIN can be added to an email-bound account', bothSet.ok === true, JSON.stringify(bothSet));
+const bothNeed = await J('POST', '/api/login', { name: NAME, token: 'fresh-device' });
+ck('with both set, login offers both proofs', bothNeed.needCode === true && bothNeed.needPin === true, JSON.stringify(bothNeed));
+const bothPinVer = await J('POST', '/api/auth/pin/verify', { name: NAME, pin: '1357' });
+ck('with both set, the PIN alone also logs you in', bothPinVer.ok && bothPinVer.user.token === bothSet.user.token, JSON.stringify(bothPinVer));
+// Lockout, on its own account so nothing above gets locked out.
+const L = 'Lock' + tag;
+const lLogin = await J('POST', '/api/login', { name: L, token: 'lock-tok-1' });
+await J('POST', '/api/auth/pin/set', { name: L, token: lLogin.user.token, pin: '0000' });
+for (let i = 0; i < 5; i++) await J('POST', '/api/auth/pin/verify', { name: L, pin: '1111' });
+const locked = await J('POST', '/api/auth/pin/verify', { name: L, pin: '0000' });
+ck('after 5 wrong tries even the right PIN is locked out', locked.ok === false && /试太多次了/.test(locked.error || ''), JSON.stringify(locked));
+// Removing the PIN (with the account's token) unprotects the account.
+const pRemove = await J('POST', '/api/auth/pin/remove', { name: P, token: pinSet.user.token });
+ck('pin remove ok', pRemove.ok === true, JSON.stringify(pRemove));
+const pListed2 = (await J('GET', '/api/users')).users.find(u => u.name === P);
+ck('after remove, the token travels with the list again', pListed2?.token === pinSet.user.token && !pListed2.pinBound, JSON.stringify(pListed2));
+const pFree = await J('POST', '/api/login', { name: P, token: 'whatever' });
+ck('after remove, login needs no PIN', pFree.ok && !pFree.needPin && !!pFree.user?.token, JSON.stringify(pFree));
 
 console.log(`EMAIL: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
