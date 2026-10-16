@@ -1,12 +1,13 @@
 // 掼蛋 bots: what to lead, what to follow with, and the 进贡 / 还贡 cards.
-// Also gives people their 提示. Simple, but plays real shapes: it breaks the
-// hand into bombs, 钢板, 三连对, 顺子, 三带二, pairs and singles, leads the
-// cheapest group, follows with the cheapest cards that beat the table without
-// breaking a bomb, lets its partner's play stand, and bombs when an opponent
-// is close to going out.
+// Simple, but plays real shapes: it breaks the hand into bombs, 钢板, 三连对,
+// 顺子, 三带二, pairs and singles, leads the cheapest group, follows with the
+// cheapest cards that beat the table without breaking a bomb, lets its
+// partner's play stand, and bombs when an opponent is close to going out.
+// People's 提示 is in hints.js.
 import { ACE, SJ, BJ, rankOf, suitOf, isWild, isBomb, power, legalPlay, value, sortHand, SUITS } from './cards.js';
 
-function split(hand, level) {
+// The hand by natural rank, with the 配 and the jokers apart.
+export function split(hand, level) {
   const byRank = new Map(), wilds = [], sj = [], bj = [];
   for (const c of hand) {
     if (isWild(c, level)) wilds.push(c);
@@ -167,12 +168,6 @@ export function choosePlay(hand, prev, level, ctx) {
   if (bomb && (close || isBomb(prev))) return bomb.cards;
   return null;
 }
-// 提示 for a person: the cheapest thing that works (a bomb only if nothing else does).
-export function hintPlay(hand, prev, level) {
-  if (!prev) return lead(hand, level, { oppMin: 27 });
-  return beaters(hand, prev, level, 2)[0]?.cards || null;
-}
-
 // 进贡: the biggest card that isn't a wild heart. 还贡: something 10 or lower,
 // preferably a lone card.
 export function tributeCard(hand, level) {

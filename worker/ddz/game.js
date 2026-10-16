@@ -3,7 +3,7 @@
 // on its own. hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat) }.
 import { deck, isBombish, legalPlay, shuffle, sortHand, takeFrom } from './cards.js';
 import { choosePlay, wantsCall, wantsGrab } from './bot.js';
-import { beatOptions } from './hints.js';
+import { beatOptions, leadOptions } from './hints.js';
 
 export const DDZ = { base: 10, startPoints: 1000, bidMs: 15000, turnMs: 30000, botMs: 900, idleMs: 10 * 60 * 1000 };
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑'];
@@ -187,22 +187,26 @@ export class DdzGame {
     if (this.toBeat(i)) return this.doPass(i);
     this.doPlay(i, [this.seats[i].cards[this.seats[i].cards.length - 1]]); // fallback lead: the smallest card
   }
-  suggest(i) {
+  // the fewest cards an opponent of seat i holds
+  oppMin(i) {
     const opp = [0, 1, 2].filter(k => k !== i && (i === this.landlord || k === this.landlord));
-    const teammateLed = !!(this.trick && this.trick.by !== i && i !== this.landlord && this.trick.by !== this.landlord);
-    return choosePlay(this.seats[i].cards, this.toBeat(i), { teammateLed, oppMin: Math.min(...opp.map(k => this.seats[k].cards.length)) });
+    return Math.min(...opp.map(k => this.seats[k].cards.length));
   }
-  // 提示: leading, the bot's lead; following, every play that beats the table
-  // (hints.js) — not just what the bot would do, which can be a deliberate
-  // pass — one per press, starting over when the cards on the table change.
+  suggest(i) {
+    const teammateLed = !!(this.trick && this.trick.by !== i && i !== this.landlord && this.trick.by !== this.landlord);
+    return choosePlay(this.seats[i].cards, this.toBeat(i), { teammateLed, oppMin: this.oppMin(i) });
+  }
+  // 提示 (hints.js): leading, the hand's own groups from the cheapest;
+  // following, every play that beats the table — not just what the bot would
+  // do, which can be a deliberate pass. One per press, starting over when the
+  // cards on the table (or, leading, your hand) change.
   hint(key) {
     const i = this.seatOf(key);
     if (this.phase !== 'playing' || i !== this.turn) return null;
-    const prev = this.toBeat(i);
-    if (!prev) return this.suggest(i);
-    const opts = beatOptions(this.seats[i].cards, prev);
+    const s = this.seats[i], prev = this.toBeat(i);
+    const opts = prev ? beatOptions(s.cards, prev) : leadOptions(s.cards, { oppMin: this.oppMin(i) });
     if (!opts.length) return [];
-    const s = this.seats[i], at = this.round + ':' + this.trick.by + ':' + this.trick.cards.join(',');
+    const at = this.round + ':' + (prev ? this.trick.by + ':' + this.trick.cards.join(',') : 'lead:' + s.cards.length);
     s.hintN = s.hintAt === at ? s.hintN + 1 : 0;
     s.hintAt = at;
     return opts[s.hintN % opts.length];
