@@ -108,3 +108,12 @@ class_name = "WerewolfHall"
 [[migrations]]
 tag = "v9"
 new_sqlite_classes = ["WerewolfHall"]
+
+# The group chat room: one Durable Object, the latest 100 messages, hibernating WebSockets.
+[[durable_objects.bindings]]
+name = "CHAT"
+class_name = "ChatRoom"
+
+[[migrations]]
+tag = "v10"
+new_sqlite_classes = ["ChatRoom"]

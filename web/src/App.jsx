@@ -9,6 +9,7 @@ import AccountButton from './components/AccountButton.jsx';
 import LoginModal from './components/LoginModal.jsx';
 import BindNag from './components/BindNag.jsx';
 import PollFab from './components/PollFab.jsx';
+import ChatFab from './components/ChatFab.jsx';
 import HuntView from './features/hunt/HuntView.jsx';
 import SplitView from './features/split/SplitView.jsx';
 import GamesView from './features/games/GamesView.jsx';
@@ -81,6 +82,7 @@ function Shell() {
       <LoginModal />
       <BindNag />
       <PollFab />
+      <ChatFab />
     </div>
   );
 }
