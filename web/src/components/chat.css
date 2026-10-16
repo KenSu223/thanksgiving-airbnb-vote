@@ -1,9 +1,9 @@
-/* 聊天室：未读数字（灰 = 普通，红 = 有人 @我）、消息气泡、@ 高亮、@ 的成员列表 */
+/* 聊天室：未读数字（灰 = 普通，红 = 有人 @我）、消息气泡（没读的灰底、@我 的红框）、@ 高亮、@ 的成员列表 */
 .ch-badge { display:grid; place-items:center; min-width:1.25rem; height:1.25rem; padding:0 .3rem; border-radius:999px; font-size:11px; font-weight:800; color:#fff; }
 .ch-badge.gray { background:#94a3b8; }
 .ch-badge.red { background:#f43f5e; box-shadow:0 0 0 2px #fff; animation:ch-ping 1.6s ease-in-out infinite; }
 @keyframes ch-ping { 0%, 100% { transform:scale(1); } 50% { transform:scale(1.15); } }
-.ch-list { flex:1; min-height:0; overflow-y:auto; margin-top:.75rem; padding:.25rem .15rem; display:flex; flex-direction:column; gap:.3rem; overscroll-behavior:contain; }
+.ch-list { position:relative; flex:1; min-height:0; overflow-y:auto; margin-top:.75rem; padding:.25rem .15rem; display:flex; flex-direction:column; gap:.3rem; overscroll-behavior:contain; }
 .ch-row { display:flex; flex-direction:column; align-items:flex-start; max-width:100%; }
 .ch-row.mine { align-items:flex-end; }
 .ch-name { margin:.45rem 0 .1rem .4rem; font-size:.75rem; font-weight:700; color:#475569; }
@@ -12,6 +12,9 @@
   white-space:pre-wrap; overflow-wrap:anywhere; box-shadow:0 2px 8px -4px rgba(30,41,59,.25); }
 .ch-bubble.mine { border-radius:1.1rem 1.1rem .35rem 1.1rem; background:linear-gradient(135deg,#6366f1,#7c3aed); color:#fff; }
 .ch-bubble.tagged { box-shadow:0 0 0 2px #fda4af, 0 2px 8px -4px rgba(30,41,59,.25); }
+.ch-bubble.unread { background:#cbd5e1; color:#1e293b; }
+.ch-new { align-self:stretch; display:flex; align-items:center; gap:.5rem; margin:.6rem 0 .1rem; font-size:.72rem; font-weight:700; color:#94a3b8; }
+.ch-new::before, .ch-new::after { content:''; flex:1; border-top:1px solid #cbd5e1; }
 .ch-at { font-weight:800; color:#4f46e5; }
 .ch-bubble.mine .ch-at { color:#e0e7ff; }
 .ch-at.me { color:#e11d48; background:#ffe4e6; border-radius:.35rem; padding:0 .15rem; }
