@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import PeoplePicker from './PeoplePicker.jsx';
 import TodoForm from './TodoForm.jsx';
+import TodoComments from './TodoComments.jsx';
 import { dueLabel, overdue } from './phases.js';
 
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 
-// 一条待办：圆圈打勾、标题、备注、截止日期、谁在做；「我来」/「不做了」；加的人可以指派、改、删
+// 一条待办：圆圈打勾、标题、备注、截止日期、谁在做；「我来」/「不做了」；加的人可以指派、改、删；
+// 💬 打开评论（谁都能评论、回复）
 export default function TodoItem({ t, me, people, today, busy, act }) {
   const [mode, setMode] = useState(null); // 'assign' | 'edit'
   const [who, setWho] = useState(t.assignees);
+  const [talk, setTalk] = useState(false);
+  const talkN = (t.comments || []).filter(c => !c.deleted).length;
   const mine = !!me && t.assignees.some(n => same(n, me));
   const owner = !!me && same(t.by, me);
   const late = overdue(t, today);
@@ -35,6 +39,7 @@ export default function TodoItem({ t, me, people, today, busy, act }) {
             ? t.assignees.map(n => <span key={n} className={'td-chip' + (same(n, me) ? ' me' : '')}>{same(n, me) ? '我' : n}</span>)
             : !t.done && <span className="td-open">没人认领</span>}
           <span className="td-by">{t.done ? '✓ ' + (t.doneBy || '有人') + ' 做完了' : t.by + ' 加的'}</span>
+          <button className={'td-talk' + (talk ? ' on' : '') + (talkN ? ' has' : '')} onClick={() => setTalk(v => !v)} aria-expanded={talk}>💬 {talkN ? talkN + ' 条评论' : '评论'}</button>
         </div>
         {mode === 'assign' && (
           <div className="mt-3 space-y-2">
@@ -61,6 +66,7 @@ export default function TodoItem({ t, me, people, today, busy, act }) {
         </div>
       )}
       {t.done && owner && <div className="td-actions"><span className="td-owner"><button onClick={() => act('/api/todos/delete', { id: t.id }, { confirm: t.title })}>删</button></span></div>}
+      {talk && <TodoComments t={t} me={me} busy={busy} act={act} />}
     </li>
   );
 }

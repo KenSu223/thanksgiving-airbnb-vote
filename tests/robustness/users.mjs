@@ -49,6 +49,10 @@ ck('retiree took a car seat', seat.ok === true, JSON.stringify(seat).slice(0, 16
 const todo = await J('POST', '/api/todos', { name: 'Aster', token: ast.token, title: 'retiree test task', assignees: [VICTIM] });
 const todoId = todo.items?.find(t => t.title === 'retiree test task')?.id;
 ck('retiree assigned a task', !!todoId && todo.items.find(t => t.id === todoId).assignees.includes(VICTIM), JSON.stringify(todo).slice(0, 160));
+const cm = await J('POST', '/api/todos/comment', { name: VICTIM, token: vic.token, id: todoId, text: 'retiree comment' });
+const cmId = cm.items?.find(t => t.id === todoId)?.comments?.[0]?.id;
+await J('POST', '/api/todos/comment', { name: 'Aster', token: ast.token, id: todoId, text: 'aster reply', replyTo: cmId });
+ck('retiree commented (and Aster replied)', !!cmId);
 // a dodge score is the server's replay of a ticketed run (a run with no input lasts
 // under 3 s and can't be longer than the time since its ticket + 2 s: wait a second)
 const tk = await J('POST', '/api/dodge/start', { name: VICTIM, token: vic.token });
@@ -91,6 +95,8 @@ const carsEnd = await J('GET', '/api/cars');
 ck('retiree car seat freed', carsEnd.cars.every(c => Object.values(c.seats).every(w => !isVictim(w))), JSON.stringify(carsEnd.cars).slice(0, 200));
 const todosEnd = await J('GET', '/api/todos');
 ck('retiree off the task (the task stays)', !!todosEnd.items.find(t => t.id === todoId) && !todosEnd.items.find(t => t.id === todoId).assignees.includes(VICTIM));
+const cms = todosEnd.items.find(t => t.id === todoId).comments;
+ck("retiree's comment gone, Aster's reply kept under a marker", cms.every(c => c.by !== VICTIM && c.text !== 'retiree comment' && c.replyToName !== VICTIM) && cms.some(c => c.text === 'aster reply') && cms.some(c => c.deleted), JSON.stringify(cms));
 const angelPm = await J('GET', `/api/angel?name=PM&token=${pm.token}`);
 ck('angel draw survives with the retiree spliced out', angelPm.drawn === true && angelPm.master?.name === 'Aster', JSON.stringify(angelPm.master));
 const angelAst = await J('GET', `/api/angel?name=Aster&token=${ast.token}`);

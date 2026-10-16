@@ -2,10 +2,16 @@
 // after. Anyone signed in can add one and assign people to it; anyone can
 // pick up a task themselves (我来) or drop out of one, and tick it done.
 // Editing, assigning and deleting is for whoever added it (everyone has the same rights).
+// Anyone signed in can comment on a task and reply to a comment; replies sit
+// one level under the comment that started the thread (a reply to a reply joins
+// that thread, remembering whom it answered). You delete only your own; a
+// comment that already has replies leaves a 「删掉了」 marker so they keep context.
 //
 // Stored in the store (worker/store) under todos:v1:
 //   { items: [{ id, title, note, phase, due, assignees: [userKey], byKey, at,
-//               doneAt, doneByKey }] }
+//               doneAt, doneByKey,
+//               comments: [{ id, byKey, text, at, replyTo, replyToKey, deleted }] }] }
+//   replyTo is the id of the thread's first comment (null for that comment).
 // userKey is the lowercased account name. Writes are version-checked
 // (lib/store.js), so two people picking up the same task at once both land.
 import { j, uid } from '../lib/http.js';
@@ -15,6 +21,7 @@ import { cleanName, getUsers, sameName } from '../users/users.js';
 const KEY = 'todos:v1';
 export const PHASES = ['pre', 'during', 'post'];
 const MAX_ITEMS = 300;
+const MAX_COMMENTS = 200, MAX_COMMENT = 500; // per task; characters per comment
 
 const normalize = d => {
   if (!d || typeof d !== 'object') d = {};
@@ -45,6 +52,8 @@ export function view(d, users) {
       id: t.id, title: t.title, note: t.note || '', phase: t.phase, due: t.due || '',
       assignees: (t.assignees || []).map(nameOf), by: nameOf(t.byKey), at: t.at,
       done: !!t.doneAt, doneAt: t.doneAt || null, doneBy: t.doneByKey ? nameOf(t.doneByKey) : '',
+      comments: (t.comments || []).map(c => ({ id: c.id, by: c.deleted ? '' : nameOf(c.byKey), text: c.deleted ? '' : c.text, at: c.at,
+        replyTo: c.replyTo || null, replyToName: c.replyToKey ? nameOf(c.replyToKey) : '', deleted: !!c.deleted })),
     })),
   };
 }
@@ -139,13 +148,46 @@ const handleDelete = (req, env) => onItem(req, env, (t, key, b, users, d) => {
   d.items = d.items.filter(x => x.id !== t.id);
 });
 
-// A retired account (users/retire.js): off every task; tasks they added stay.
+// Comment on a task, or reply ({ replyTo: commentId }).
+const handleComment = (req, env) => onItem(req, env, (t, key, b) => {
+  const text = String(b.text || '').trim().slice(0, MAX_COMMENT);
+  if (!text) return { error: '写点什么再发' };
+  t.comments = t.comments || [];
+  if (t.comments.length >= MAX_COMMENTS) return { error: '这条的评论太多了' };
+  let replyTo = null, replyToKey = null;
+  if (b.replyTo) {
+    const to = t.comments.find(c => c.id === b.replyTo);
+    if (!to) return { error: '你要回复的评论不在了' };
+    replyTo = to.replyTo || to.id; // a reply to a reply joins that thread
+    replyToKey = to.deleted ? null : to.byKey;
+  }
+  t.comments.push({ id: uid(), byKey: key, text, at: Date.now(), replyTo, replyToKey });
+});
+
+// Delete your own comment (one with replies stays as a 「删掉了」 marker).
+const handleCommentDelete = (req, env) => onItem(req, env, (t, key, b) => {
+  const list = t.comments || [];
+  const c = list.find(x => x.id === b.commentId);
+  if (!c || c.deleted) return { error: '这条评论不在了' };
+  if (c.byKey !== key) return { error: '只能删自己的评论' };
+  dropComment(t, c);
+});
+function dropComment(t, c) {
+  if (!c.replyTo && t.comments.some(x => x.replyTo === c.id)) Object.assign(c, { deleted: true, text: '', byKey: null });
+  else t.comments = t.comments.filter(x => x !== c);
+  // a 「删掉了」 marker whose replies are all gone goes too
+  t.comments = t.comments.filter(x => !x.deleted || t.comments.some(y => y.replyTo === x.id));
+}
+
+// A retired account (users/retire.js): off every task, their comments gone; tasks they added stay.
 export async function scrubUserFromTodos(env, user) {
   const key = user.name.toLowerCase();
   await update(env, d => {
     for (const t of d.items) {
       t.assignees = (t.assignees || []).filter(k => k !== key);
       if (t.doneByKey === key) t.doneByKey = null;
+      for (const c of (t.comments || []).filter(x => x.byKey === key)) dropComment(t, c);
+      for (const c of t.comments || []) if (c.replyToKey === key) c.replyToKey = null;
     }
   });
 }
@@ -158,4 +200,6 @@ export const routes = {
   'POST /api/todos/done': handleDone,
   'POST /api/todos/edit': handleEdit,
   'POST /api/todos/delete': handleDelete,
+  'POST /api/todos/comment': handleComment,
+  'POST /api/todos/comment-delete': handleCommentDelete,
 };
