@@ -33,11 +33,12 @@ export default function TodosView({ active }) {
     return () => clearInterval(id);
   }, [active, load]);
 
-  // 所有改动走这里：没登录先登录；opts.confirm 是要删的标题（先确认）
+  // 所有改动走这里：没登录先登录；opts.confirm 是要删的标题（先确认），opts.confirmComment 删评论前确认
   function act(path, payload, opts = {}) {
     return new Promise(resolve => {
       ensureName(async me => {
         if (opts.confirm && !await confirm({ title: '删掉这条待办？', message: '「' + opts.confirm + '」删掉后大家都看不到了。', confirmText: '删除', danger: true })) return resolve(false);
+        if (opts.confirmComment && !await confirm({ title: '删掉这条评论？', message: '删掉后大家都看不到了。', confirmText: '删除', danger: true })) return resolve(false);
         setBusy(true);
         try {
           const r = await api(path, 'POST', { name: me.name, token: me.token, ...payload });
