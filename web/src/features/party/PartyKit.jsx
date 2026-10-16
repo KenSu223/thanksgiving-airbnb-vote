@@ -8,19 +8,21 @@ import './party.css';
 // 谁是卧底 / 阿瓦隆 / 狼人杀 共用的零件：连线（useTable，掉线、锁屏回来自动坐回原座位）、
 // 播报开关、座位格子（选座位、换座位、投票时点人）、顶上的阶段横幅、只给自己看的身份牌、记录和胜场榜。
 
-export function useParty(active, { path, roomKey, game }) {
+// voice: false — a game run by a person (谁是卧底): no 播报, no switch for it
+export function useParty(active, { path, roomKey, game, voice = true }) {
   const tb = useTable(active, { path, roomKey });
   const { st, live } = tb;
   const t = st?.table;
   const me = t ? t.you : -1;
   const seated = me >= 0;
   // 播报默认：开局的那个人、和没坐下的（放在桌上当「上帝」的那台）开着
-  const [voiceOn, setVoice] = useVoiceSetting(game, !seated || (!!t?.host && t.host === st?.you));
+  const [voicePref, setVoice] = useVoiceSetting(game, !seated || (!!t?.host && t.host === st?.you));
+  const voiceOn = voice && voicePref;
   useAnnouncer(t, voiceOn && active && live);
   useWakeLock(voiceOn && active && !!t && t.phase !== 'waiting');
   const timer = useCountdown(st, active && live);
   const secs = secondsLeft(st);
-  return { ...tb, t, me, seated, inGame: !!t?.inGame, voiceOn, setVoice, timer, secs };
+  return { ...tb, t, me, seated, inGame: !!t?.inGame, voice, voiceOn, setVoice, timer, secs };
 }
 
 // 第一次点到桌上任何地方时顺便把朗读解锁（iPhone 要求）
@@ -30,13 +32,13 @@ export function PartyFrame({ theme, children }) {
 
 // 顶上一排：选桌、播报、站起来
 export function TopBar({ p, phases, title }) {
-  const { st, room, watch, seated, t, standUp, voiceOn, setVoice } = p;
+  const { st, room, watch, seated, t, standUp, voice, voiceOn, setVoice } = p;
   return (
     <>
       <RoomPicker st={st} room={room} watch={watch} phases={phases} rooms={2} />
       <div className="pt-top">
         <span className="pt-title">{title}</span>
-        {canSpeak() && <button className={'pt-chip' + (voiceOn ? ' on' : '')} onClick={() => setVoice(!voiceOn)} title="这台设备念出每一步（一桌开一台就够）">{voiceOn ? '🔊 播报开' : '🔈 播报关'}</button>}
+        {voice && canSpeak() && <button className={'pt-chip' + (voiceOn ? ' on' : '')} onClick={() => setVoice(!voiceOn)} title="这台设备念出每一步（一桌开一台就够）">{voiceOn ? '🔊 播报开' : '🔈 播报关'}</button>}
         {seated && t && !t.inGame && <button className="pt-chip" onClick={standUp}>站起来</button>}
       </div>
     </>

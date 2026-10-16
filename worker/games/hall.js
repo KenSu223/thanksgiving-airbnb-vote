@@ -152,7 +152,7 @@ export class TableHall {
         if (!this.rejoin) for (const [other, o] of this.sockets) if (other !== ws && o.key === key) o.key = null; // a newer tab takes the seat
         err = here.sit(key, user.name, this.board.get(key), m);
         info.room = room;
-        info.key = err ? null : key;
+        info.key = err && !here.has(key) ? null : key; // a refused sit / seat change leaves you where you were
         if (!err) info.as = { key, name: user.name }; // sitting proves identity too (for reactions)
       }
     } else if (!info.key) {

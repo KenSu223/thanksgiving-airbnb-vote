@@ -110,3 +110,12 @@ button.pt-seat.can:hover, button.pt-seat.can:focus-visible { transform:translate
 
 /* 狼人杀：结束时每晚发生了什么 */
 .ww-history { margin-top:.6rem; text-align:left; font-size:.8rem; line-height:1.6; padding:.4rem .6rem; border-radius:.6rem; background:rgba(0,0,0,.25); }
+
+/* 谁是卧底：主持位，主持人写词的两个框 */
+.uc-chair { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem .7rem; }
+.uc-chair-title { font-weight:900; }
+.uc-chair-name { font-weight:800; padding:.15rem .6rem; border-radius:9999px; background:var(--pt-accent); color:var(--pt-accent-ink); }
+.uc-words { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin-bottom:.4rem; }
+.uc-words label { display:flex; flex-direction:column; gap:.2rem; font-size:.8rem; font-weight:800; }
+.uc-words input { padding:.5rem .7rem; border-radius:.7rem; border:0; font-size:1.05rem; font-weight:800; color:#1f1510; background:#fff7ed; }
+@media (max-width:420px) { .uc-words { grid-template-columns:1fr; } }

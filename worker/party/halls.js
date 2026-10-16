@@ -24,8 +24,17 @@ export const byWins = (a, b) => (b.wins || 0) - (a.wins || 0)
   || (b.wins || 0) / Math.max(1, b.games || 0) - (a.wins || 0) / Math.max(1, a.games || 0) || (b.games || 0) - (a.games || 0);
 const party = (Game, actions = {}) => ({ Game, rooms: ROOMS, actions: { ...COMMON, ...actions }, idleNotice: '太久没动，帮你站起来了', rejoin: true, boardSort: byWins });
 
+// 谁是卧底 is run by a person: the host chair (sit with { host: true }), the host's
+// setup (settings), dealing, tapping who's out, undo, and ending it.
 export class UndercoverHall extends TableHall {
-  constructor(state, env) { super(state, env, party(UndercoverGame)); }
+  constructor(state, env) {
+    super(state, env, party(UndercoverGame, {
+      deal: (t, key) => t.deal(key),
+      out: (t, key, m) => t.eliminate(key, m.seat),
+      undo: (t, key) => t.undo(key),
+      end: (t, key, m) => t.end(key, m.side),
+    }));
+  }
 }
 export class AvalonHall extends TableHall {
   constructor(state, env) {
