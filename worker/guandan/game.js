@@ -16,7 +16,8 @@
 // Kept apart from sockets and storage so it can be tested on its own.
 // hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat), park?(key, snapshot), unpark?(key), peek?(key) }.
 import { deck, shuffle, sortHand, takeFrom, legalPlay, rankOf, BJ, value } from './cards.js';
-import { choosePlay, hintPlay, tributeCard, returnCard, canReturn } from './bot.js';
+import { choosePlay, tributeCard, returnCard, canReturn } from './bot.js';
+import { beatOptions, leadOptions } from './hints.js';
 
 // aceBonus: 过 A (winning the match) — on top of the 60, each person on the winning team gets this from the house
 export const GD = { base: 10, matchBonus: 60, aceBonus: 100, startPoints: 1000, turnMs: 60000, tributeMs: 20000, botMs: 900, idleMs: 10 * 60 * 1000 };
@@ -264,10 +265,19 @@ export class GuandanGame {
     if (prev) return this.doPass(i);
     this.doPlay(i, [s.cards[s.cards.length - 1]]); // fallback lead: the smallest card
   }
+  // 提示 (hints.js): leading, the hand's own groups from the cheapest;
+  // following, everything that beats the table. One per press, starting over
+  // when the cards on the table (or, leading, your hand) change.
   hint(key) {
     const i = this.seatOf(key);
     if (this.phase !== 'playing' || i !== this.turn) return null;
-    return hintPlay(this.seats[i].cards, this.toBeat(i), this.level);
+    const s = this.seats[i], prev = this.toBeat(i);
+    const opts = prev ? beatOptions(s.cards, prev, this.level) : leadOptions(s.cards, this.level, this.ctx(i));
+    if (!opts.length) return [];
+    const at = this.round + ':' + (prev ? this.trick.by + ':' + this.trick.cards.join(',') : 'lead:' + s.cards.length);
+    s.hintN = s.hintAt === at ? s.hintN + 1 : 0;
+    s.hintAt = at;
+    return opts[s.hintN % opts.length];
   }
   setAuto(key, on) {
     const i = this.seatOf(key);

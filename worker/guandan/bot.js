@@ -1,12 +1,13 @@
 // 掼蛋 bots: what to lead, what to follow with, and the 进贡 / 还贡 cards.
-// Also gives people their 提示. Simple, but plays real shapes: it breaks the
-// hand into bombs, 钢板, 三连对, 顺子, 三带二, pairs and singles, leads the
-// cheapest group, follows with the cheapest cards that beat the table without
-// breaking a bomb, lets its partner's play stand, and bombs when an opponent
-// is close to going out.
+// Simple, but plays real shapes: it breaks the hand into bombs, 钢板, 三连对,
+// 顺子, 三带二, pairs and singles, leads the cheapest group, follows with the
+// cheapest cards that beat the table without breaking a bomb, lets its
+// partner's play stand, and bombs when an opponent is close to going out.
+// People's 提示 is in hints.js.
 import { ACE, SJ, BJ, rankOf, suitOf, isWild, isBomb, power, legalPlay, value, sortHand, SUITS } from './cards.js';
 
-function split(hand, level) {
+// The hand by natural rank, with the 配 and the jokers apart.
+export function split(hand, level) {
   const byRank = new Map(), wilds = [], sj = [], bj = [];
   for (const c of hand) {
     if (isWild(c, level)) wilds.push(c);
@@ -53,10 +54,15 @@ function* shapes(g, type, maxWild) {
   } else if (type === 'triple') {
     yield* sets(g, 3, maxWild);
   } else if (type === 'full') {
+    // the pair it carries: the cheapest spare one — an exact pair before splitting a triple, a bomb
+    // last, smaller before bigger (the hand is held big to small, so "the first pair" was the biggest)
+    const pairs = [...g.byRank].filter(([, list]) => list.length >= 2)
+      .sort(([, a], [, b]) => (a.length >= 4) - (b.length >= 4) || (a.length > 2) - (b.length > 2) || value(a[0], g.level) - value(b[0], g.level));
     for (const t of sets(g, 3, maxWild)) {
       const tr = rankOf(t.find(c => !isWild(c, g.level)) || t[0]);
       const usedW = t.filter(c => g.wilds.includes(c)).length;
-      for (const [r, list] of g.byRank) if (r !== tr && list.length >= 2) { yield t.concat(list.slice(0, 2)); break; }
+      const kick = pairs.find(([r]) => r !== tr);
+      if (kick) yield t.concat(kick[1].slice(0, 2));
       if (g.sj.length === 2) yield t.concat(g.sj);
       if (g.bj.length === 2) yield t.concat(g.bj);
       if (usedW === 0 && maxWild >= 1) for (const [r, list] of g.byRank) if (r !== tr && list.length === 1 && g.wilds.length) { yield t.concat(list[0], g.wilds[0]); break; }
@@ -167,12 +173,6 @@ export function choosePlay(hand, prev, level, ctx) {
   if (bomb && (close || isBomb(prev))) return bomb.cards;
   return null;
 }
-// 提示 for a person: the cheapest thing that works (a bomb only if nothing else does).
-export function hintPlay(hand, prev, level) {
-  if (!prev) return lead(hand, level, { oppMin: 27 });
-  return beaters(hand, prev, level, 2)[0]?.cards || null;
-}
-
 // 进贡: the biggest card that isn't a wild heart. 还贡: something 10 or lower,
 // preferably a lone card.
 export function tributeCard(hand, level) {
