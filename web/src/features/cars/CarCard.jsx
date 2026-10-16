@@ -10,13 +10,13 @@ const SPOT = {
 const initials = n => (/^[A-Za-z0-9]/.test(n) ? n.slice(0, 2) : n.slice(-2)).toUpperCase(); // 英文名取头两个字母，中文名取最后两个字
 
 // 一辆车：俯视的车身、五个座位按钮、后备箱装了多少
-export default function CarCard({ car, index, me, actingFor, isAdmin, bags, busy, onSeat, onLabel }) {
+export default function CarCard({ car, index, me, actingFor, bags, busy, onSeat, onLabel }) {
   const load = carLoad(car, bags);
   const pct = Math.round((load.liters / TRUNK_LITERS) * 100);
   const filled = Object.values(car.seats).filter(Boolean).length;
   const tone = pct > 100 ? 'over' : pct > 80 ? 'tight' : 'ok';
   const skis = load.counts.skis || 0;
-  const [editing, setEditing] = useState(null); // 管理员改车名时的草稿
+  const [editing, setEditing] = useState(null); // 改车名时的草稿（谁登录了都能改）
   const saveLabel = () => { onLabel(car, editing.trim()); setEditing(null); };
   return (
     <article className="car-card glass-card rounded-3xl p-5 flex flex-col">
@@ -26,7 +26,7 @@ export default function CarCard({ car, index, me, actingFor, isAdmin, bags, busy
           : <input autoFocus value={editing} onChange={e => setEditing(e.target.value)} onBlur={saveLabel}
               onKeyDown={e => { if (e.key === 'Enter') saveLabel(); if (e.key === 'Escape') setEditing(null); }}
               placeholder={'X5 · ' + (index + 1)} maxLength={40} aria-label="车名" className="text-lg font-bold border-b border-indigo-300 bg-transparent outline-none min-w-0 flex-1" />}
-        {isAdmin && editing == null && <button onClick={() => setEditing(car.label || '')} className="text-xs text-slate-400 hover:text-indigo-600">改名</button>}
+        {me && editing == null && <button onClick={() => setEditing(car.label || '')} className="text-xs text-slate-400 hover:text-indigo-600">改名</button>}
         <span className="ml-auto text-sm text-slate-500 tabular-nums">{filled} / 5</span>
       </header>
       <p className="text-xs text-slate-400 mb-3">2026 BMW X5 M60 · 5 座</p>

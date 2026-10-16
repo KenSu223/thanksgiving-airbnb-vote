@@ -1,5 +1,5 @@
 import { BJ, BlackjackGame } from './game.js';
-import { cleanName, getUsers, sameName, USER_ADMIN } from '../users/users.js';
+import { cleanName, getUsers, sameName } from '../users/users.js';
 import { noteReaction, freshReactions } from '../games/reactions.js';
 import { j } from '../lib/http.js';
 
@@ -31,16 +31,11 @@ export class BlackjackTable {
     this.board.set(s.key, rec);
     this.state.storage.put('p:' + s.key, rec);
   }
-  // Internal scrub, same contract as TableHall.scrubUser: called by
-  // POST /api/users/delete through the binding (never publicly
-  // routed), PM-proven, removes the deleted person's saved chips.
+  // Internal scrub, same contract as TableHall.scrubUser: a retired
+  // account's saved chips (users/retire.js), through the binding only —
+  // the public worker never routes /scrub-user here.
   async scrubUser(request) {
     const body = await request.json().catch(() => null) || {};
-    const users = await getUsers(this.env);
-    const by = users.find(u => sameName(u.name, cleanName(body.byName)));
-    if (!by || !body.byToken || by.token !== body.byToken || !sameName(by.name, USER_ADMIN)) {
-      return j({ ok: false, error: '只有 PM 能清游戏记录' }, 403);
-    }
     await this.load();
     const key = cleanName(body.target).toLowerCase();
     if (!key) return j({ ok: true, removed: 0 });
@@ -51,7 +46,7 @@ export class BlackjackTable {
     return j({ ok: true, removed });
   }
   async fetch(request) {
-    if (request.method === 'POST' && new URL(request.url).pathname.endsWith('/scrub-user')) return this.scrubUser(request);
+    if (request.method === 'POST' && new URL(request.url).pathname === '/scrub-user') return this.scrubUser(request);
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a WebSocket', { status: 426 });
     await this.load();
     const [client, server] = Object.values(new WebSocketPair());

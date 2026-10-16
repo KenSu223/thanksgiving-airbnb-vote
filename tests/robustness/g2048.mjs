@@ -2,8 +2,7 @@
 // over the WebSocket, moves applied and a new tile spawned by the server, a
 // stale move from another tab refused, picking the same game up from a second
 // tab and after every tab closed (it's saved then), a new game, the board
-// ranking by biggest tile, and a bad login refused. Plus the autopilot:
-// PM's grants (who may flip it on) and the 🤖 marking of bot games.
+// ranking by biggest tile, and a bad login refused.
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/g2048.mjs
 const B = process.env.TEST_BASE || 'http://localhost:8791';
 const WS = B.replace(/^http/, 'ws') + '/api/2048';
@@ -106,111 +105,6 @@ d.send({ type: 'hello', name: u.name, token: 'not-the-token' });
 const refused = await d.next(m => m.error, 'bad login');
 ck('a wrong token is refused', /登录/.test(refused.error) && !refused.game);
 await c.close(); await d.close();
-
-// ---------- Autopilot grants (same shape as Dodge's) ----------
-// PM always may use the bot; anyone else only once PM grants them, and
-// only PM can grant or see the list.
-const J = async (m, p, o) => {
-  const r = await fetch(B + p, { method: m, headers: { 'Content-Type': 'application/json' }, body: o === undefined ? undefined : JSON.stringify(o) });
-  const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch { /* ignore */ }
-  return j;
-};
-const grantsOf = x => J('GET', '/api/2048/grants?' + new URLSearchParams({ name: x.name, token: x.token }));
-const pmLogin = await J('POST', '/api/login', { name: 'PM', token: 'pm-2048-' + tag });
-const pm = { name: pmLogin.user?.name, token: pmLogin.user?.token };
-const pal = await login('BotPal');
-ck('grant test users created', !!(pm.token && pal.token));
-const pmView = await grantsOf(pm);
-ck('PM is admin and can always use the bot', pmView.isAdmin === true && pmView.canBot === true, JSON.stringify(pmView));
-const palView = await grantsOf(pal);
-ck('ungranted account: no bot, no admin, no list', palView.canBot === false && palView.isAdmin === false && (palView.grants || []).length === 0, JSON.stringify(palView));
-const selfGrant = await J('POST', '/api/2048/grants', { name: pal.name, token: pal.token, target: pal.name, on: true });
-ck('granting by a non-admin rejected', selfGrant.ok === false, JSON.stringify(selfGrant));
-const granted = await J('POST', '/api/2048/grants', { name: pm.name, token: pm.token, target: pal.name, on: true });
-ck('PM grants the pal', granted.ok === true && granted.grants.some(n => n.toLowerCase() === pal.name.toLowerCase()), JSON.stringify(granted));
-ck('pal can now use the bot', (await grantsOf(pal)).canBot === true);
-const revoked = await J('POST', '/api/2048/grants', { name: pm.name, token: pm.token, target: pal.name, on: false });
-ck('PM revokes the pal', revoked.ok === true && !revoked.grants.some(n => n.toLowerCase() === pal.name.toLowerCase()), JSON.stringify(revoked));
-ck('pal loses the bot', (await grantsOf(pal)).canBot === false);
-const anonG = await J('GET', '/api/2048/grants');
-ck('anonymous grant check is harmless', anonG.ok === true && anonG.canBot === false && anonG.isAdmin === false, JSON.stringify(anonG));
-
-// ---------- Bot games are marked, human games are not ----------
-// A fresh player's record comes from their first game, so one bot move
-// in it marks the game and the board row; a human move in a fresh game
-// marks neither.
-const bm = await login('BotMark');
-const e = await open();
-e.send({ type: 'hello', name: bm.name, token: bm.token });
-let eg = (await e.next(m => m.game, 'bot-mark game')).game;
-let botState = null;
-for (const dir of ['left', 'up', 'right', 'down']) {
-  e.send({ type: 'move', dir, n: eg.moves, bot: true });
-  const r = await e.next(m => m.game, 'bot move reply');
-  eg = r.game;
-  if (r.spawn) { botState = r; break; }
-}
-ck('a bot move marks the game as a bot game', !!botState && botState.game.bot === true, JSON.stringify(botState?.game));
-ck('the best record out of a bot game is marked', botState.best?.bot === true, JSON.stringify(botState.best));
-const look = await open();
-const lookState = await look.next(m => m.board, 'board on connect');
-ck('the board row is marked 🤖 (bot)', (lookState.board || []).some(r => r.name === bm.name && r.bot === true), JSON.stringify(lookState.board).slice(0, 300));
-await look.close(); await e.close();
-const hm = await login('HandMark');
-const h2 = await open();
-h2.send({ type: 'hello', name: hm.name, token: hm.token });
-let hg = (await h2.next(m => m.game, 'hand game')).game;
-let handState = null;
-for (const dir of ['left', 'up', 'right', 'down']) {
-  h2.send({ type: 'move', dir, n: hg.moves });
-  const r = await h2.next(m => m.game, 'hand move reply');
-  hg = r.game;
-  if (r.spawn) { handState = r; break; }
-}
-ck('a human move leaves the game and the record unmarked', !!handState && !handState.game.bot && handState.best?.bot !== true, JSON.stringify(handState?.game) + JSON.stringify(handState?.best));
-await h2.close();
-
-// ---------- The server-side autopilot ----------
-// An account without a grant is refused; PM (always allowed) turns it on
-// and the game advances with no moves sent from here at all — the
-// object's own alarm is playing. A manual move takes the wheel back:
-// the bot turns off and the game stops advancing on its own.
-const nb = await login('NoBot');
-const n1 = await open();
-n1.send({ type: 'hello', name: nb.name, token: nb.token });
-let ng = (await n1.next(m => m.game, 'ungranted game')).game;
-n1.send({ type: 'bot', on: true });
-const nRefused = await n1.next(m => m.error, 'ungranted bot refused');
-ck('bot-on without a grant is refused', !!nRefused.error && nRefused.botOn !== true, JSON.stringify(nRefused).slice(0, 160));
-await new Promise(r => setTimeout(r, 1600));
-n1.send({ type: 'keep' }); // any reply carries the current totals
-const nAfter = await n1.next(m => m.game, 'ungranted game after a wait');
-ck('an ungranted game does not advance on its own', nAfter.game.moves === ng.moves, `moves ${ng.moves} -> ${nAfter.game.moves}`);
-await n1.close();
-
-const p1 = await open();
-p1.send({ type: 'hello', name: pm.name, token: pm.token });
-let pg = (await p1.next(m => m.game, 'PM game')).game;
-p1.send({ type: 'bot', on: true });
-const pOn = await p1.next(m => m.botOn === true, 'PM bot on');
-ck('bot-on is acknowledged in state (botOn)', pOn.botOn === true, JSON.stringify(pOn).slice(0, 160));
-const pGrown = await p1.next(m => m.game && m.game.moves >= pg.moves + 3, 'server bot moves on its own', 20000);
-ck('the server bot advances the game with no client moves', pGrown.game.moves >= pg.moves + 3, `moves ${pg.moves} -> ${pGrown.game.moves}`);
-ck('a server-bot game is a bot game', pGrown.game.bot === true, JSON.stringify(pGrown.game));
-const pBest = pGrown.best || (await p1.next(m => m.best, 'PM best after bot')).best;
-ck('the record from a server-bot game is marked', pBest?.bot === true, JSON.stringify(pBest));
-const before = pGrown.game.moves;
-p1.send({ type: 'move', dir: 'left', n: before });
-const pBack = await p1.next(m => m.game && m.botOn === false, 'manual move turns the bot off');
-ck('a manual move turns the server bot off', pBack.botOn === false, JSON.stringify(pBack).slice(0, 160));
-// 步数以抢回方向盘那一刻服务器的盘面为准（排队里的外挂 state 可能还
-// 在路上，pGrown 那个数早就过时了）；从这一刻起一步都不许再自己走
-await new Promise(r => setTimeout(r, 1600));
-p1.send({ type: 'keep' });
-const pAfter = await p1.next(m => m.game, 'PM game after taking the wheel');
-ck('after the takeover the game stays put', pAfter.game.moves === pBack.game.moves, `moves ${pBack.game.moves} -> ${pAfter.game.moves}`);
-p1.send({ type: 'bot', on: false });
-await p1.close();
 
 console.log(`\n2048: ${pass} passed, ${fail} failed (${merges} moves scored)`);
 process.exit(fail ? 1 : 0);

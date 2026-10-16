@@ -30,7 +30,7 @@ export async function updateFood(env, trip, fn) {
 }
 
 // Remove one person's restaurant votes from every trip (thorough user
-// deletion, users/admin.js). Returns votes removed.
+// deletion, users/retire.js). Returns votes removed.
 export async function scrubUserFromFood(env, user) {
   const key = user.name.toLowerCase();
   let removed = 0;

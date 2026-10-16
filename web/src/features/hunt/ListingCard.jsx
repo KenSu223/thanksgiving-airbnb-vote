@@ -10,7 +10,7 @@ const airbnbLink = (l, T) => 'https://www.airbnb.com/rooms/' + l.roomId + '?adul
 // 酒店（从地图链接加的，或者之前从 Booking.com 加的）：打开原来的链接
 const isMapUrl = u => /(^https?:\/\/)?((www|maps)\.google\.|maps\.app\.goo\.gl|maps\.apple\.com)/i.test(String(u || ''));
 
-// closed：投票已截止（不能投、不能删）；chosen：大家选定的这间；onChoose：管理员截止后改选（不是管理员时没有）
+// closed：投票已截止（不能投、不能删）；chosen：大家选定的这间；onChoose：截止后改选（谁都可以）
 export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, closed, chosen, onChoose, onVote, onRemove, onSetArea, onSetRate }) {
   const hotel = l.kind === 'hotel';
   const votes = l.votes || [];
@@ -51,7 +51,7 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
             : <a href={airbnbLink(l, T)} target="_blank" rel="noopener" title={'按 ' + T.date + ' · ' + T.people + '人查看实时价格'}
                 className="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">去 Airbnb ↗</a>}
         </div>
-        {onChoose && !chosen && <button onClick={() => onChoose(l)} className="mt-2 text-sm font-bold text-amber-700 border-2 border-amber-200 hover:border-amber-400 rounded-xl py-1.5">👑 改选这间（管理员）</button>}
+        {onChoose && !chosen && <button onClick={() => onChoose(l)} className="mt-2 text-sm font-bold text-amber-700 border-2 border-amber-200 hover:border-amber-400 rounded-xl py-1.5">改选这间</button>}
       </div>
     </article>
   );

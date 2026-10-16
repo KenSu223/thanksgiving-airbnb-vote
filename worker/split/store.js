@@ -52,7 +52,7 @@ export async function updateSplit(env, fn) {
 }
 
 // Remove one person from the ledger entirely (thorough user deletion,
-// users/admin.js): expenses they paid are deleted, and they are taken
+// users/retire.js): expenses they paid are deleted, and they are taken
 // out of everyone else's split lists (an expense left with nobody to
 // split it is deleted too). Balances are computed from the expenses on
 // read, so nothing else needs fixing. Returns expenses deleted.
