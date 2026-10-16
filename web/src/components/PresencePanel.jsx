@@ -18,22 +18,34 @@ export function agoText(lastSeen, now) {
   return `${Math.floor(h / 24)} 天前`;
 }
 
-export default function PresencePanel() {
+export default function PresencePanel({ fold = false }) {
   const { users } = usePresence();
   const { name } = useSession();
   const [now, setNow] = useState(() => Date.now());
+  const [open, setOpen] = useState(!fold); // fold 的默认收起，只露标题那行
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(id);
   }, []);
   if (!users.length) return null;
   const online = users.filter(u => u.online).length;
+  const head = (
+    <>
+      <span>大家</span>
+      <span className="presence-right">
+        <span className="presence-count">{online} 人在线</span>
+        {fold && <span className="presence-chev" aria-hidden="true">{open ? '▾' : '▸'}</span>}
+      </span>
+    </>
+  );
   return (
     <section className="presence" aria-label="大家的在线状态">
-      <div className="presence-head">
-        <span>大家</span>
-        <span className="presence-count">{online} 人在线</span>
-      </div>
+      {fold ? (
+        <button type="button" className="presence-head presence-foldbtn" aria-expanded={open} onClick={() => setOpen(o => !o)}>{head}</button>
+      ) : (
+        <div className="presence-head">{head}</div>
+      )}
+      {open && (
       <ul className="presence-list">
         {users.map(u => (
           <li key={u.name} className="presence-row">
@@ -43,6 +55,7 @@ export default function PresencePanel() {
           </li>
         ))}
       </ul>
+      )}
     </section>
   );
 }

@@ -1,12 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from '../session/SessionContext.jsx';
+import { usePresence } from '../session/PresenceContext.jsx';
+import { agoText } from './PresencePanel.jsx';
 import './login.css';
+import './presence.css';
 
 // 登录 sheet：玻璃面板 + 右上角关闭钮。点遮罩、按 Esc 也能关（和「先随便看看」一个效果）
 // 绑了邮箱的账号在新设备上登录要邮箱验证码（challenge 视图）；
 // 没绑的可以从这里绑（选人 → 绑邮箱 → 收到码 → 验证完成）。
+// 名字列表里带在线状态（PresenceContext 的名单）：下拉里名字后面跟
+// 「· 在线 / · 3 分钟前」，选中谁下面还有一行带点的状态。
 export default function LoginModal() {
   const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, bindIntent } = useSession();
+  const { users: presenceUsers } = usePresence();
+  const presOf = n => presenceUsers.find(u => u.name === n);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!loginOpen) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, [loginOpen]);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [sel, setSel] = useState('');
@@ -134,10 +148,19 @@ export default function LoginModal() {
                   <select id="userSel" ref={selRef} value={sel}
                     onChange={e => { setSel(e.target.value); setBindOpen(false); if (e.target.value) go(e.target.value); }} className={field}>
                     <option value="">选择你的名字…</option>
-                    {users.map(u => <option key={u.name} value={u.name}>{u.name}{u.emailBound ? ' 🔒' : ''}</option>)}
+                    {users.map(u => {
+                      const p = presOf(u.name);
+                      return <option key={u.name} value={u.name}>{u.name}{u.emailBound ? ' 🔒' : ''}{p ? ` · ${p.online ? '在线' : agoText(p.lastSeen, now)}` : ''}</option>;
+                    })}
                   </select>
                   <button onClick={() => sel && go(sel)} className="btn-primary shrink-0 rounded-xl px-5 py-2.5 font-bold">登录</button>
                 </div>
+                {selUser && presOf(sel) && (
+                  <p className="mb-3 flex items-center gap-1.5 text-xs text-slate-400">
+                    <span className={'presence-dot' + (presOf(sel).online ? ' on' : '')} aria-hidden="true" />
+                    {presOf(sel).online ? `${sel} 现在在线` : `${sel}：${agoText(presOf(sel).lastSeen, now)}`}
+                  </p>
+                )}
                 {selUser?.emailBound && <p className="mb-3 text-xs text-slate-400">🔒 {sel} 绑了邮箱（{selUser.emailHint}），在这台设备上第一次登录要收验证码；这台设备验过就不用了</p>}
                 {selUser && !selUser.emailBound && (
                   bindOpen ? (
