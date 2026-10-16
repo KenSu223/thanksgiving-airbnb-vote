@@ -5,12 +5,22 @@
 // next hand is played at its level. Winning a hand at your own A, with your
 // partner not last, wins the match; levels then start over at 2.
 // From the second hand on there's 进贡 / 还贡 (or 抗贡 with both 大王).
+// Winning the match (过 A) pays 60 plus a bonus from the house to each winner.
+//
+// Saving, like 2048: the table can be written out (snapshot) and read back
+// (restore + resume) — the hall keeps it in storage, so a deploy carries on
+// the hand. Everyone's 豆子 are saved after every hand. Someone alone with
+// bots who leaves (stands up, closes the page, goes idle) doesn't lose the
+// match: the whole table is parked under them (hooks.park) and comes back
+// when they next press 开始 alone (hooks.unpark). 结束比赛 starts over at 2.
 // Kept apart from sockets and storage so it can be tested on its own.
-// hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat) }.
+// hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat), park?(key, snapshot), unpark?(key), peek?(key) }.
 import { deck, shuffle, sortHand, takeFrom, legalPlay, rankOf, BJ, value } from './cards.js';
 import { choosePlay, hintPlay, tributeCard, returnCard, canReturn } from './bot.js';
 
-export const GD = { base: 10, matchBonus: 60, startPoints: 1000, turnMs: 60000, tributeMs: 20000, botMs: 900, idleMs: 10 * 60 * 1000 };
+// aceBonus: 过 A (winning the match) — on top of the 60, each person on the winning team gets this from the house
+export const GD = { base: 10, matchBonus: 60, aceBonus: 100, startPoints: 1000, turnMs: 60000, tributeMs: 20000, botMs: 900, idleMs: 10 * 60 * 1000 };
+const SNAPSHOT_V = 1;
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑', '🤖 大橘'];
 const next = i => (i + 1) % 4;
 const team = i => i % 2;
@@ -54,7 +64,7 @@ export class GuandanGame {
     if (this.waitlist.some(w => w.key === key)) return null;
     if (this.humans().length + this.waitlist.length >= 4) return '这桌已经有 4 个人了';
     const p = { key, name, bot: false, connected: true, leaving: false, auto: false, cards: [], timeouts: 0, activeAt: this.h.now(),
-      points: saved ? saved.points : GD.startPoints, refills: saved?.refills || 0, games: saved?.games || 0, wins: saved?.wins || 0 };
+      points: saved ? saved.points : GD.startPoints, refills: saved?.refills || 0, games: saved?.games || 0, wins: saved?.wins || 0, aces: saved?.aces || 0 };
     if (p.points <= 0) { p.points = GD.startPoints; p.refills++; }
     const free = this.inHand() ? -1 : this.seats.findIndex(s => !s || s.bot);
     if (free >= 0) this.seats[free] = p; else this.waitlist.push(p);
@@ -63,17 +73,35 @@ export class GuandanGame {
   bot(i) { return { key: 'bot' + i, name: BOT_NAMES[i], bot: true, connected: true, cards: [] }; }
 
   // Anyone at the table (or queued for it) deals: the first hand, and the next one after each result.
+  // Alone at the table with a match parked under you: that match comes back instead (not on sitting
+  // down, so friends sitting down together aren't held up by someone's solo game).
   start(key) {
     if (!this.has(key)) return '先坐下';
     const i = this.seatOf(key);
     if (i >= 0) this.touch(i);
+    if (this.phase === 'waiting' && this.solo(key) && this.unpark(key)) return null;
     if (this.phase === 'waiting') { this.first = Math.floor(this.h.rand() * 4); this.deal(); }
     else if (this.phase === 'result') this.nextHand();
     return null;
   }
+  solo(key) { return this.humans().length === 1 && !this.waitlist.length && this.seatOf(key) >= 0; }
+  // Put back the table someone parked: their seat as it was, their 豆子 as saved since (another
+  // table may have moved them), the clock running again.
+  unpark(key) {
+    const me = this.seats[this.seatOf(key)];
+    const snap = this.h.unpark?.(key);
+    if (!snap?.seats?.some(x => x && !x.bot && x.key === key) || !this.restore(snap)) return false;
+    const s = this.seats.find(x => x && !x.bot && x.key === key);
+    const { name, points, refills, games, wins, aces } = me;
+    Object.assign(s, { name, points, refills, games, wins, aces, connected: true, leaving: false, auto: false, timeouts: 0, activeAt: this.h.now() });
+    this.resumedRound = this.round;
+    this.resume();
+    return true;
+  }
 
   deal() {
     this.clearTimer();
+    this.endedBy = null;
     for (const w of this.waitlist.splice(0)) { const i = this.seats.findIndex(s => !s || s.bot); if (i >= 0) this.seats[i] = w; }
     this.seats = this.seats.map((s, i) => s || this.bot(i));
     this.reset();
@@ -262,14 +290,21 @@ export class GuandanGame {
     const matchWon = this.banker === win && this.levels[win] === 14 && place !== 4;
     const unit = matchWon ? GD.matchBonus : GD.base * up;
     const deltas = [0, 1, 2, 3].map(k => (team(k) === win ? unit : -unit));
-    this.seats.forEach((s, k) => { if (!s.bot) { s.points += deltas[k]; s.games++; if (deltas[k] > 0) s.wins++; } });
+    const bonus = matchWon ? GD.aceBonus : 0; // 过 A: from the house, not from the losers
+    this.seats.forEach((s, k) => {
+      if (s.bot) return;
+      s.points += deltas[k]; s.games++;
+      if (deltas[k] > 0) { s.wins++; if (bonus) { s.points += bonus; s.aces = (s.aces || 0) + 1; } }
+    });
     const before = this.levels.slice();
     if (matchWon) { this.levels = [2, 2]; this.banker = -1; this.last = null; }
     else { this.levels[win] = Math.min(14, this.levels[win] + up); this.banker = win; this.last = order.slice(); }
-    this.result = { order: order.slice(), winTeam: win, up, matchWon, deltas, level: this.level, before, after: this.levels.slice(),
+    this.result = { order: order.slice(), winTeam: win, up, matchWon, deltas, bonus, level: this.level, before, after: this.levels.slice(),
       names: this.seats.map(s => s.name) };
     this.phase = 'result';
     this.turn = -1;
+    // 豆子 are saved after every hand, not just on standing up
+    for (const s of this.seats) if (s && !s.bot && !s.leaving && s.connected) this.h.save(s);
     this.release();
   }
   // Let go of people who stood up or dropped during the hand. The result stays
@@ -281,6 +316,7 @@ export class GuandanGame {
   clear() {
     this.clearTimer();
     this.seats = [null, null, null, null]; this.levels = [2, 2]; this.banker = -1; this.last = null;
+    this.endedBy = null; this.resumedRound = null;
     this.reset(); this.phase = 'waiting'; this.turn = -1;
   }
   nextHand() {
@@ -292,12 +328,21 @@ export class GuandanGame {
   }
 
   // Stand up. Mid-hand, 托管 plays your cards to the end, then you're saved.
+  // Alone with bots, with a match going: the table is parked under you instead
+  // (nothing plays on), and comes back when you next press 开始 alone. Returns a
+  // notice for that person, if any.
   leave(key) {
     const w = this.waitlist.findIndex(x => x.key === key);
     if (w >= 0) { this.waitlist.splice(w, 1); return; }
     const i = this.seatOf(key);
     if (i < 0) return;
     const s = this.seats[i];
+    if (this.h.park && this.humans().length === 1 && !this.waitlist.length && this.matchOn()) {
+      this.h.save(s);
+      this.h.park(key, this.snapshot());
+      this.clear();
+      return '这局存好了，下次一个人坐下点「开始」就接着打';
+    }
     if (this.inHand()) {
       s.leaving = true;
       this.setAuto(key, true);
@@ -323,10 +368,53 @@ export class GuandanGame {
     return idle;
   }
 
+  // A match is going: levels have moved, or a hand is being played.
+  matchOn() { return this.inHand() || this.banker >= 0 || this.levels[0] !== 2 || this.levels[1] !== 2; }
+  // 结束比赛: levels back to 2, the hand in play (if any) doesn't count. Anyone
+  // seated can; with other people at the table, only between hands, so nobody
+  // ends a hand they're losing.
+  endMatch(key) {
+    const i = this.seatOf(key);
+    if (i < 0) return '先坐下';
+    if (this.inHand() && this.humans().length > 1) return '这一手打完才能结束比赛';
+    if (!this.matchOn()) {
+      // nothing on this table, but a match parked under you: that's the one you're ending
+      if (this.phase === 'waiting' && this.solo(key) && this.h.unpark?.(key)) { this.endedBy = this.seats[i].name; return null; }
+      return '还没开始呢';
+    }
+    this.clearTimer();
+    this.levels = [2, 2]; this.banker = -1; this.last = null; this.first = null;
+    this.reset();
+    for (const s of this.seats) if (s) { s.cards = []; s.leaving = false; }
+    this.phase = 'waiting'; this.turn = -1;
+    this.endedBy = this.seats[i].name; this.resumedRound = null;
+    return null;
+  }
+
+  // ---- saving ----
+  // Everything but the hooks and the running timer, as plain data.
+  snapshot() {
+    const { h, timer, deadline, ...rest } = this;
+    return JSON.parse(JSON.stringify({ ...rest, v: SNAPSHOT_V }));
+  }
+  restore(snap) {
+    if (!snap || snap.v !== SNAPSHOT_V) return false;
+    const { v, ...rest } = snap;
+    Object.assign(this, rest);
+    this.timer = null; this.deadline = 0;
+    return true;
+  }
+  // After a restore: start the clock that was running, from the top.
+  resume() {
+    if (this.phase === 'tribute') this.setTimer(GD.tributeMs, () => this.finishReturns());
+    else if (this.phase === 'playing' && this.turn >= 0) this.setTurn(this.turn);
+  }
+
   // What one viewer sees: their own cards, everyone's counts, all hands once it's over.
   view(key) {
     const me = this.seatOf(key), over = this.phase === 'result';
     const tr = this.tribute;
+    const parked = this.phase === 'waiting' && this.solo(key) ? this.h.peek?.(key) || null : null;
     return {
       phase: this.phase, round: this.round, turn: this.turn, deadline: this.deadline, now: this.h.now(),
       level: this.level, levels: this.levels, banker: this.banker, base: GD.base,
@@ -345,6 +433,13 @@ export class GuandanGame {
       waiting: this.waitlist.some(w => w.key === key),
       you: me,
       result: this.result,
+      // a match this viewer parked (alone with bots), waiting for them to press 开始: { us, them } levels
+      parked,
+      // 结束比赛: whether there's a match to end, and whether this viewer may end it now
+      matchOn: this.matchOn(),
+      canEnd: me >= 0 && (this.matchOn() || !!parked) && !(this.inHand() && this.humans().length > 1),
+      resumed: this.resumedRound != null && this.resumedRound === this.round,
+      endedBy: this.phase === 'waiting' ? this.endedBy || null : null,
     };
   }
 }

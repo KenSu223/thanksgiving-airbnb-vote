@@ -7,6 +7,7 @@ import TableFrame, { useFullTable, RoomPicker, PointsBoard } from '../games/Tabl
 import PlayingCard, { CardRun, faceOf } from '../games/PlayingCard.jsx';
 import CardHand from '../games/CardHand.jsx';
 import { ReactionBar, ReactBubbles, reactionsFor } from '../games/Reactions.jsx';
+import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import './guandan.css';
 
 const PHASE = { waiting: '等人开始', tribute: '进贡中', playing: '对局中', result: '这局结束' };
@@ -50,6 +51,7 @@ function Seat({ s, idx, t, me, timer, compact, reacts }) {
 
 export default function GuandanView({ active }) {
   const { st, live, msg, flash, hint, setHint, room, watch, send, sit, standUp } = useTable(active, { path: '/api/guandan', roomKey: 'gdRoom', noHint: '没有管得上的牌，建议不出' });
+  const confirm = useConfirm();
   const timer = useCountdown(st, active && live);
   const t = st?.table;
   const me = t ? t.you : -1;
@@ -99,6 +101,17 @@ export default function GuandanView({ active }) {
     if (sel.size !== 1) return flash('选一张 10 或以下的牌还回去');
     send({ type: 'back', card: [...sel][0] });
   }
+  // 结束比赛：级数回到 2 重新开始。一个人带机器人随时能结束（这一手不算）；有别人时只能在两手之间，桌上会写是谁结束的
+  const solo = t ? t.seats.filter(s => s && !s.bot).length === 1 : false;
+  async function endMatch() {
+    const ok = await confirm({
+      title: '结束这场比赛？',
+      message: '两队的级数都回到 2，重新开始。' + (t.phase === 'playing' || t.phase === 'tribute' ? '这一手打到一半，不算输赢。' : '') + (solo ? '' : '桌上的人都会看到是你结束的。'),
+      confirmText: '结束比赛', danger: true,
+    });
+    if (ok) send({ type: 'end' });
+  }
+  const endBtn = t?.canEnd && <button onClick={endMatch} className="gt-btn bg-white/15 text-white">结束比赛</button>;
 
   function controls() {
     if (!live || !t) return null;
@@ -115,22 +128,24 @@ export default function GuandanView({ active }) {
     const auto = mySeat.auto
       ? <button onClick={() => send({ type: 'auto', on: false })} className="gt-btn bg-fuchsia-500 text-white">取消托管</button>
       : t.phase === 'playing' || t.phase === 'tribute' ? <button onClick={() => send({ type: 'auto', on: true })} className="gt-btn bg-white/15 text-white">托管</button> : null;
-    if (t.phase === 'waiting') return <>{deal('开始游戏')}<span className="text-sm text-emerald-100">空位由机器人补上，对面是队友</span>{stand}</>;
+    if (t.phase === 'waiting') return t.parked
+      ? <>{deal('▶ 接着打')}{endBtn}{stand}</>
+      : <>{deal('开始游戏')}<span className="text-sm text-emerald-100">空位由机器人补上，对面是队友</span>{stand}</>;
     // 再来一局 is in the result banner; full screen also puts it here, where it's always on screen
-    if (t.phase === 'result') return full ? <>{deal('🔁 再来一局')}{stand}</> : stand;
+    if (t.phase === 'result') return full ? <>{deal('🔁 再来一局')}{endBtn}{stand}</> : <>{endBtn}{stand}</>;
     if (t.phase === 'tribute') {
-      if (!t.mustReturn) return <><span className="text-sm text-emerald-100">等还贡…</span>{auto}{stand}</>;
+      if (!t.mustReturn) return <><span className="text-sm text-emerald-100">等还贡…</span>{auto}{endBtn}{stand}</>;
       return <>{bell}<button onClick={giveBack} disabled={sel.size !== 1} className="gt-btn bg-amber-400 text-slate-900">还贡</button>
         <span className="text-sm text-amber-200">选一张 10 或以下的牌</span>{clock}{auto}{stand}</>;
     }
-    if (mySeat.place) return <><span className="text-sm text-emerald-100">你已经{PLACE[mySeat.place]}，看队友的</span>{stand}</>;
-    if (!myTurn || mySeat.auto) return <><span className="text-sm text-emerald-100">等别人出牌…</span>{auto}{stand}</>;
+    if (mySeat.place) return <><span className="text-sm text-emerald-100">你已经{PLACE[mySeat.place]}，看队友的</span>{endBtn}{stand}</>;
+    if (!myTurn || mySeat.auto) return <><span className="text-sm text-emerald-100">等别人出牌…</span>{auto}{endBtn}{stand}</>;
     return <>
       {bell}
       <button onClick={() => send({ type: 'pass' })} disabled={leading} className="gt-btn bg-white text-emerald-800">不出</button>
       <button onClick={() => send({ type: 'hint' })} className="gt-btn bg-sky-400 text-slate-900">提示</button>
       <button onClick={() => send({ type: 'play', cards: [...sel] })} disabled={!sel.size} className="gt-btn bg-amber-400 text-slate-900">出牌</button>
-      {clock}{auto}{stand}
+      {clock}{auto}{endBtn}{stand}
     </>;
   }
 
@@ -140,6 +155,16 @@ export default function GuandanView({ active }) {
     tr.gives.map(g => `${name(g.from)} 进贡 ${cardText(g.card)} → ${name(g.to)}`).concat(tr.returns.map(r => `${name(r.from)} 还贡 ${r.card ? cardText(r.card) : r.done ? '一张' : '…'} → ${name(r.to)}`)).join(' · '));
   const weWon = result && (me >= 0 ? result.winTeam === us : null);
   const meLine = full && mySeat && <span className="text-xs text-emerald-50/90">{mySeat.place ? PLACE[mySeat.place] + ' · ' : ''}🫘 {mySeat.points?.toLocaleString()}</span>;
+  // 观战：没坐下的人在看；桌上写着有谁在看（登录了的写名字）
+  const w = st?.watchers;
+  const watching = w?.count > 0 && (
+    <span className="text-xs text-emerald-100" title={w.names.join('、')}>👀 {w.count} 人观战{w.names.length ? '：' + w.names.slice(0, 4).join('、') + (w.names.length > 4 ? ' 等' : '') : ''}</span>
+  );
+  // 存着的比赛（一个人带机器人打、站起来时存下的）/ 接着上次那局 / 谁结束了比赛
+  const pk = t?.parked;
+  const note = pk ? `你上次一个人打的比赛还存着：我们打 ${levelName(pk.us)} · 对方打 ${levelName(pk.them)}${pk.inHand ? '，这一手打到一半' : ''}。点「接着打」继续，想从 2 重新打就点「结束比赛」`
+    : t?.resumed ? '接着上次那局 · ' + levels + (t.canEnd ? '（想从 2 重新打就点「结束比赛」）' : '')
+    : t?.endedBy ? t.endedBy + ' 结束了比赛，两队重新从 2 打起' : '';
   return (
     <div>
       <RoomPicker st={st} room={room} watch={watch} phases={PHASE} />
@@ -148,8 +173,9 @@ export default function GuandanView({ active }) {
           {/* 点牌桌任何地方都让浏览器允许提醒出声（浏览器要求先点过页面） */}
           <div style={{ display: 'contents' }} onPointerDownCapture={unlock}>
           <div className="gt-bar flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3 text-sm">
-            <span className="font-medium text-emerald-100">{status}</span>
+            <span className="font-medium text-emerald-100">{status}{me < 0 && t && !t.waiting ? ' · 👀 观战中' : ''}</span>
             {meLine}
+            {watching}
             {t && <span className="font-bold text-amber-200">本局打 {levelName(t.level)}<span className="font-normal text-emerald-100"> · {levels}</span></span>}
             <button onClick={toggleAlerts} aria-pressed={alerts} title={alerts ? '轮到你时响一声（点一下关掉）' : '轮到你时不响（点一下打开）'}
               className="text-xs rounded-full bg-white/15 px-2 py-1">{alerts ? '🔔 提醒' : '🔕 提醒'}</button>
@@ -163,6 +189,7 @@ export default function GuandanView({ active }) {
                   <div className="gd-side"><Seat s={t.seats[left]} idx={left} t={t} me={me} timer={timer} compact reacts={reactionsFor(st?.reactions, t.seats[left]?.name?.toLowerCase())} /><Said said={t.said[left]} isWild={isWild} /></div>
                   <div className="gd-side right"><Seat s={t.seats[right]} idx={right} t={t} me={me} timer={timer} compact reacts={reactionsFor(st?.reactions, t.seats[right]?.name?.toLowerCase())} /><Said said={t.said[right]} isWild={isWild} /></div>
                 </div>
+                {note && <div className="gd-note">{note}</div>}
                 {tributeLine && !result && t.phase !== 'waiting' && <div className="gd-note">{tributeLine}</div>}
                 {result && (
                   <div className="gt-result">
@@ -172,6 +199,7 @@ export default function GuandanView({ active }) {
                     </div>
                     <div className="text-sm mt-1">{result.order.map((k, i) => PLACE[i + 1] + ' ' + name(k)).join(' · ')}</div>
                     <div className="text-sm mt-1">{result.names.map((n, k) => n + ' ' + (result.deltas[k] > 0 ? '+' : '') + result.deltas[k]).join(' · ')}</div>
+                    {result.bonus > 0 && <div className="gd-ace">🏆 过 A 奖励：赢的一队每人再 +{result.bonus} 豆</div>}
                     {result.matchWon ? <div className="text-xs mt-1 text-emerald-100">整场结束，下一局两队都从 2 打起</div>
                       : <div className="text-xs mt-1 text-emerald-100">下一局打 {levelName(result.after[result.winTeam])}</div>}
                     {[left, top, right].filter(k => t.seats[k]?.cards?.length).map(k => (
@@ -195,12 +223,13 @@ export default function GuandanView({ active }) {
           </div>
         </TableFrame>
         <ReactionBar send={send} active={active} />
-        <PointsBoard title="掼蛋豆子榜" rows={st?.board || []} me={st?.boardMe}>
+        <PointsBoard title="掼蛋豆子榜" rows={st?.board || []} me={st?.boardMe} saveNote="每打完一手就保存豆子">
           规则：两副牌 108 张，四人各 27 张，对面是队友。从 2 打起，打几就是级牌（比 A 大），红心级牌是「配」，能当任何牌（王除外）。
           牌型：单张、对子、三张、三带二、顺子（5 张）、三连对、钢板；炸弹 4–10 张，同花顺比 5 炸大、比 6 炸小，四个王最大。
           头游一方升级：队友二游升 3 级、三游升 2 级、末游升 1 级；在自己的 A 上赢（队友不是末游）就是整场赢。
           从第二局起末游进贡最大的牌，头游还一张 10 以下的；双下两人都进贡；有两个大王可以抗贡。出完牌的人没人管，由队友接风。
-          每局按升的级数算豆子（底分 10），整场赢 +60。空位由机器人补上。
+          每局按升的级数算豆子（底分 10），整场赢 +60，过 A 的一队每人再奖励 100 豆。空位由机器人补上。
+          牌局会一直存着：断线、刷新、网站更新都接着打；一个人带机器人打时站起来，这场比赛存在你名下，下次一个人坐下点「接着打」就继续。想重新开始就点「结束比赛」。没坐下的人可以选一张桌观战。
         </PointsBoard>
       </div>
     </div>

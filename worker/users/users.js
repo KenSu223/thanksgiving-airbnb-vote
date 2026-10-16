@@ -23,13 +23,6 @@ export const nameKey = v => squashName(v).trim().toLowerCase();
 const USERS_KEY = 'users:v1';
 export const sameName = (a, b) => nameKey(a) === nameKey(b);
 
-// Account deletion (成员管理 in the login dialog, POST /api/users/delete
-// in retire.js) is restricted to this account. PM's token is a real
-// credential — PM is email-bound, so the token is not in the public user
-// list — and the delete endpoint checks the caller's token against it,
-// so the permission can't be borrowed by picking a name from the list.
-export const USER_ADMIN = 'pm';
-
 // First run: build the list from everyone who already voted or was added
 // as a splitwise member, reusing the token from their votes.
 async function buildUsers(env) {

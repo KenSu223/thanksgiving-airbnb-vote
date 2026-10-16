@@ -19,22 +19,38 @@ function storage(init = {}) {
 const before = { name: '🐘', points: 1030, refills: 0, games: 1, wins: 1, updatedAt: 1 };
 const stop = hall => hall.tables.forEach(t => t.clearTimer());
 
-test('the five wins land on the record once, and stay once across deploys', async () => {
+test('both corrections land on the record once, and stay once across deploys', async () => {
   const s = storage({ 'p:🐘': before });
   const a = new GuandanHall({ storage: s }, {});
   await a.load();
-  assert.deepEqual([a.board.get('🐘').points, a.board.get('🐘').games, a.board.get('🐘').wins], [1130, 6, 6]);
-  assert.equal(s.m.get('p:🐘').points, 1130);
+  assert.deepEqual([a.board.get('🐘').points, a.board.get('🐘').games, a.board.get('🐘').wins], [1030 + 100 + 320, 6, 6]);
+  assert.equal(s.m.get('p:🐘').points, 1450);
   const b = new GuandanHall({ storage: s }, {}); // the next deploy: same storage, fresh object
   await b.load();
-  assert.equal(b.board.get('🐘').points, 1130);
+  assert.equal(b.board.get('🐘').points, 1450);
   assert.equal(b.board.get('🐘').games, 6);
 });
 
-test('no record yet: starts from 1000 and adds the five', async () => {
+test('live: the first one already landed, so only the 320 goes on (950 → 1270), and no match is set up', async () => {
+  const s = storage({
+    'p:🐘': { name: '🐘', points: 950, refills: 0, games: 14, wins: 11, updatedAt: 1 },
+    'restore:🐘:2026-10-16:record': 1, 'restore:🐘:2026-10-16:match': 1,
+  });
+  const h = new GuandanHall({ storage: s }, {});
+  await h.load();
+  assert.deepEqual([h.board.get('🐘').points, h.board.get('🐘').games, h.board.get('🐘').wins], [1270, 14, 11]);
+  assert.equal(h.resumes.length, 0);
+  const t = h.tables[0];
+  t.sit('🐘', '🐘', h.board.get('🐘'));
+  h.actions.start(t, '🐘');
+  assert.equal(t.level, 2, 'a plain new match');
+  stop(h);
+});
+
+test('no record yet: starts from 1000 and adds both', async () => {
   const h = new GuandanHall({ storage: storage() }, {});
   await h.load();
-  assert.deepEqual(h.board.get('🐘'), { ...h.board.get('🐘'), name: '🐘', points: 1100, games: 5, wins: 5 });
+  assert.deepEqual(h.board.get('🐘'), { ...h.board.get('🐘'), name: '🐘', points: 1420, games: 5, wins: 5 });
 });
 
 test('the next match alone with bots: their team plays Q, the other team 2, and the last opponent pays 进贡', async () => {
