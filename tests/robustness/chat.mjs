@@ -1,7 +1,8 @@
 // The chat room (worker/chat/room.js) over real sockets: you have to say who
 // you are (name + token) before reading or sending, messages reach everyone
 // signed in, @name mentions are found by the server (case-insensitive, the
-// longest name wins, never yourself), empty and over-long messages are
+// longest name wins, never yourself), @all / @所有人 calls everyone (but a
+// member whose name starts with "All" is still just them), empty and over-long messages are
 // handled, and only the latest 100 are kept. Uses the global WebSocket
 // client (Node 22+).
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/chat.mjs
@@ -57,7 +58,8 @@ const Short = await mkUser('Mx');
 // two names where one starts with the other: "@Ny<tag>Z" mustn't also tag "@Ny<tag>"
 const Short2 = (await J('POST', '/api/login', { name: 'Ny' + tag, token: 'dev-chat-ny' + tag })).user;
 const Long2 = (await J('POST', '/api/login', { name: 'Ny' + tag + 'Z', token: 'dev-chat-nyz' + tag })).user;
-ck('test users created', !!(A?.token && Bu?.token && Short?.token && Short2?.token && Long2?.token));
+const AllU = await mkUser('All'); // "All<tag>": "@All<tag>" is them, not everyone
+ck('test users created', !!(A?.token && Bu?.token && Short?.token && Short2?.token && Long2?.token && AllU?.token));
 const key = u => u.name.toLowerCase();
 
 // ---- not a socket ----
@@ -109,6 +111,24 @@ const t6 = `@NobodyCalledThis${tag} and @${Bu.name} and @${Short.name} ${tag}`;
 a.say(t6);
 const m6 = (await msgWith(a, t6)).msg.mentions;
 ck('several people at once; an unknown @ is just text', m6.length === 2 && m6.includes(key(Bu)) && m6.includes(key(Short)), JSON.stringify(m6));
+
+// ---- @all ----
+const t7 = `@all dinner's ready ${tag}`;
+a.say(t7);
+const m7 = (await msgWith(b, t7)).msg;
+ck('@all calls everyone but the sender', m7.all === true && [Bu, Short, Short2, Long2, AllU].every(u => m7.mentions.includes(key(u))) && !m7.mentions.includes(key(A)), JSON.stringify(m7).slice(0, 160));
+const t8 = `@所有人 出发了 ${tag}`;
+b.say(t8);
+const m8 = (await msgWith(a, t8)).msg;
+ck('@所有人 does too', m8.all === true && m8.mentions.includes(key(A)) && !m8.mentions.includes(key(Bu)), JSON.stringify(m8).slice(0, 160));
+const t9 = `@${AllU.name} only you ${tag}`;
+a.say(t9);
+const m9 = (await msgWith(a, t9)).msg;
+ck('a member called All… is just them', !m9.all && JSON.stringify(m9.mentions) === JSON.stringify([key(AllU)]), JSON.stringify(m9));
+const t10 = `@alligator ${tag}`;
+a.say(t10);
+const m10 = (await msgWith(a, t10)).msg;
+ck('@alligator isn’t @all', !m10.all && m10.mentions.length === 0, JSON.stringify(m10));
 
 // ---- bad input ----
 const errsBefore = a.got.filter(m => m.type === 'error').length;

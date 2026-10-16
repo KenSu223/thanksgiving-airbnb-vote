@@ -9,7 +9,8 @@ import './chat.css';
 // WebSocket 推过来（服务器那边空闲时会睡，连着不花钱），所以这页一直连着、红点灰点随时更新。
 // 没读的：普通消息是灰色的数字，有人 @我 就变红色（还会弹一句提示）；打开聊天室，别人没读的
 // 消息灰底、上面一条「以下是新消息」，@我 的红框。读到哪了记在这台设备上。
-// 输入 @ 会弹出成员列表，点一下就 @ 上；谁被 @ 了由服务器从文字里认出来。
+// 输入 @ 会弹出成员列表，点一下就 @ 上；最后一个「@all 所有人」叫全组（@all 或 @所有人 都算）。
+// 谁被 @ 了由服务器从文字里认出来。
 const time = at => {
   const d = new Date(at), today = new Date();
   const hm = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
@@ -57,14 +58,17 @@ function useChat(name, token, onMsg) {
   return { msgs, live, send };
 }
 
-// 一条消息的文字：被 @ 的人加粗（@我 是红的）
+// 一条消息的文字：被 @ 的人加粗（@我 是红的）；@all / @所有人 叫的也有我，对别人都是红的
+const ALL_WORDS = ['all', '所有人'];
 function Text({ msg, names, me }) {
   const tagged = (msg.mentions || []).map(k => names.get(k) || k);
-  if (!tagged.length) return msg.text;
-  const re = new RegExp('(@(?:' + tagged.sort((a, b) => b.length - a.length).map(esc).join('|') + '))', 'gi');
+  if (!tagged.length && !msg.all) return msg.text;
+  const alts = [...(msg.all ? ['all(?![a-z0-9_])', '所有人'] : []), ...tagged.sort((a, b) => b.length - a.length).map(esc)];
+  const re = new RegExp('(@(?:' + alts.join('|') + '))', 'gi');
   return msg.text.split(re).map((part, i) => {
     if (i % 2 === 0) return part;
-    const isMe = part.slice(1).toLowerCase() === me;
+    const word = part.slice(1).toLowerCase();
+    const isMe = word === me || (ALL_WORDS.includes(word) && msg.byKey !== me);
     return <span key={i} className={'ch-at' + (isMe ? ' me' : '')}>{part}</span>;
   });
 }
@@ -81,7 +85,7 @@ export default function ChatFab() {
   const openRef = useRef(open); openRef.current = open;
   const onMsg = useCallback((msg, error) => {
     if (error) { toast(error); return; }
-    if (msg && !openRef.current && msg.byKey !== me && (msg.mentions || []).includes(me)) toast('💬 ' + msg.by + ' 在聊天室 @了你');
+    if (msg && !openRef.current && msg.byKey !== me && (msg.mentions || []).includes(me)) toast('💬 ' + msg.by + ' 在聊天室 @了' + (msg.all ? '所有人' : '你'));
   }, [me, toast]);
   const { msgs, live, send } = useChat(name, token, onMsg);
   const names = useMemo(() => new Map(users.map(u => [u.name.toLowerCase(), u.name])), [users]);
@@ -128,6 +132,8 @@ export default function ChatFab() {
   const before = text.slice(0, caret);
   const atMatch = /@([^\s@]*)$/.exec(before);
   const picks = atMatch ? users.filter(u => u.name.toLowerCase() !== me && u.name.toLowerCase().includes(atMatch[1].toLowerCase())).slice(0, 8) : [];
+  // 「@all 所有人」排在最后（回车还是先选人），打 @a、@al、@所 也还在
+  const pickAll = !!atMatch && ALL_WORDS.some(w => w.startsWith(atMatch[1].toLowerCase()));
   const pick = n => {
     const start = caret - atMatch[0].length;
     const next = text.slice(0, start) + '@' + n + ' ' + text.slice(caret);
@@ -185,9 +191,10 @@ export default function ChatFab() {
               })}
             </div>
             <div className="relative mt-2">
-              {picks.length > 0 && (
+              {(picks.length > 0 || pickAll) && (
                 <div className="ch-picks" role="listbox" aria-label="@谁">
                   {picks.map(u => <button key={u.name} role="option" aria-selected="false" onMouseDown={e => e.preventDefault()} onClick={() => pick(u.name)}>@{u.name}</button>)}
+                  {pickAll && <button role="option" aria-selected="false" className="all" onMouseDown={e => e.preventDefault()} onClick={() => pick('all')}>@all 所有人</button>}
                 </div>
               )}
               <div className="flex items-end gap-2">
@@ -195,7 +202,7 @@ export default function ChatFab() {
                 <textarea ref={box} rows={1} maxLength={500} value={text} placeholder="说点什么，@ 叫人"
                   onChange={e => { setText(e.target.value); setCaret(e.target.selectionStart); }}
                   onSelect={e => setCaret(e.currentTarget.selectionStart)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (picks.length && atMatch) pick(picks[0].name); else submit(); } }}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (atMatch && (picks.length || pickAll)) pick(picks.length ? picks[0].name : 'all'); else submit(); } }}
                   className="ch-input" />
                 <button onClick={submit} disabled={!text.trim()} className="btn-primary h-10 shrink-0 rounded-xl px-4 font-bold disabled:opacity-40">发送</button>
               </div>

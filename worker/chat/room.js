@@ -8,9 +8,11 @@
 // Out: { type: 'history', msgs, you }   on hello: the last 100
 //      { type: 'msg', msg }             each new message, to everyone signed in
 //      { type: 'error', error }
-// A message: { id, by, byKey, text, at, mentions: [userKey] }. Mentions are
-// found here, not trusted from the page: every member whose name appears as
+// A message: { id, by, byKey, text, at, mentions: [userKey], all? }. Mentions
+// are found here, not trusted from the page: every member whose name appears as
 // "@name" in the text (longest names first, so "@PM Test" isn't also "@PM").
+// "@all" or "@所有人" calls everyone: mentions is then every member but the
+// sender, and all: true. Anyone can use it (everyone has the same rights).
 // Who has read what is kept on each device (the page), not here.
 import { getUsers, sameName, cleanName } from '../users/users.js';
 import { j } from '../lib/http.js';
@@ -18,7 +20,10 @@ import { j } from '../lib/http.js';
 export const KEEP = 100, MAX_TEXT = 500;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-// Members mentioned in a text: "@name" (case-insensitive), longest names win.
+// "@all" / "@所有人", but not "@allen" (a letter or digit right after it).
+const ALL = /@(?:all(?![a-z0-9_])|所有人)/i;
+// Members mentioned in a text: "@name" (case-insensitive), longest names win;
+// "@all" means every member. → { keys, all }
 export function findMentions(text, users) {
   let rest = String(text).toLowerCase();
   const out = [];
@@ -28,7 +33,9 @@ export function findMentions(text, users) {
     out.push(u.name.toLowerCase());
     rest = rest.split(tag).join(' '); // so a shorter name inside it doesn't match again
   }
-  return out;
+  // checked on what's left, so a member called "Allie" written as "@Allie" isn't "@all"
+  if (ALL.test(rest)) return { keys: users.map(u => u.name.toLowerCase()), all: true };
+  return { keys: out, all: false };
 }
 
 export class ChatRoom {
@@ -69,7 +76,8 @@ export class ChatRoom {
     const text = String(m.text || '').replace(/\r\n/g, '\n').trim().slice(0, MAX_TEXT);
     if (!text) return this.send(ws, { type: 'error', error: '写点什么再发' });
     const users = await getUsers(this.env);
-    const msg = { id: uid(), by: who.name, byKey: who.key, text, at: Date.now(), mentions: findMentions(text, users).filter(k => k !== who.key) };
+    const found = findMentions(text, users);
+    const msg = { id: uid(), by: who.name, byKey: who.key, text, at: Date.now(), mentions: found.keys.filter(k => k !== who.key), ...(found.all ? { all: true } : {}) };
     const msgs = await this.load();
     msgs.push(msg);
     if (msgs.length > KEEP) msgs.splice(0, msgs.length - KEEP);

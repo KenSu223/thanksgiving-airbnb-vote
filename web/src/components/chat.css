@@ -23,4 +23,6 @@
 .ch-picks { position:absolute; left:0; right:0; bottom:calc(100% + .35rem); display:flex; flex-wrap:wrap; gap:.3rem; padding:.45rem; border-radius:1rem; background:rgba(255,255,255,.96); box-shadow:0 10px 28px -10px rgba(30,27,75,.4); z-index:2; }
 .ch-picks button { padding:.3rem .7rem; border-radius:999px; font-size:.85rem; font-weight:700; color:#4338ca; background:#eef2ff; }
 .ch-picks button:hover, .ch-picks button:focus-visible { background:#4f46e5; color:#fff; }
+.ch-picks button.all { color:#be123c; background:#ffe4e6; }
+.ch-picks button.all:hover, .ch-picks button.all:focus-visible { background:#e11d48; color:#fff; }
 @media (prefers-reduced-motion: reduce) { .ch-badge.red { animation:none; } }
