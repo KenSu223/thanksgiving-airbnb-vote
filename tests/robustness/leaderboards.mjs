@@ -33,6 +33,7 @@ await Promise.all(players.map(async u => {
 const { board, boardMe } = await J('GET', '/api/dodge/board');
 ck('the board is the top 3 only', board.length === 3, board.length);
 ck('nobody signed in: no place of your own', boardMe === null, JSON.stringify(boardMe));
+ck('how many runs someone played is not on the board', board.every(r => !('runs' in r)), JSON.stringify(board[0]));
 for (const [i, r] of board.entries()) {
   const rep = await J('GET', '/api/dodge/replay?name=' + encodeURIComponent(r.name));
   if (r.replay) ck(`#${i + 1} ${r.name}: replay served`, rep.ok === true && Array.isArray(rep.events), JSON.stringify(rep).slice(0, 200));
