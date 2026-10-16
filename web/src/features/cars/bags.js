@@ -1,3 +1,5 @@
+import { layoutOf, modelById, seatName as seatNameIn } from './models.js';
+
 // 行李预设：名字、尺寸说明、大概占多少升（用来估后备箱装不装得下）。和后端 worker/cars/routes.js 的 BAGS 一一对应
 export const BAGS = [
   { id: 'backpack', name: '背包', hint: '双肩包 / 随身小包', liters: 25 },
@@ -7,18 +9,15 @@ export const BAGS = [
   { id: 'duffel', name: '旅行袋', hint: '软包 / 健身包', liters: 55 },
   { id: 'skis', name: '雪具包', hint: '雪板或双板', liters: 80 },
 ];
-// X5 后排坐满人时，后备箱实际能码行李的空间大约这么多（官方 33.9 立方英尺是装到车顶的）
-export const TRUNK_LITERS = 650;
+// 一个 28 寸大箱占多少升：车型表里「能放约 N 个大箱」用它算
+export const LARGE_LITERS = BAGS.find(b => b.id === 'large').liters;
 
-export const SEATS = [
-  { id: 'driver', name: '主驾', short: '主驾' },
-  { id: 'front', name: '副驾', short: '副驾' },
-  { id: 'rearLeft', name: '后排左', short: '后左' },
-  { id: 'rearMiddle', name: '后排中', short: '后中' },
-  { id: 'rearRight', name: '后排右', short: '后右' },
-];
-export const seatName = id => (SEATS.find(s => s.id === id) || { name: id }).name;
-export const carName = (car, i) => car.label || 'X5 · ' + (i + 1);
+// 座位名（主驾、后排左、三排中…）跟着这辆车的排法走
+export const seatName = (id, car) => seatNameIn(id, layoutOf(car));
+export const seatShort = (id, car) => seatName(id, car).replace('排', '');
+// 车的叫法：起了名就用名字，不然是车型 + 第几辆（Suburban · 2）
+export const modelShort = car => (car.model === 'custom' ? car.custom?.name || '其他车型' : (modelById(car.model) || modelById('x5')).name);
+export const carName = (car, i) => car.label || modelShort(car) + ' · ' + (i + 1);
 
 // 一辆车上所有乘客的行李加起来：{ counts: { carryon: 3, … }, liters, pieces }
 export function carLoad(car, bagsByName) {

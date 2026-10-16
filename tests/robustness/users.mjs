@@ -4,7 +4,8 @@
 // "Retiree") comes off the member list the next time anyone loads it.
 // Both doors run the same removal, with everything recorded under it:
 // votes, flights, split entries, Secret Angel prefs and draw seat, car seat
-// and luggage, to-do assignments, and the game records (the dodge board).
+// and luggage, to-do assignments and comments, chat messages (and @mentions
+// of them), and the game records (the dodge board).
 // Also: Secret Angel has no admin any more — any member draws and leaves
 // people out, and it's logged who did.
 //
@@ -81,7 +82,28 @@ const sc = await J('POST', '/api/dodge/score', { name: VICTIM, token: vic.token,
 ck('retiree dodge score recorded', sc.ok === true, JSON.stringify(sc).slice(0, 160));
 const scrubDoor = await J('POST', '/api/dodge/scrub-user', { target: VICTIM });
 ck('the dodge board has no public scrub door', !scrubDoor || scrubDoor.ok !== true, JSON.stringify(scrubDoor));
-ck('retiree still on the dodge board', (await J('GET', '/api/dodge/board')).board.some(r => isVictim(r.name)));
+const vicBoard = await J('GET', `/api/dodge/board?name=${VICTIM}&token=${vic.token}`);
+ck('retiree still on the dodge board', [...vicBoard.board, vicBoard.boardMe].some(r => r && isVictim(r.name)), JSON.stringify(vicBoard));
+
+// the chat room: the retiree says something, and Aster @s them
+const chat = who => new Promise((resolve, reject) => {
+  const ws = new WebSocket(B.replace(/^http/, 'ws') + '/api/chat');
+  const got = [];
+  ws.onmessage = e => got.push(JSON.parse(e.data));
+  ws.onopen = () => { ws.send(JSON.stringify({ type: 'hello', name: who.name, token: who.token })); resolve({ ws, got, say: text => ws.send(JSON.stringify({ type: 'send', text })) }); };
+  ws.onerror = () => reject(new Error('chat socket error'));
+});
+const until = async (pred, ms = 5000) => {
+  for (const t0 = Date.now(); Date.now() - t0 < ms; await new Promise(r => setTimeout(r, 50))) { const hit = pred(); if (hit) return hit; }
+  return null;
+};
+const vicChat = await chat({ name: VICTIM, token: vic.token });
+const astChat = await chat({ name: 'Aster', token: ast.token });
+vicChat.say('retiree chat ' + tag);
+await until(() => astChat.got.some(m => m.type === 'msg' && m.msg.text === 'retiree chat ' + tag));
+astChat.say(`@${VICTIM} aster chat ${tag}`);
+const astMsg = await until(() => astChat.got.find(m => m.type === 'msg' && m.msg.text.endsWith('aster chat ' + tag)));
+ck('retiree chatted and was @-ed', !!astMsg && astMsg.msg.mentions.includes(VICTIM.toLowerCase()), JSON.stringify(astMsg?.msg));
 
 // ---- Secret Angel: no admin; a plain member draws, with the retiree in the circle ----
 await J('POST', '/api/angel/prefs', { name: VICTIM, token: vic.token, picks: { gear: 'love' } });
@@ -117,6 +139,15 @@ const todosEnd = await J('GET', '/api/todos');
 ck('retiree off the task (the task stays)', !!todosEnd.items.find(t => t.id === todoId) && !todosEnd.items.find(t => t.id === todoId).assignees.includes(VICTIM));
 const cms = todosEnd.items.find(t => t.id === todoId).comments;
 ck("retiree's comment gone, Aster's reply kept under a marker", cms.every(c => c.by !== VICTIM && c.text !== 'retiree comment' && c.replyToName !== VICTIM) && cms.some(c => c.text === 'aster reply') && cms.some(c => c.deleted), JSON.stringify(cms));
+const astAfter = await chat({ name: 'Aster', token: ast.token });
+const hist = await until(() => astAfter.got.find(m => m.type === 'history'));
+ck("retiree's chat messages gone, Aster's kept without the @", !!hist && !hist.msgs.some(m => isVictim(m.by) || m.text === 'retiree chat ' + tag)
+  && hist.msgs.some(m => m.text.endsWith('aster chat ' + tag) && !m.mentions.includes(VICTIM.toLowerCase())), JSON.stringify(hist?.msgs.slice(-3)));
+const vicCount = vicChat.got.length;
+vicChat.say('still here? ' + tag);
+const vicErr = await until(() => vicChat.got.slice(vicCount).find(m => m.type === 'error'));
+ck("the retiree's open chat can't send any more", vicErr?.error === '先登录再聊天', JSON.stringify(vicChat.got.slice(vicCount)));
+for (const c of [vicChat, astChat, astAfter]) c.ws.close();
 const angelPm = await J('GET', `/api/angel?name=PM&token=${pm.token}`);
 ck('angel draw survives with the retiree spliced out', angelPm.drawn === true && angelPm.master?.name === 'Aster', JSON.stringify(angelPm.master));
 const angelAst = await J('GET', `/api/angel?name=Aster&token=${ast.token}`);

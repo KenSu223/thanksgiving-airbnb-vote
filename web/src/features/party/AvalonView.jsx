@@ -139,7 +139,7 @@ export default function AvalonView({ active }) {
           <ReactionBar send={send} active={active} />
         </PartyFrame>
       </div>
-      <WinsBoard title="阿瓦隆 胜场榜" rows={st?.board || []}>
+      <WinsBoard title="阿瓦隆 胜场榜" rows={st?.board || []} me={st?.boardMe}>
         <p><b>怎么玩：</b>好人要完成三个任务，坏人要让三个任务失败。每轮队长选人，所有人公开投票赞成 / 反对（过半数才通过，连续否决五次坏人赢）。队员暗中出成功或失败，好人只能出成功，一张失败任务就失败（7 人以上第四个任务要两张）。</p>
         <p className="mt-1">梅林知道坏人是谁（看不到莫德雷德），派西维尔知道谁可能是梅林（莫甘娜会冒充），坏人互相认识（奥伯伦除外）。好人完成三个任务后，刺客还有一次机会：指认中梅林，坏人翻盘。</p>
         <p className="mt-1">湖中仙女（7 人以上）：第二、三、四个任务后，拿着的人可以偷看一个人是好是坏，然后交给他。</p>

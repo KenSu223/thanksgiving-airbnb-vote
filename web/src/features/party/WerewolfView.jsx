@@ -195,7 +195,7 @@ export default function WerewolfView({ active }) {
           <ReactionBar send={send} active={active} />
         </PartyFrame>
       </div>
-      <WinsBoard title="狼人杀 胜场榜" rows={st?.board || []}>
+      <WinsBoard title="狼人杀 胜场榜" rows={st?.board || []} me={st?.boardMe}>
         <p><b>app 当上帝：</b>每一步都会念出来（开着「播报」的设备念，一桌开一台就够；可以放一台不坐下的手机或平板在桌子中间）。晚上大家都看自己的手机，轮到你的角色才有按钮，别人只看到「天黑请闭眼」。</p>
         <p className="mt-1"><b>晚上：</b>守卫 → 狼人 → 女巫 → 预言家。死了的角色也照样叫，等一会儿再闭眼，听不出谁还活着。同守同救会死。女巫{s.witchSelf ? '第一晚可以' : '不能'}自救。</p>
         <p className="mt-1"><b>白天：</b>{t?.sheriffOn ? '第一天先竞选警长（警长一票算 1.5 票，发言顺序由他定，他最后说）。' : ''}公布昨晚谁死了（不说怎么死的），第一晚死的人有遗言。大家依次发言，然后投票放逐，平票的人再说一次再投，还平就没人出局。被投出去的有遗言；猎人（没被毒死）可以开枪；白痴翻牌免死但以后不能投票。狼人白天可以自爆，直接天黑。</p>

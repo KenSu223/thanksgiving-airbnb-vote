@@ -8,20 +8,22 @@
 // losing a run. Bests and their replays live in this object's storage
 // (p:<name>, r:<name>), never in KV.
 //   POST /api/dodge/start { name, token }                  -> { seed, ticket }
-//   POST /api/dodge/score { name, token, ticket, events }  -> { ticks, by, best, newBest, rank, board, bot, react }
-//   GET  /api/dodge/board                                  -> { board }
+//   POST /api/dodge/score { name, token, ticket, events }  -> { ticks, by, best, newBest, rank, board, boardMe, bot, react }
+//   GET  /api/dodge/board?name=&token=                     -> { board, boardMe }  (the top 3; your own place if signed in)
 //   GET  /api/dodge/replay?name=                           -> { name, seed, v, events, ticks, by, stats, bot } (top 3 only)
 //   POST /scrub-user { target }  (internal only: a retired account, users/retire.js)
 // Times are in ticks: 60 a second.
 import { getUsers, sameName, cleanName } from '../users/users.js';
 import { j } from '../lib/http.js';
+import { TOP, topFor } from '../lib/board.js';
 import { HZ, SIM_VERSION } from '../../web/src/features/dodge/sim.js';
 import { badEvents, replay } from '../../web/src/features/dodge/verify.js';
 
 const TICKET_DAYS = 7; // a run saved on the device can still be sent this long after it started
-// Only the top 3's replays are public, for everyone to check; the rest stay
-// private (still saved, so they show once that person climbs into the top 3).
-const OPEN_REPLAYS = 3;
+// Only the top 3 are on the board (lib/board.js), and their replays are public,
+// for everyone to check; the rest stay private (still saved, so they show once
+// that person climbs into the top 3).
+const OPEN_REPLAYS = TOP;
 
 // Records taken off the board by hand, each exactly once ([flag, key]): the
 // flag is kept, so a later record of the same person is never touched.
@@ -59,15 +61,19 @@ export class DodgeBoard {
   ranked() {
     return [...this.best].sort(([, a], [, b]) => b.ticks - a.ticks || a.at - b.at);
   }
-  top() {
-    return this.ranked().slice(0, 50)
-      .map(([, r], i) => ({ name: r.name, ticks: r.ticks, runs: r.runs, at: r.at, replay: i < OPEN_REPLAYS && !!r.replay, bot: !!r.bot, react: r.react ?? null }));
+  // The top 3 and the viewer's own place, as rows. How many runs someone has
+  // played stays private (still counted in p:<name>), only the best time shows.
+  boardFor(key) {
+    return topFor(this.ranked().map(([k, r], i) => [k, { name: r.name, ticks: r.ticks, at: r.at, replay: i < OPEN_REPLAYS && !!r.replay, bot: !!r.bot, react: r.react ?? null }]), key);
   }
 
   async fetch(request) {
     await this.load();
     const url = new URL(request.url), path = url.pathname;
-    if (request.method === 'GET' && path === '/api/dodge/board') return j({ ok: true, board: this.top() });
+    if (request.method === 'GET' && path === '/api/dodge/board') {
+      const user = await this.caller(url.searchParams.get('name'), url.searchParams.get('token'));
+      return j({ ok: true, ...this.boardFor(user?.name.toLowerCase()) });
+    }
     if (request.method === 'GET' && path === '/api/dodge/replay') return this.replayOf(url.searchParams.get('name'));
     // always read the body (answering without it trips the runtime), and only use it if it's an object
     const parsed = request.method === 'POST' ? await request.json().catch(() => null) : null;
@@ -132,8 +138,7 @@ export class DodgeBoard {
     this.best.set(key, rec);
     await this.state.storage.put('p:' + key, rec);
     if (newBest) await this.state.storage.put('r:' + key, { name: user.name, seed: run.s, v: run.v, events, ticks: r.ticks, by: r.by, stats: r.stats, bot: r.bot, at: now });
-    const board = this.top();
-    return j({ ok: true, ticks: r.ticks, by: r.by, best: rec.ticks, newBest, rank: board.findIndex(x => x.name === user.name) + 1, board, bot: r.bot, react: r.stats.medianMs });
+    return j({ ok: true, ticks: r.ticks, by: r.by, best: rec.ticks, newBest, rank: this.ranked().findIndex(([k]) => k === key) + 1, ...this.boardFor(key), bot: r.bot, react: r.stats.medianMs });
   }
 
   // A best run, to watch again: same seed, same inputs, same game. Top 3 only.

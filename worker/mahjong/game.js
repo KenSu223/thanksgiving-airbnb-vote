@@ -62,7 +62,7 @@ export class MahjongGame {
     if (free >= 0) this.seats[free] = p; else this.waitlist.push(p);
     return null;
   }
-  fresh(s) { Object.assign(s, { hand: [], melds: [], river: [], lack: null, won: null, swap: null, received: null, passHu: false, justKonged: false, afterPong: false, drawn: null, draws: 0 }); }
+  fresh(s) { Object.assign(s, { hand: [], melds: [], river: [], lack: null, won: null, swap: null, received: null, passHu: false, justKonged: false, afterPong: false, drawn: null, draws: 0, tingKey: null, tingRaw: null }); }
   bot(i) { const b = { key: 'bot' + i, name: BOT_NAMES[i], bot: true, connected: true }; this.fresh(b); return b; }
 
   // Anyone at the table (or queued for it) deals: the first hand, and the next one after each result.
@@ -205,6 +205,54 @@ export class MahjongGame {
       if (s.won) for (const k of s.hand) c[idx(k)]++;
     }
     return c;
+  }
+  // Tiles one player can see: their own hand and melds, every river, the
+  // others' melds (a 暗杠 is face down), and the hands and winning tiles of
+  // players who have won.
+  seenBy(me) {
+    const c = new Array(27).fill(0);
+    this.seats.forEach((s, k) => {
+      if (!s) return;
+      for (const t of s.river) c[idx(t)]++;
+      for (const m of s.melds) if (!m.concealed || k === me) c[idx(m.kind)] += m.type === 'kong' ? 4 : 3;
+      if (k === me || s.won) for (const t of s.hand) c[idx(t)]++;
+      if (s.won) c[idx(s.won.tile)]++;
+    });
+    return c;
+  }
+  // 听牌 hints, for that player only: holding 13 (well, 3n+1), which tiles win,
+  // for how many 番, and how many of each they can't see yet ({ now }); on
+  // their turn (3n+2), the same for each tile they could throw ({ ifDiscard }).
+  // The waits only change with the hand, so they're kept per seat; the counts
+  // left change with every discard, so they're worked out each time.
+  tingFor(me) {
+    const s = me >= 0 && this.seats[me];
+    if (!s || s.won || this.phase !== 'playing') return null;
+    const key = s.hand.join() + '|' + s.melds.map(m => m.kind + m.type).join() + '|' + s.lack;
+    if (s.tingKey !== key) {
+      const c = counts(s.hand);
+      let raw = null;
+      if (s.hand.length % 3 === 1) {
+        const w = waits(c, s.melds, s.lack);
+        if (w.length) raw = { now: w };
+      } else {
+        const ifDiscard = {};
+        for (const k of new Set(s.hand)) {
+          c[idx(k)]--;
+          const w = waits(c, s.melds, s.lack);
+          c[idx(k)]++;
+          if (w.length) ifDiscard[k] = w;
+        }
+        if (Object.keys(ifDiscard).length) raw = { ifDiscard };
+      }
+      Object.assign(s, { tingKey: key, tingRaw: raw });
+    }
+    if (!s.tingRaw) return null;
+    const seen = this.seenBy(me);
+    const left = list => list.map(w => ({ ...w, left: Math.max(0, 4 - seen[idx(w.kind)]) }));
+    return s.tingRaw.now
+      ? { now: left(s.tingRaw.now) }
+      : { ifDiscard: Object.fromEntries(Object.entries(s.tingRaw.ifDiscard).map(([k, w]) => [k, left(w)])) };
   }
   botAct(i) {
     if (this.phase !== 'playing' || this.stage !== 'act' || this.turn !== i) return;
@@ -501,6 +549,7 @@ export class MahjongGame {
         won: s.won,
       }),
       options: o,
+      ting: this.tingFor(me),
       claim: c && !c.choice ? { hu: !!c.hu, kong: !!c.kong, pong: !!c.pong } : null,
       ledger: this.ledger,
       waitlist: this.waitlist.map(w => w.name),

@@ -8,6 +8,7 @@ import { reduceMotion } from '../../lib/motion.js';
 import { HZ, SKILLS, SIM_VERSION } from './sim.js';
 import DodgeGame, { killedBy } from './DodgeGame.jsx';
 import DodgePreview from './DodgePreview.jsx';
+import { BoardRows, place, TOP_NOTE } from '../games/TopBoard.jsx';
 import * as sfx from './sfx.js';
 import './dodge.css';
 
@@ -56,8 +57,11 @@ async function sendScore(s) {
 }
 
 export default function DodgeView({ active }) {
-  const { name, ensureName } = useSession();
+  const { name, token, ensureName } = useSession();
+  // the top 3, and your own place when you're below them (only you get it)
   const [board, setBoard] = useState([]);
+  const [boardMe, setBoardMe] = useState(null);
+  const showBoard = useCallback(r => { setBoard(r.board || []); setBoardMe(r.boardMe || null); }, []);
   // while playing: { me: { name, token }, seed, ticket, practice?, n }; while watching: { replay, seed, n }
   const [run, setRun] = useState(null);
   const [result, setResult] = useState(null); // { ticks, by, server?, error?, retry?, practice?, replay? }
@@ -67,14 +71,15 @@ export default function DodgeView({ active }) {
   const [paused, setPaused] = useState(false);
   const [started, setStarted] = useState(false); // the 3-2-1 is over and the run is going
 
-  const loadBoard = useCallback(() => api('/api/dodge/board').then(r => r.ok && setBoard(r.board)).catch(() => {}), []);
+  const loadBoard = useCallback(() => api('/api/dodge/board?name=' + encodeURIComponent(name || '') + '&token=' + encodeURIComponent(token || ''))
+    .then(r => r.ok && showBoard(r)).catch(() => {}), [name, token, showBoard]);
   // opening the page also sends a score that couldn't be sent last time
   useEffect(() => {
     if (!active) return;
     const p = pendingScore();
-    if (p) sendScore(p).then(r => (r.ok ? setBoard(r.board) : loadBoard()));
+    if (p) sendScore(p).then(r => (r.ok ? showBoard(r) : loadBoard()));
     else loadBoard();
-  }, [active, loadBoard]);
+  }, [active, loadBoard, showBoard]);
   useEffect(() => {
     const q = window.matchMedia(PORTRAIT), f = () => setPortrait(q.matches);
     q.addEventListener('change', f);
@@ -140,7 +145,7 @@ export default function DodgeView({ active }) {
     const r = await sendScore(score);
     setResult(x => ({ ...x, server: r.ok ? r : null, error: r.ok ? '' : r.error, retry: !!r.retry }));
     if (r.ok) {
-      setBoard(r.board);
+      showBoard(r);
       if (r.newBest && !reduceMotion) confetti({ particleCount: 140, spread: 90, origin: { y: 0.5 }, colors: CONFETTI_COLORS });
     }
   }
@@ -157,7 +162,7 @@ export default function DodgeView({ active }) {
   }
   function quit() { setRun(null); setResult(null); setPaused(false); if (touch) leaveFull(); loadBoard(); }
 
-  const mine = board.find(r => name && r.name.toLowerCase() === name.toLowerCase());
+  const mine = boardMe || board.find(r => name && r.name.toLowerCase() === name.toLowerCase());
   const overlay = result && (result.replay ? (
     <div className="dg-over">
       <div className="text-2xl font-extrabold">回放结束：{run.replay.name} 存活 {secs(result.ticks)} 秒</div>
@@ -242,13 +247,13 @@ export default function DodgeView({ active }) {
         </section>
         <aside className="glass-card rounded-2xl p-5 self-start">
           <h2 className="font-bold text-lg mb-1">🏆 躲技能排行榜</h2>
-          <p className="text-xs text-slate-500 mb-3">每人最好的一次 · 新成绩由服务器重放核对 · 为了防止作弊，前三名的录像会被保存并公开（点 ▶ 看），其他人的不公开</p>
-          {board.length ? board.map((r, i) => (
-            <div key={r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (mine && r.name === mine.name ? ' font-bold text-indigo-700' : '')}>
-              <span className="truncate">{i < 3 ? ['🥇', '🥈', '🥉'][i] : (i + 1) + '.'} {r.name}
+          <p className="text-xs text-slate-500 mb-3">每人最好的一次 · {TOP_NOTE} · 新成绩由服务器重放核对 · 为了防止作弊，前三名的录像会被保存并公开（点 ▶ 看）</p>
+          <BoardRows rows={board} me={boardMe} empty="还没人玩过，来当第一" row={(r, i, isMe) => (
+            <div key={isMe ? 'me' : r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (isMe || (mine && r.name === mine.name) ? ' font-bold text-indigo-700' : '')}>
+              <span className="truncate">{place(i)} {r.name}
                 {r.bot && <span className="dg-bot-mark" title={BOT_NOTE(r.react)} aria-label={BOT_NOTE(r.react)}> 🤖</span>}</span>
               <span className="flex items-center gap-1.5">
-                <span className="tabular-nums whitespace-nowrap">{secs(r.ticks)} 秒<span className="text-xs font-normal text-slate-400"> · {r.runs} 局</span></span>
+                <span className="tabular-nums whitespace-nowrap">{secs(r.ticks)} 秒</span>
                 {/* only the top 3's replays are public (the server hands out no others); below that, an empty slot keeps the times lined up */}
                 {i >= 3 ? <span className="dg-watch dg-watch-none" aria-hidden="true" />
                   : r.replay
@@ -256,7 +261,7 @@ export default function DodgeView({ active }) {
                   : <span className="dg-watch dg-watch-none" title="以前的纪录，没有回放" aria-hidden="true">·</span>}
               </span>
             </div>
-          )) : <p className="text-sm text-slate-400">还没人玩过，来当第一</p>}
+          )} />
         </aside>
       </div>
       {full && createPortal(<div className="dg-full">{game}</div>, document.body)}

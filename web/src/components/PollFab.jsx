@@ -3,11 +3,13 @@ import { useSession } from '../session/SessionContext.jsx';
 import { useToast } from './Toast.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
 import { api } from '../lib/api.js';
+import { load as loadKey, save as saveKey } from '../lib/storage.js';
 
 // 快速投票：独立于所有 tab 的悬浮球 + 投票中心（挂在 App 顶层）。
 // 别人发起投票时，本机每 20 秒对一次列表，发现"没投过的新投票"就
-// 弹出卡片；点选项即投票，卡片收回悬浮球。投过的、自己发起的、
-// 点了"稍后再说"的都不再弹，但悬浮球上留红点，进中心随时能投。
+// 弹出卡片；点选项即投票，卡片收回悬浮球。每支投票在这台设备上最多
+// 弹一次（弹过的记在 localStorage pollSeen:名字，打开 app 不会再弹），
+// 投过的、自己发起的不弹；没投的悬浮球上留红点，进中心随时能投。
 // 已登录才显示；数据口径和后端 worker/polls 对齐（单选、可改票、
 // 发起人可提前结束、到点自动结束）。
 const DURATIONS = [
@@ -76,11 +78,19 @@ export default function PollFab() {
   const [centerOpen, setCenterOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [popupId, setPopupId] = useState(null);
-  const [dismissed, setDismissed] = useState(() => new Set());
+  const myKey = name ? name.toLowerCase() : '';
+  const seenKey = 'pollSeen:' + myKey;
+  const readSeen = () => { try { return new Set(JSON.parse(loadKey(seenKey, '[]'))); } catch (e) { return new Set(); } };
+  const [seen, setSeen] = useState(readSeen);
+  const markSeen = ids => setSeen(s => {
+    if (ids.every(id => s.has(id))) return s;
+    const next = new Set([...s, ...ids]);
+    saveKey(seenKey, JSON.stringify([...next].slice(-200)));
+    return next;
+  });
   const [busy, setBusy] = useState(false);
   // 选项默认预填"同意 / 不同意"（最常见的用法），发起人随时改成任何内容
   const [form, setForm] = useState({ q: '', img: '', options: ['同意', '不同意'], dur: '60' });
-  const myKey = name ? name.toLowerCase() : '';
 
   const load = useCallback(async () => {
     if (!name) return;
@@ -97,18 +107,20 @@ export default function PollFab() {
     return () => clearInterval(t);
   }, [name, load]);
   // 换账号：提醒状态和打开的浮层都重置，别把上一个人的红点带过来
-  useEffect(() => { setDismissed(new Set()); setPopupId(null); setCenterOpen(false); setCreating(false); }, [name]);
+  useEffect(() => { setSeen(readSeen()); setPopupId(null); setCenterOpen(false); setCreating(false); }, [name]); // eslint-disable-line react-hooks/exhaustive-deps -- readSeen follows name
   useEffect(() => { if (centerOpen) load(); }, [centerOpen, load]);
 
   const active = polls.filter(p => p.status === 'active');
   const unvoted = active.filter(p => !p.myVote && p.byKey !== myKey);
 
-  // 弹出：最新一支没投过、没被"稍后再说"掉的投票，一次只弹一支
+  // 弹出：最新一支没投过、这台设备没弹过的投票，一次只弹一支；一弹就记下，
+  // 之后刷新、重开 app 都不再弹。打开投票中心看过的也算弹过。
   useEffect(() => {
-    if (popupId || centerOpen || creating) return;
-    const cand = unvoted.find(p => !dismissed.has(p.id));
-    if (cand) setPopupId(cand.id);
-  }, [unvoted, dismissed, popupId, centerOpen, creating]);
+    if (popupId || creating) return;
+    if (centerOpen) { if (active.some(p => !seen.has(p.id))) markSeen(active.map(p => p.id)); return; }
+    const cand = unvoted.find(p => !seen.has(p.id));
+    if (cand) { setPopupId(cand.id); markSeen([cand.id]); }
+  }, [unvoted, active, seen, popupId, centerOpen, creating]); // eslint-disable-line react-hooks/exhaustive-deps -- markSeen is stable in effect
   const popup = popupId ? polls.find(p => p.id === popupId) : null;
   useEffect(() => {
     if (popup && (popup.status !== 'active' || popup.myVote)) setPopupId(null);
@@ -147,7 +159,7 @@ export default function PollFab() {
     } catch (e) { toast('网络有点问题，稍后再试'); }
   };
 
-  const later = () => { if (popup) setDismissed(s => new Set(s).add(popup.id)); setPopupId(null); };
+  const later = () => setPopupId(null);
 
   const submitCreate = async () => {
     const options = form.options.map(s => s.trim()).filter(Boolean);
