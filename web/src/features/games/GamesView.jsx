@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { load, save } from '../../lib/storage.js';
 import PresencePanel from '../../components/PresencePanel.jsx';
+import { usePresence } from '../../session/PresenceContext.jsx';
 import BlackjackView from '../blackjack/BlackjackView.jsx';
 import DdzView from '../ddz/DdzView.jsx';
 import GuandanView from '../guandan/GuandanView.jsx';
@@ -28,12 +29,17 @@ const GAMES = [
 export default function GamesView({ active }) {
   const [game, setGame] = useState(() => (GAMES.some(g => g.key === load('game')) ? load('game') : 'bj'));
   const pick = g => { setGame(g); save('game', g); };
+  // 把「我此刻在玩哪个游戏」报给在线名单（游戏 tab 里的名单会写出来）：
+  // 在这个 tab 上就是选中的那个游戏，切走 / 关掉就清空。
+  const { setActivity } = usePresence();
+  useEffect(() => { setActivity(active ? game : null); }, [active, game, setActivity]);
+  useEffect(() => () => setActivity(null), [setActivity]);
   return (
     <>
       {/* 手机上没有侧栏，先看看谁在再决定开哪桌（电脑上侧栏里有同一份）。
           默认折叠：只露「大家 · N 人在线」一行，点标题才展开名单 */}
       <div className="md:hidden glass-card rounded-2xl px-3 py-2 mb-4">
-        <PresencePanel fold />
+        <PresencePanel fold showGame />
       </div>
       <div className="flex flex-wrap gap-2 mb-5">
         {GAMES.map(g => (
