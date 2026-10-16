@@ -24,6 +24,7 @@
   - **谁是卧底**（`undercover.js`）：由一个真人主持，app 只记账。主持人坐主持位（`mc`，不占 14 个玩家座位、不算玩家、不进胜场榜；掉线了别的不在局里的人可以接替），自己想好平民的词和卧底的词写进来，定几个卧底、几个白板（随便几个），随机分或者点座位指定（`setup`，只有主持人看得到），点「发词」。每个人只看到自己的词（白板知道自己是白板），主持人看得到所有人的身份和词。描述、讨论、投票都当面来：谁被投出去由主持人点（显示身份不显示词，点错了可以撤销）；不念、不计时、不自动往下走（这个游戏不用播报：`useParty` 的 `voice: false`）。按规则哪边赢了（卧底和白板全出局平民赢；卧底一方人数不少于平民，或者只剩 3 人时卧底一方还有人，卧底赢）app 会提醒主持人，由主持人点「平民赢 / 卧底赢」（记胜负）或者「结束不算」。
   - **阿瓦隆**（`avalon.js`）：5–14 人（官方 5–10 人；11–14 人是我们自己的扩展：坏人和队伍都多一些，`SIDES` / `QUESTS`）。角色：梅林、刺客必有，派西维尔、莫甘娜默认有，莫德雷德、奥伯伦可选，其余是忠臣 / 爪牙；谁知道谁在发牌时算好、只在自己的 view 里（梅林看坏人但看不到莫德雷德；派西维尔看梅林和莫甘娜、分不出谁是谁；坏人互相认识，奥伯伦除外）。队长选人（到时间系统补齐）→ 所有人公开投赞成 / 反对（过半数才通过，没投算赞成，连续否决五次坏人赢）→ 队员暗中出成功 / 失败（好人只能出成功，服务器挡着；没出算成功；7 人以上第四个任务要两张失败）。三败坏人赢；三胜进入刺杀：坏人亮出身份一起商量，刺客指认梅林，中了坏人赢。湖中仙女（7 人以上，默认开）：第二、三、四个任务后拿着的人偷看一个人的阵营（只有他自己看得到）再交给那个人，拿过的人不能被查。
   - **狼人杀**（`werewolf.js`）：6–14 人，app 当上帝——每一步都念出来、等该行动的人在手机上选、保管所有秘密。角色：狼人、村民、预言家、女巫、猎人、守卫、白痴；按人数的推荐板子（`PRESETS`：6 人 2 狼 2 民预女 … 9 人预女猎 … 12 人预女猎白 … 14 人预女猎白守），也可以自己配（加起来要等于人数）。晚上：天黑请闭眼 → 守卫 → 狼人 → 女巫 → 预言家 → 天亮了；死了的角色也照样叫，每一步至少等一个随机的时间（`roleMin`），听不出谁还活着；夜里的倒计时只给正在行动的人看。守卫不能连守同一人、可以守自己；狼人互相看得到选了谁，意见一致就定，到时间按多数（平票随机），可以空刀；女巫有解药时才知道谁被杀，一晚一瓶，默认不能自救（可以设「第一晚可以」）；预言家查验结果只给他看。同守同救会死。第一天（警长默认 9 人以上开）先竞选警长：上警 → 竞选发言（可以退水）→ 警下投票（平票 PK 再投，还平或没人投就警徽流失），警长一票算 1.5 票、定发言方向（他最后说）、死了移交或撕警徽。然后公布昨晚死了谁（不说怎么死的）；每个死的人都有一个「确认技能」的时刻（这样猎人不会被单独点出来），没被毒死的猎人可以开枪；第一晚死的和白天被投出去的有遗言。白天发言 → 放逐投票（平票 PK，再平没人出局）；白痴被投出翻牌免死、以后不能投票；狼人白天任何时候可以自爆，直接天黑（竞选时自爆警徽流失，昨晚的死讯照样公布）。屠边：狼人全出局好人赢，村民全出局或神职全出局狼人赢。结束时亮出所有身份和每晚发生了什么。
+- **聊天室**：一个 Durable Object（`ChatRoom`，`worker/chat/room.js`，WebSocket `/api/chat`），全组一个房间，只留最近 100 条（每条最多 500 字）。连上后先 `hello`（登录名单里的名字 + token），之后才收得到历史和新消息、才能发；没 hello 的连接什么都收不到。用的是 Durable Object 的休眠 WebSocket（`acceptWebSocket`）：没人说话时对象睡着，连着不花运行时长，所以每个登录的页面都一直连着（切到后台就断开，回来重连）。谁被 @ 了由服务器从文字里认（`findMentions`：成员名前面加 `@`，不分大小写，长名字优先，所以 `@PM Test` 不会也算 `@PM`；@自己不算），存在消息的 `mentions` 里。读到哪了不在服务器上，存在每台设备的 `localStorage`（`chatRead:<名字>`，最后读到的那条的时间）：没读的普通消息在 💬 上是灰色数字，有人 @我 就变红色 `@n`，页面开着时还会弹一句「某某 在聊天室 @了你」。账号退役时 ta 的消息和别人对 ta 的 @ 一起去掉
 - **域名**：`denver-thanksgiving-airbnb-vote.thanksgiving-vote.workers.dev`（免费子域名）
 
 ## 前端（`web/`，React + Vite + Tailwind）
@@ -45,7 +46,7 @@
 | `web/src/features/g2048/` | 2048：`logic.js`（滑砖、合并、出新砖、还能不能走；服务器也用）、`useG2048.js`（WebSocket，在这页才连）、`G2048View`（盘面：砖按行列定位、换位置就滑过去，新砖淡入、合成的弹一下；方向键 / WASD / 在盘面上滑；结束和拼出 2048 的浮层；排行榜） |
 | `web/src/features/party/` | 派对游戏：`PartyKit.jsx`（连线 `useParty`——就是 `useTable` 加播报；座位格子：局外点空座位坐下 / 换座，投票时点人，局中只摆在玩的人；阶段横幅和倒计时；点一下翻开、5 秒自动盖上的身份牌；说完了 / 投票 / 开始按钮；记录；胜场榜）、`voice.js`（播报：浏览器自带朗读，中文声音；每台设备自己开关，默认只有开局的人和没坐下的那台开着；开着时屏幕常亮；谁是卧底不用）、`UndercoverView`（主持位、主持人写词和分配、主持人点出局 / 撤销 / 结束）、`AvalonView`（五个任务的圆圈和连续否决的点；队长点座位选人；赞成 / 反对、成功 / 失败按钮；湖中仙女和刺杀也是点座位）、`WerewolfView`（晚上变暗；轮到的角色有按钮——守卫守人、狼人点人（同伴看得到）/空刀、女巫救 / 毒 / 不用、预言家查验，其他人只看到「天黑请闭眼」；上警 / 退水、警长选发言方向、猎人开枪、移交警徽、自爆；没坐下的设备提示可以当上帝放在桌子中间） |
 | `web/src/session/` | 登录：从用户列表选名字，名字和 token 存在 `localStorage`（`vn` / `vt`）；`PresenceContext.jsx` 是全 App 一条的在线状态连线（见「在线状态」） |
-| `web/src/components/` | 共用：开场动画、导航、标题、登录框、顶部横幅、照片轮播 `Carousel`（选房和餐厅卡片都用） |
+| `web/src/components/` | 共用：开场动画、导航、标题、登录框、顶部横幅、照片轮播 `Carousel`（选房和餐厅卡片都用）；左下角（电脑在右下）叠着的两个悬浮球：🗳️ 快速投票 `PollFab`（别人发起的新投票弹出来，每支在一台设备上只弹一次——弹过的记在 `localStorage` 的 `pollSeen:<名字>`，重开 app 不再弹；没投的留红点）和它上面的 💬 聊天室 `ChatFab`（消息列表、输入 @ 弹出成员可以点、@我 的消息红框） |
 | `web/src/lib/` | 共用：`api()`、行程和页面配置（`TRIPS`、`VIEWS`）、URL hash 路由（`#nov26/split`） |
 | `web/public/` | 原样拷进 `dist/`：`manifest.webmanifest` 和图标（`icon-192/512.png`、`apple-touch-icon.png`），配合 `web/index.html` 里的苹果标签，网站能「添加到主屏幕」。从主屏幕打开没有浏览器地址栏——iPhone 上 Safari / Chrome 都不让网页自己隐藏地址栏（全屏接口只给视频），这是横屏玩游戏唯一的真全屏办法；躲技能在 iPhone 浏览器里会提示这一点 |
 
@@ -54,7 +55,7 @@
 
 ## 后端（`worker/`，跑在 Worker 里）
 
-入口 `worker/index.js` 只做一件事：把各功能目录导出的路由表（`routes`）合并起来按「方法 + 路径」分发，其他路径交给 `env.ASSETS` 返回构建好的页面。功能目录：`listings/`（房源、抓取、实时价）、`food/`（餐厅：读 Google 地图链接）、`users/`（用户列表、登录；`retire.js`：没有谁能在 app 里删账号，大家权限一样——要去掉的名字写进 `RETIRED`，下次有人打开成员列表时，这个账号连同 ta 的投票、航班、分账、用车、待办、Secret Angel 和各个游戏里的纪录一起清掉）、`split/`（账本计算和存储）、`blackjack/`（规则 `game.js` 和 Durable Object `table.js`）、`games/`（三个牌桌游戏共用的 Durable Object 大厅 `hall.js`）、`ddz/`（斗地主：牌型 `cards.js`、机器人 `bot.js`、一桌 `game.js`、Durable Object `hall.js`）、`guandan/`、`mahjong/`（同样的分法；川麻的牌型在 `tiles.js` 和 `hand.js`）、`dodge/`（躲技能排行榜 Durable Object `board.js`）、`g2048/`（2048 的 Durable Object `board.js`）、`presence/`（在线状态 Durable Object `presence.js`）、`party/`（派对游戏：一桌 `room.js`、各个游戏、大厅 `halls.js`）、`config/`（行程和预置房源）。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
+入口 `worker/index.js` 只做一件事：把各功能目录导出的路由表（`routes`）合并起来按「方法 + 路径」分发，其他路径交给 `env.ASSETS` 返回构建好的页面。功能目录：`listings/`（房源、抓取、实时价）、`food/`（餐厅：读 Google 地图链接）、`users/`（用户列表、登录；`retire.js`：没有谁能在 app 里删账号，大家权限一样——要去掉的名字写进 `RETIRED`，下次有人打开成员列表时，这个账号连同 ta 的投票、航班、分账、用车、待办、聊天消息、Secret Angel 和各个游戏里的纪录一起清掉）、`split/`（账本计算和存储）、`blackjack/`（规则 `game.js` 和 Durable Object `table.js`）、`games/`（三个牌桌游戏共用的 Durable Object 大厅 `hall.js`）、`ddz/`（斗地主：牌型 `cards.js`、机器人 `bot.js`、一桌 `game.js`、Durable Object `hall.js`）、`guandan/`、`mahjong/`（同样的分法；川麻的牌型在 `tiles.js` 和 `hand.js`）、`dodge/`（躲技能排行榜 Durable Object `board.js`）、`g2048/`（2048 的 Durable Object `board.js`）、`presence/`（在线状态 Durable Object `presence.js`）、`chat/`（聊天室 Durable Object `room.js`）、`party/`（派对游戏：一桌 `room.js`、各个游戏、大厅 `halls.js`）、`config/`（行程和预置房源）。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
 
 | 路由 | 作用 |
 |---|---|
@@ -109,7 +110,7 @@ Airbnb 房源页的价格框是浏览器单独请求的（GraphQL 持久化查�
 
 ## 部署（`wrangler.toml`）
 
-声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、四个游戏的 Durable Object（`BlackjackTable`、`DdzHall`、`GuandanHall`、`MahjongHall`；migration v1、v2 各加一个，v3 加掼蛋和川麻两个）、躲技能排行榜 `DodgeBoard`（v5；v4 是 StoreDO）、2048 的 `Board2048`（v6）、谁是卧底的 `UndercoverHall`（v7）、阿瓦隆的 `AvalonHall`（v8）、狼人杀的 `WerewolfHall`（v9）、在线状态的 `PresenceDO`（v10）。推到 `main` 由 GitHub Action 自动 `npm ci` + `wrangler deploy`；每个 PR 都会跑 `npm run check`（lint + 构建 + 打包 worker）。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
+声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、四个游戏的 Durable Object（`BlackjackTable`、`DdzHall`、`GuandanHall`、`MahjongHall`；migration v1、v2 各加一个，v3 加掼蛋和川麻两个）、躲技能排行榜 `DodgeBoard`（v5；v4 是 StoreDO）、2048 的 `Board2048`（v6）、谁是卧底的 `UndercoverHall`（v7）、阿瓦隆的 `AvalonHall`（v8）、狼人杀的 `WerewolfHall`（v9）、在线状态的 `PresenceDO`（v10）、聊天室的 `ChatRoom`（v11）。推到 `main` 由 GitHub Action 自动 `npm ci` + `wrangler deploy`；每个 PR 都会跑 `npm run check`（lint + 构建 + 打包 worker）。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
 
 **部署踩坑清单（2026-10-10）：**
 

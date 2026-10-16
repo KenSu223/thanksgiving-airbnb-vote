@@ -4,9 +4,9 @@
 // the next time anyone loads the member list (GET /api/users — every page
 // load does) the account is removed thoroughly: listing/food/activity votes,
 // saved flights, split expenses and shares, car seats and luggage, to-do
-// assignments, Secret Angel prefs and draw seat (each feature's
-// scrubUserFrom* does its own part), plus the game records inside the game
-// Durable Objects, reached through their bindings below. Cards and
+// assignments and comments, Secret Angel prefs and draw seat (each feature's
+// scrubUserFrom* does its own part), plus the game records and chat messages
+// inside the Durable Objects, reached through their bindings below. Cards and
 // restaurants they added stay (others may have voted on them).
 //
 // RETIRE (comma-separated names) adds to the list — only the robustness
@@ -58,6 +58,7 @@ export async function removeUser(env, target) {
     scrubGame(env.DDZ_HALL, 'hall'), scrubGame(env.GD_HALL, 'hall'), scrubGame(env.MJ_HALL, 'hall'),
     scrubGame(env.BJ_TABLE, 'main'), scrubGame(env.DODGE, 'board'), scrubGame(env.G2048, 'board'),
     scrubGame(env.UC_HALL, 'hall'), scrubGame(env.AV_HALL, 'hall'), scrubGame(env.WW_HALL, 'hall'),
+    scrubGame(env.CHAT, 'room'),
   ]);
 }
 
