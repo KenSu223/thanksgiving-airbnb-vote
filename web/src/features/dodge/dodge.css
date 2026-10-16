@@ -38,7 +38,9 @@
 .dg-control-hint { position:absolute; bottom:.4rem; left:50%; transform:translateX(-50%); color:#c5d6d6; font-size:.6rem; letter-spacing:.05em; white-space:nowrap; pointer-events:none; text-shadow:0 1px 4px #000; }
 .dg-flash[data-left]:not([data-left=''])::after { content:attr(data-left); position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:#fff; text-shadow:0 1px 3px #000; }
 .dg-flash[data-left]:not([data-left='']) span,.dg-flash[data-left]:not([data-left='']) small { visibility:hidden; }
-.dg-flash.big { width:5.2rem; height:5.2rem; right:max(1.6rem, env(safe-area-inset-right)); bottom:max(1.6rem, env(safe-area-inset-bottom)); font-size:1rem; }
+/* 闪现 on a touch screen: in from the corner by a share of the screen, so on an iPad it isn't at the edge either */
+.dg-flash.big { width:5.2rem; height:5.2rem; right:max(1.6rem, env(safe-area-inset-right), 7vw); bottom:max(1.6rem, env(safe-area-inset-bottom), 14vh); font-size:1rem; }
+@media (pointer: coarse) and (min-width: 900px) and (min-height: 600px) { .dg-flash.big { width:6rem; height:6rem; } }
 .dg-joyzone { position:absolute; left:0; top:0; bottom:0; width:50%; touch-action:none; }
 .dg-joy { position:absolute; width:7rem; height:7rem; margin:-3.5rem 0 0 -3.5rem; border-radius:9999px; background:#37677b44; box-shadow:inset 0 0 0 2px #9bc7d780,0 0 0 5px #18334266; pointer-events:none; }
 /* no fixed joystick: a hint in the middle of the left half until the first touch */
@@ -66,7 +68,7 @@ html.dg-lock, html.dg-lock body { overflow:hidden; overscroll-behavior:none; }
 .dg-hero-hud { position:absolute; top:.6rem; left:.75rem; display:flex; align-items:center; gap:.6rem; pointer-events:none; color:#f5e5be; font-size:.75rem; text-shadow:0 2px 4px #000; }.dg-hero-hud .dg-hero-avatar { display:block; width:2.5rem; height:2.5rem; border-radius:50%; border:2px solid #cdbf90; background:#123a3f url('/dodge/luban-directions.webp') no-repeat; background-size:314px 209px; background-position:-177px -24px; }
 .dg-bolt { width:52%; height:52%; fill:#fffbe6; filter:drop-shadow(0 0 6px #ffe08a); }.dg-hero-hud small { display:block; font-size:.55rem; color:#aabfc4; margin-top:.15rem; }
 @media(max-width:640px) { .dg-roster { grid-template-columns:repeat(2,minmax(0,1fr)); }.dg-preview { right:-22%; opacity:.6; }.dg-intro::after { background:linear-gradient(90deg,#0c252bf5,#102a3099); } }
-@media(max-height:450px) { .dg-flash.big { width:4.2rem; height:4.2rem; bottom:1.4rem; }.dg-hud { top:.15rem; }.dg-count { font-size:3rem; } }
+@media(max-height:450px) { .dg-flash.big { width:4.2rem; height:4.2rem; bottom:max(1.4rem, 9vh); }.dg-hud { top:.15rem; }.dg-count { font-size:3rem; } }
 /* nothing in the game is for selecting or copying: a long-press on iPhone would otherwise select text and pop up 拷贝 */
 .dg-full, .dg-stage, .dg-over, .dg-box { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
 html.dg-lock, html.dg-lock body { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
