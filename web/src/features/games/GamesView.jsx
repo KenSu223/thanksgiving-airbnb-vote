@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { load, save } from '../../lib/storage.js';
+import PresencePanel from '../../components/PresencePanel.jsx';
 import BlackjackView from '../blackjack/BlackjackView.jsx';
 import DdzView from '../ddz/DdzView.jsx';
 import GuandanView from '../guandan/GuandanView.jsx';
@@ -29,6 +30,11 @@ export default function GamesView({ active }) {
   const pick = g => { setGame(g); save('game', g); };
   return (
     <>
+      {/* 手机上没有侧栏，先看看谁在再决定开哪桌（电脑上侧栏里有同一份）。
+          默认折叠：只露「大家 · N 人在线」一行，点标题才展开名单 */}
+      <div className="md:hidden glass-card rounded-2xl px-3 py-2 mb-4">
+        <PresencePanel fold />
+      </div>
       <div className="flex flex-wrap gap-2 mb-5">
         {GAMES.map(g => (
           <button key={g.key} onClick={() => pick(g.key)}

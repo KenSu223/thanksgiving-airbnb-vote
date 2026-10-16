@@ -109,11 +109,20 @@ class_name = "WerewolfHall"
 tag = "v9"
 new_sqlite_classes = ["WerewolfHall"]
 
+# 在线状态: one Durable Object holding who has the app open + everyone's last-seen.
+[[durable_objects.bindings]]
+name = "PRESENCE"
+class_name = "PresenceDO"
+
+[[migrations]]
+tag = "v10"
+new_sqlite_classes = ["PresenceDO"]
+
 # The group chat room: one Durable Object, the latest 100 messages, hibernating WebSockets.
 [[durable_objects.bindings]]
 name = "CHAT"
 class_name = "ChatRoom"
 
 [[migrations]]
-tag = "v10"
+tag = "v11"
 new_sqlite_classes = ["ChatRoom"]

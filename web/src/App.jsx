@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { SessionProvider, useSession } from './session/SessionContext.jsx';
+import { PresenceProvider } from './session/PresenceContext.jsx';
 import { ToastProvider } from './components/Toast.jsx';
 import { ConfirmProvider } from './components/ConfirmDialog.jsx';
 import Splash from './components/Splash.jsx';
@@ -90,11 +91,13 @@ function Shell() {
 export default function App() {
   return (
     <SessionProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <Shell />
-        </ConfirmProvider>
-      </ToastProvider>
+      <PresenceProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <Shell />
+          </ConfirmProvider>
+        </ToastProvider>
+      </PresenceProvider>
     </SessionProvider>
   );
 }
