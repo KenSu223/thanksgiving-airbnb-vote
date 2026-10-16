@@ -217,7 +217,7 @@ ck('sitting down alone again picks the game up (same colour, same stones, 接着
   && JSON.stringify(resumed.table.moves) === JSON.stringify(reply.table.moves) && resumed.table.turn === 0 && resumed.table.deadline - resumed.table.now > 55000, JSON.stringify(resumed.table).slice(0, 200));
 c.send({ type: 'fresh' });
 const fresh = await c.until(m => m.table.moves.length === 0 && !m.table.resumed, 'fresh');
-ck('重新开一局 throws it away', fresh.table.phase === 'playing' && fresh.table.vsBot);
+ck('重新开一局 starts over (the game you had played in counts as 认输)', fresh.table.phase === 'playing' && fresh.table.vsBot);
 c.send({ type: 'resign' });
 await c.until(m => m.table.phase === 'over', 'C resigned');
 c.send({ type: 'leave' });
@@ -236,7 +236,7 @@ d.send({ type: 'leave' }); e.send({ type: 'leave' });
 c.send({ type: 'watch', room: 1 });
 const cb = await c.until(m => m.boardMe, 'C own place');
 ck('only the top 3 go out', cb.board.length === 3 && cb.board.every((r, i) => i === 0 || r.wins <= cb.board[i - 1].wins), JSON.stringify(cb.board));
-ck('C (0 wins) gets their own place below them', cb.boardMe.name === C.name && cb.boardMe.rank >= 4 && cb.boardMe.wins === 0 && cb.boardMe.games === 1, JSON.stringify(cb.boardMe));
+ck('C (0 wins) gets their own place below them', cb.boardMe.name === C.name && cb.boardMe.rank >= 4 && cb.boardMe.wins === 0 && cb.boardMe.games === 2, JSON.stringify(cb.boardMe)); // 重新开一局 (认输) + 认输
 ck('a spectator not signed in has no own place', s.last().boardMe === null);
 ck('nobody\'s board has a row past the top 3', [a, s, w, c].every(x => x.last().board.length <= 3));
 
