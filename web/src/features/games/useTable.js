@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from '../../session/SessionContext.jsx';
 import { load, save } from '../../lib/storage.js';
+import { setSeated } from '../../lib/seated.js';
 
 // 斗地主 / 掼蛋 / 川麻 共用的连线：牌局都在服务器（每个游戏一个 Durable Object，里面几张桌子），
 // 这里只负责连上、选桌、坐下、站起。和 21 点一样：不在这页、也没坐下就不连，省免费额度；
@@ -66,7 +67,7 @@ export function useTable(active, { path, roomKey, noHint }) {
 
   // sit()（牌桌）、sit({ seat })（派对游戏选座位）或 sit({ host: true })（谁是卧底的主持位）；onClick 直接传进来的点击事件不算
   const sit = extra => ensureName(me => actions.current.sit(me, Number.isInteger(extra?.seat) ? { seat: extra.seat } : extra?.host === true ? { host: true } : null));
-  // 站起来：服务器这时才保存豆子（这局打到一半的话，托管打完再存）
+  // 站起来：服务器存豆子（这局打到一半的话，托管打完再存；一个人带机器人打的，这把存起来下次接着打）
   const standUp = useCallback(() => {
     send({ type: 'leave' });
     wantSeat.current = false; satConfirmed.current = false;
@@ -90,6 +91,11 @@ export function useTable(active, { path, roomKey, noHint }) {
 
   // 登录/换人之后补上身份（围观发表情用；坐下了就不用，sit 本身就证明了）
   useEffect(() => { if (name && token) send({ type: 'identify', name, token }); }, [name, token, send]);
+
+  // 这个游戏的页面开着、你坐在桌上：聊天、投票的悬浮球先收起来（lib/seated.js）
+  const seatedHere = !!(active && st?.seatedAt);
+  useEffect(() => { setSeated(path, seatedHere); }, [path, seatedHere]);
+  useEffect(() => () => setSeated(path, false), [path]);
 
   return { st, live, msg, flash, hint, setHint, room, watch, send, sit, standUp };
 }

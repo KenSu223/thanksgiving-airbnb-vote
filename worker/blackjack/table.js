@@ -6,7 +6,11 @@ import { topFor } from '../lib/board.js';
 
 // The Durable Object: WebSockets in, game state out. Every client gets the
 // whole table after each change. Saved chips live in this object's storage
-// under p:<name>.
+// under p:<name> (written after every hand). The table itself is written to
+// t:1 whenever it changes and read back when the object starts, so a deploy
+// carries the hand on; people who were seated get RECONNECT_MS to come back
+// (the page sits again by itself) before they count as gone.
+const RECONNECT_MS = 90 * 1000;
 export class BlackjackTable {
   constructor(state, env) {
     this.state = state; this.env = env;
@@ -24,8 +28,29 @@ export class BlackjackTable {
     });
   }
   load() {
-    return this.loaded ||= this.state.storage.list({ prefix: 'p:' })
-      .then(m => { for (const [k, v] of m) this.board.set(k.slice(2), v); });
+    return this.loaded ||= (async () => {
+      for (const [k, v] of await this.state.storage.list({ prefix: 'p:' })) this.board.set(k.slice(2), v);
+      const json = await this.state.storage.get('t:1');
+      if (!json) return;
+      this.written = json;
+      if (!this.game.restore(JSON.parse(json))) return;
+      for (const s of this.game.seats) s.connected = true; // until RECONNECT_MS says otherwise
+      this.game.resume();
+      if (this.game.seats.length) this.ghostTimer = setTimeout(() => this.dropGhosts(), RECONNECT_MS);
+    })();
+  }
+  // After a restart: whoever hasn't come back counts as gone (as when a page closes).
+  dropGhosts() {
+    const here = new Set([...this.sockets.values()].filter(Boolean));
+    for (const s of [...this.game.seats]) if (!here.has(s.key)) this.game.disconnect(s.key);
+    this.broadcast();
+  }
+  // Write the table when it changed since it was last written.
+  persist() {
+    const json = JSON.stringify(this.game.snapshot());
+    if (json === this.written) return;
+    this.written = json;
+    this.state.storage.put('t:1', json);
   }
   save(s) {
     const rec = { name: s.name, chips: s.chips, refills: s.refills, updatedAt: Date.now() };
@@ -137,5 +162,9 @@ export class BlackjackTable {
     try { ws.send(JSON.stringify({ type: 'state', table: this.game.view(), you: this.sockets.get(ws), reactions: freshReactions(this.reactions, Date.now()), ...topFor(this.ranking(), this.ident.get(ws)?.key || this.sockets.get(ws)), ...extra })); }
     catch (e) { /* socket already gone; its close handler cleans up */ }
   }
-  broadcast(skip) { for (const ws of this.sockets.keys()) if (ws !== skip) this.send(ws); }
+  // Every change ends here, so it's also where the table gets written.
+  broadcast(skip) {
+    this.persist();
+    for (const ws of this.sockets.keys()) if (ws !== skip) this.send(ws);
+  }
 }

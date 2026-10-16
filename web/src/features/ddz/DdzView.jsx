@@ -3,7 +3,8 @@ import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useTable, useCountdown, secondsLeft } from '../games/useTable.js';
 import { alertsOn, setAlertsOn, unlock, useTurnAlert } from '../games/turnAlert.js';
-import TableFrame, { useFullTable, RoomPicker, PointsBoard } from '../games/TableFrame.jsx';
+import TableFrame, { useFullTable, RoomPicker, PointsBoard, SavedNote } from '../games/TableFrame.jsx';
+import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import PlayingCard from '../games/PlayingCard.jsx';
 import CardHand from '../games/CardHand.jsx';
 import SeatBox, { Said } from './SeatBox.jsx';
@@ -14,6 +15,8 @@ const PHASE = { waiting: '等人开始', bidding: '叫地主中', playing: '对�
 
 export default function DdzView({ active }) {
   const { st, live, msg, hint, setHint, room, watch, send, sit, standUp } = useTable(active, { path: '/api/ddz', roomKey: 'ddzRoom', noHint: '没有管得上的牌，建议不出' });
+  const confirm = useConfirm();
+  const dropParked = async () => { if (await confirm({ title: '不打这把了？', message: '上次存着的这把就扔掉了，不算输赢。', confirmText: '不打了', danger: true })) send({ type: 'end' }); };
   const timer = useCountdown(st, active && live);
   const t = st?.table;
   const me = t ? t.you : -1;
@@ -90,6 +93,8 @@ export default function DdzView({ active }) {
     const auto = mySeat.auto
       ? <button onClick={() => send({ type: 'auto', on: false })} className="gt-btn bg-fuchsia-500 text-white">取消托管</button>
       : t.phase === 'playing' || t.phase === 'bidding' ? <button onClick={() => send({ type: 'auto', on: true })} className="gt-btn bg-white/15 text-white">托管</button> : null;
+    // 存着上次一个人打的那把：接着打，或者扔掉
+    if (t.phase === 'waiting' && t.parked) return <>{deal('▶ 接着打')}<button onClick={dropParked} className="gt-btn bg-white/15 text-white">不打这把了</button>{stand}</>;
     if (t.phase === 'waiting') return <>{deal('开始游戏')}<span className="text-sm text-emerald-100">空位由机器人补上</span>{stand}</>;
     // 再来一局 is in the result banner; full screen also puts it here, where it's always on screen
     if (t.phase === 'result') return full ? <>{deal('🔁 再来一局')}{stand}</> : stand;
@@ -162,12 +167,13 @@ export default function DdzView({ active }) {
             </>
           )}
           {yourTurn}
+          <SavedNote t={t} />
           <div className="flex flex-wrap items-center gap-2 mt-4 dz-controls">{controls()}</div>
           <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 dz-msg">{msg}</p>
           </div>
         </TableFrame>
         <ReactionBar send={send} active={active} />
-        <PointsBoard title="斗地主豆子榜" rows={st?.board || []} me={st?.boardMe}>
+        <PointsBoard title="斗地主豆子榜" rows={st?.board || []} me={st?.boardMe} saveNote="每打完一把就保存豆子">
           规则：一副牌 54 张，三人各 17 张，留 3 张底牌。叫地主 / 抢地主，每抢一次 ×2；炸弹、王炸各 ×2；春天 / 反春 ×2。底分 10 豆，地主一人对两家，输赢都算两份。
           叫地主超时算不叫（抢地主超时算不抢），三家都不叫就重新洗牌。提示：点一次给一种出法，再点换下一种；不拆牌、小的先给，带牌带最小的闲牌，炸弹放最后。
           空位由机器人补上；掉线或连着两次没出牌会自动托管。豆子只是好玩，和分账无关。

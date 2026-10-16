@@ -2,8 +2,8 @@
 // (斗地主, 掼蛋, 川麻). Clients connect over a WebSocket, pick a table to watch,
 // and sit down with their login (name + token from the user list). Each viewer
 // gets their own view of the table after every change. Points (豆子) are saved
-// in this object's storage under p:<name> when a player stands up or
-// disconnects (掼蛋 also after every hand); it never touches the KV write budget.
+// in this object's storage under p:<name> after every hand and when a player
+// stands up or disconnects; it never touches the KV write budget.
 // Every game has its own hall, so its leaderboard is its own; only its top 3
 // go out, plus each viewer's own place (lib/board.js).
 //
@@ -18,8 +18,8 @@
 // who it is (identify) goes straight back to that person's seat, and several
 // tabs of one person can all hold it. `boardSort` orders their leaderboard (by wins).
 //
-// Saving (a game opts in by having snapshot() / restore(snap) / resume(), so
-// far 掼蛋): every table is written to t:<room> whenever it changes and read
+// Saving (a game opts in by having snapshot() / restore(snap) / resume(): 掼蛋,
+// 斗地主, 川麻; games/saving.js): every table is written to t:<room> whenever it changes and read
 // back when the object starts, so a deploy carries on the hand; the people who
 // were seated get RECONNECT_MS to come back (the page re-sits by itself)
 // before they count as gone. A game may also park one person's table
@@ -60,11 +60,14 @@ export class TableHall {
         if (snap) { this.parked.delete(key); this.state.storage.delete('m:' + key); }
         return snap || null;
       },
-      // a parked match, in short: that person's team level and the other team's
+      // a parked table, in short: whether a hand was going, which round, and (掼蛋) that person's
+      // team level and the other team's
       peek: key => {
         const snap = this.parked.get(key);
         const i = snap?.seats?.findIndex(s => s && !s.bot && s.key === key);
-        return i >= 0 ? { us: snap.levels[i % 2], them: snap.levels[1 - (i % 2)], inHand: snap.phase === 'playing' || snap.phase === 'tribute' } : null;
+        if (!(i >= 0)) return null;
+        return { inHand: snap.phase !== 'waiting' && snap.phase !== 'result', round: snap.round,
+          ...(snap.levels ? { us: snap.levels[i % 2], them: snap.levels[1 - (i % 2)] } : {}) };
       },
     }));
     this.saving = typeof this.tables[0].snapshot === 'function';

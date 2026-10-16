@@ -8,11 +8,18 @@
 // three have won or the wall runs out; then 查花猪 / 查大叫 settle the rest.
 // Money moves during the hand (杠 pays at once: 直杠 2 from the discarder,
 // 暗杠 2 and 补杠 1 from everyone still playing) and is booked at the end.
-// Kept apart from sockets and storage so it can be tested on its own.
-// hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat) }.
+// Saved like 掼蛋 (games/saving.js): the room writes the table on every
+// change, so a deploy carries the hand on (换三张, 定缺, a turn or a 碰杠胡 call
+// gets its clock back from the top); 豆子 are saved after every hand; someone
+// alone with bots who leaves mid-hand (before they've 胡'd) has the table parked
+// under them, and it comes back when they next press 开始 alone (or 不打这把了
+// throws it away). Kept apart from sockets and storage so it can be tested on
+// its own. hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat),
+// park?(key, snapshot), unpark?(key), peek?(key) }.
 import { wall, shuffle, sortTiles, counts, take, suitOf, SUITS, idx } from './tiles.js';
 import { isWin, fan, waits, holdsSuit } from './hand.js';
 import { chooseSwap, chooseLack, chooseDiscard, wantPong, wantKong, wantAddKong } from './bot.js';
+import { snapshotOf, restoreInto, parkOut, unparkInto } from '../games/saving.js';
 
 export const MJ = { base: 5, hua: 16, startPoints: 1000, swapMs: 25000, lackMs: 15000, turnMs: 60000, claimMs: 10000, botMs: 800, idleMs: 10 * 60 * 1000 };
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑', '🤖 大橘'];
@@ -70,6 +77,7 @@ export class MahjongGame {
     if (!this.has(key)) return '先坐下';
     const i = this.seatOf(key);
     if (i >= 0) this.touch(i);
+    if (this.phase === 'waiting' && this.solo(key) && unparkInto(this, key)) return null; // the hand they left alone with bots
     if (this.phase === 'waiting') { this.dealer = Math.floor(this.h.rand() * 4); this.deal(); }
     else if (this.phase === 'result') this.nextHand();
     return null;
@@ -78,6 +86,7 @@ export class MahjongGame {
 
   deal() {
     this.clearTimer();
+    this.resumedRound = null;
     for (const w of this.waitlist.splice(0)) { const i = this.seats.findIndex(s => !s || s.bot); if (i >= 0) this.seats[i] = w; }
     this.seats = this.seats.map((s, i) => s || this.bot(i));
     this.reset();
@@ -458,6 +467,7 @@ export class MahjongGame {
     if (this.nextDealer !== null) this.dealer = this.nextDealer;
     this.phase = 'result';
     this.turn = -1; this.stage = null;
+    for (const s of this.seats) if (!s.bot && !s.leaving && s.connected) this.h.save(s); // 豆子 saved after every hand
     this.release();
   }
   // Let go of people who stood up or dropped during the hand. The result stays
@@ -466,7 +476,7 @@ export class MahjongGame {
     this.seats.forEach((s, k) => { if (s && !s.bot && (s.leaving || !s.connected)) { this.h.save(s); this.seats[k] = null; } });
     if (!this.humans().length && !this.waitlist.length) this.clear();
   }
-  clear() { this.clearTimer(); this.reset(); this.seats = [null, null, null, null]; this.phase = 'waiting'; this.turn = -1; }
+  clear() { this.clearTimer(); this.reset(); this.seats = [null, null, null, null]; this.phase = 'waiting'; this.turn = -1; this.resumedRound = null; }
   nextHand() {
     this.release();
     if (this.phase !== 'result') return;
@@ -495,13 +505,20 @@ export class MahjongGame {
     }
   }
 
-  // Stand up. Mid-hand, 托管 plays your tiles to the end, then you're saved.
+  // Stand up. Mid-hand, 托管 plays your tiles to the end, then you're saved —
+  // or, alone with bots and not 胡'd yet, the table is parked under you
+  // (nothing plays on) and comes back when you next press 开始 alone.
+  // Returns a notice, if any.
   leave(key) {
     const w = this.waitlist.findIndex(x => x.key === key);
     if (w >= 0) { this.waitlist.splice(w, 1); return; }
     const i = this.seatOf(key);
     if (i < 0) return;
     const s = this.seats[i];
+    if (this.h.park && this.inHand() && !s.won && this.solo(key)) {
+      parkOut(this, s);
+      return '这把存好了，下次一个人坐下点「开始」就接着打';
+    }
     if (this.inHand()) { s.leaving = true; this.setAuto(key, true); return; }
     this.h.save(s);
     this.seats[i] = null;
@@ -525,8 +542,31 @@ export class MahjongGame {
 
   // What one viewer sees: their own tiles, everyone's melds and discards, the
   // hands of players who've won, all hands once it's over.
+  solo(key) { return this.humans().length === 1 && !this.waitlist.length && this.seatOf(key) >= 0; }
+  // 不打这把了: alone at the table, throw away the hand parked under you.
+  endMatch(key) {
+    const i = this.seatOf(key);
+    if (i < 0) return '先坐下';
+    if (this.phase === 'waiting' && this.solo(key) && this.h.unpark?.(key)) return null;
+    return '没有存着的牌局';
+  }
+
+  // ---- saving (games/saving.js) ----
+  snapshot() { return snapshotOf(this); }
+  restore(snap) { return restoreInto(this, snap); }
+  // After a restore: start the clock that was running, from the top.
+  resume() {
+    if (this.phase === 'swap') this.setTimer(MJ.swapMs, () => this.autoStep());
+    else if (this.phase === 'lack') this.setTimer(MJ.lackMs, () => this.autoStep());
+    else if (this.phase === 'playing' && this.stage === 'claim' && this.claims) {
+      if (this.claimsDone()) this.setTimer(MJ.botMs, () => this.resolveClaims());
+      else this.setTimer(MJ.claimMs, () => this.timeoutClaims());
+    } else if (this.phase === 'playing' && this.turn >= 0) this.setTurn(this.turn);
+  }
+
   view(key) {
     const me = this.seatOf(key), over = this.phase === 'result';
+    const parked = this.phase === 'waiting' && this.solo(key) ? this.h.peek?.(key) || null : null;
     const o = me >= 0 && this.mine(key) === me ? this.options(me) : null;
     const c = this.claims && me >= 0 && this.claims.who[me];
     return {
@@ -556,6 +596,8 @@ export class MahjongGame {
       waiting: this.waitlist.some(w => w.key === key),
       you: me,
       result: this.result,
+      parked, // a hand this viewer left alone with bots, waiting for 开始
+      resumed: this.resumedRound != null && this.resumedRound === this.round,
     };
   }
 }

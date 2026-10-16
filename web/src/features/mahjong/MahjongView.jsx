@@ -3,7 +3,8 @@ import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useTable, useCountdown, secondsLeft } from '../games/useTable.js';
 import { alertsOn, setAlertsOn, unlock, useTurnAlert } from '../games/turnAlert.js';
-import TableFrame, { useFullTable, RoomPicker, PointsBoard } from '../games/TableFrame.jsx';
+import TableFrame, { useFullTable, RoomPicker, PointsBoard, SavedNote } from '../games/TableFrame.jsx';
+import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import MjTile from './MjTile.jsx';
 import { ReactionBar, ReactBubbles, reactionsFor } from '../games/Reactions.jsx';
 import './mahjong.css';
@@ -115,6 +116,8 @@ function MySeatBox({ s, idx, t, timer, reacts }) {
 
 export default function MahjongView({ active }) {
   const { st, live, msg, flash, room, watch, send, sit, standUp } = useTable(active, { path: '/api/mahjong', roomKey: 'mjRoom' });
+  const confirm = useConfirm();
+  const dropParked = async () => { if (await confirm({ title: '不打这把了？', message: '上次存着的这把就扔掉了，不算输赢。', confirmText: '不打了', danger: true })) send({ type: 'end' }); };
   const timer = useCountdown(st, active && live);
   const t = st?.table;
   const me = t ? t.you : -1;
@@ -215,6 +218,8 @@ export default function MahjongView({ active }) {
     const auto = mySeat.auto
       ? <button onClick={() => send({ type: 'auto', on: false })} className="gt-btn bg-fuchsia-500 text-white">取消托管</button>
       : t.phase !== 'waiting' && t.phase !== 'result' && !mySeat.won ? <button onClick={() => send({ type: 'auto', on: true })} className="gt-btn bg-white/15 text-white">托管</button> : null;
+    // 存着上次一个人打的那把：接着打，或者扔掉
+    if (t.phase === 'waiting' && t.parked) return <>{deal('▶ 接着打')}<button onClick={dropParked} className="gt-btn bg-white/15 text-white">不打这把了</button>{stand}</>;
     if (t.phase === 'waiting') return <>{deal('开始游戏')}<span className="text-sm text-emerald-100">空位由机器人补上</span>{stand}</>;
     // 再来一局 is in the result banner; full screen also puts it here, where it's always on screen
     if (t.phase === 'result') return full ? <>{deal('🔁 再来一局')}{stand}</> : stand;
@@ -360,12 +365,13 @@ export default function MahjongView({ active }) {
             </>
           )}
           {banner}
+          <SavedNote t={t} />
           <div className="flex flex-wrap items-center gap-2 mt-4 mj-controls">{controls()}</div>
           <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 mj-msg">{msg}</p>
           </div>
         </TableFrame>
         <ReactionBar send={send} active={active} />
-        <PointsBoard title="川麻豆子榜" rows={st?.board || []} me={st?.boardMe}>
+        <PointsBoard title="川麻豆子榜" rows={st?.board || []} me={st?.boardMe} saveNote="每打完一把就保存豆子">
           规则：血战到底。108 张（万条筒），开局换三张、定缺；只能碰、杠，不能吃；缺的那门要先打完，手里还有就不能胡。
           一炮可以多响；没胡的放过一张能胡的牌，到自己下次摸牌前都不能胡别人打的（过水不胡）。胡了的人退出，剩下的接着打，直到三家胡完或者摸完牌。
           番：平胡 0、对对胡 1、清一色 2、七对 2、带幺九 2、将对 +2、金钩钓 +1、每个根 +1、杠上花 / 杠上炮 / 抢杠 / 海底 +1，不封顶。

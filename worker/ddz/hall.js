@@ -13,6 +13,7 @@ const ACTIONS = {
   pass: (t, key) => t.pass(key),
   hint: (t, key) => ({ reply: { hint: t.hint(key) || [] } }),
   auto: (t, key, m) => { t.setAuto(key, m.on); },
+  end: (t, key) => t.endMatch(key), // 不打这把了 (a parked hand)
 };
 
 export class DdzHall extends TableHall {

@@ -2,8 +2,10 @@
 // in table.js.
 // Rules: 6-deck shoe, dealer stands on soft 17, blackjack pays 3:2, double on
 // the first two cards, no split or insurance. Chips are play money, unrelated
-// to the expense ledger, and are saved only when a player stands up (or
-// disconnects), never per hand.
+// to the expense ledger, and are saved after every hand and when a player
+// stands up (or disconnects).
+import { snapshotOf, restoreInto } from '../games/saving.js';
+
 export const BJ = { decks: 6, seats: 6, minBet: 10, maxBet: 500, startChips: 1000,
   betMs: 15000, turnMs: 30000, resultMs: 5000, idleMs: 10 * 60 * 1000 };
 const BJ_RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -33,6 +35,8 @@ const BJ_IN_HAND = ['playing', 'stood', 'bust', 'blackjack'];
 
 // The table's rules and flow, kept apart from sockets and storage so they can
 // be tested on their own. hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat) }.
+// Saved like the other tables (games/saving.js): snapshot / restore / resume,
+// and everyone's chips are saved after every hand.
 // Seat status: out (not in this hand) -> bet -> playing -> stood | bust | blackjack -> done.
 export class BlackjackGame {
   constructor(hooks) {
@@ -153,6 +157,7 @@ export class BlackjackGame {
       s.result = s.status === 'bust' ? 'bust' : natural && net > 0 ? 'blackjack' : net > 0 ? 'win' : net < 0 ? 'lose' : 'push';
       s.net = net; s.chips += net; s.status = 'done';
     }
+    for (const s of this.seats) if (s.connected && !s.leaving) this.h.save(s); // chips saved after every hand
     this.phase = 'result';
     this.setTimer(BJ.resultMs, () => this.nextRound());
   }
@@ -211,6 +216,18 @@ export class BlackjackGame {
     const idle = this.seats.filter(s => s.status === 'out' && s.activeAt < cutoff);
     idle.forEach(s => this.leave(s.key));
     return idle.map(s => s.key);
+  }
+
+  // ---- saving (games/saving.js) ----
+  snapshot() { return snapshotOf(this); }
+  restore(snap) { return restoreInto(this, snap); }
+  // After a restore: start the clock that was running, from the top.
+  resume() {
+    if (this.phase === 'betting') this.setTimer(BJ.betMs, () => this.deal());
+    else if (this.phase === 'playing') {
+      const s = this.seat(this.turnKey);
+      if (s && s.status === 'playing') this.startTurnTimer(s); else this.nextTurn();
+    } else if (this.phase === 'result') this.setTimer(BJ.resultMs, () => this.nextRound());
   }
 
   view() {

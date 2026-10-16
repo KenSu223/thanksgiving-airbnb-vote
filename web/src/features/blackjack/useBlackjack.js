@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from '../../session/SessionContext.jsx';
+import { setSeated } from '../../lib/seated.js';
 
 // 21 点：牌局都在服务器（Durable Object）里，这里只负责连线。
 // 不在 21 点页面、也没坐下就不连：没人连着时 Durable Object 能休息，省免费额度。
@@ -58,7 +59,7 @@ export function useBlackjack(active) {
   };
 
   const sit = () => ensureName(me => actions.current.sit(me));
-  // 站起来：服务器这时才保存筹码（这局打到一半的话，打完再存）
+  // 站起来：服务器存筹码（这一手打到一半的话，打完再存）
   const standUp = useCallback(() => {
     send({ type: 'leave' });
     wantSeat.current = false; satConfirmed.current = false;
@@ -83,5 +84,9 @@ export function useBlackjack(active) {
   useEffect(() => { if (name && token) send({ type: 'identify', name, token }); }, [name, token, send]);
 
   const me = st?.you ? st.table.seats.find(s => s.key === st.you) : null;
+  // 21 点的页面开着、你坐在桌上：聊天、投票的悬浮球先收起来（lib/seated.js）
+  const seatedHere = !!(active && me);
+  useEffect(() => { setSeated('bj', seatedHere); }, [seatedHere]);
+  useEffect(() => () => setSeated('bj', false), []);
   return { st, live, me, msg, send, sit, standUp };
 }

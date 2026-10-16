@@ -4,6 +4,7 @@ import { useToast } from './Toast.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
 import { api } from '../lib/api.js';
 import { load as loadKey, save as saveKey } from '../lib/storage.js';
+import { useSeated } from '../lib/seated.js';
 
 // 快速投票：独立于所有 tab 的悬浮球 + 投票中心（挂在 App 顶层）。
 // 别人发起投票时，本机每 20 秒对一次列表，发现"没投过的新投票"就
@@ -72,6 +73,8 @@ function PollCard({ poll, busy, onVote, onClose, onDelete, myKey }) {
 
 export default function PollFab() {
   const { name, token } = useSession();
+  // 坐在游戏桌上：球先收起来，新投票也等站起来再弹（不挡出牌的按钮、不打断这一手）
+  const seated = useSeated();
   const toast = useToast();
   const confirm = useConfirm();
   const [polls, setPolls] = useState([]);
@@ -116,11 +119,11 @@ export default function PollFab() {
   // 弹出：最新一支没投过、这台设备没弹过的投票，一次只弹一支；一弹就记下，
   // 之后刷新、重开 app 都不再弹。打开投票中心看过的也算弹过。
   useEffect(() => {
-    if (popupId || creating) return;
+    if (popupId || creating || seated) return;
     if (centerOpen) { if (active.some(p => !seen.has(p.id))) markSeen(active.map(p => p.id)); return; }
     const cand = unvoted.find(p => !seen.has(p.id));
     if (cand) { setPopupId(cand.id); markSeen([cand.id]); }
-  }, [unvoted, active, seen, popupId, centerOpen, creating]); // eslint-disable-line react-hooks/exhaustive-deps -- markSeen is stable in effect
+  }, [unvoted, active, seen, popupId, centerOpen, creating, seated]); // eslint-disable-line react-hooks/exhaustive-deps -- markSeen is stable in effect
   const popup = popupId ? polls.find(p => p.id === popupId) : null;
   useEffect(() => {
     if (popup && (popup.status !== 'active' || popup.myVote)) setPopupId(null);
@@ -183,13 +186,13 @@ export default function PollFab() {
 
   return (
     <>
-      {/* 悬浮球：手机在左下（避开底部导航和游戏桌的 😆），桌面在右下 */}
-      <button onClick={() => setCenterOpen(true)} aria-label="投票中心"
+      {/* 悬浮球：手机在左下（避开底部导航和游戏桌的 😆），桌面在右下；坐在游戏桌上时收起来 */}
+      {!seated && <button onClick={() => setCenterOpen(true)} aria-label="投票中心"
         className="glass-pill fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] left-3 z-40 flex items-center gap-1.5 rounded-full py-2.5 pl-3.5 pr-4 font-bold shadow-[0_10px_28px_-8px_rgba(30,27,75,.45)] transition hover:scale-[1.04] active:scale-95 md:bottom-6 md:left-auto md:right-4">
         <span className="text-lg leading-none">🗳️</span> 投票
         {active.length > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-indigo-600 px-1 text-[11px] font-extrabold text-white">{active.length}</span>}
         {unvoted.length > 0 && <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white bg-rose-500" />}
-      </button>
+      </button>}
 
       {/* 投票中心 */}
       {centerOpen && (
@@ -252,7 +255,7 @@ export default function PollFab() {
       )}
 
       {/* 新投票弹出卡：投了就收回，或者"稍后再说"去中心里投 */}
-      {popup && !centerOpen && (
+      {popup && !centerOpen && !seated && (
         <div className="login-fade fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-[3px]"
           onClick={e => { if (e.target === e.currentTarget) later(); }}>
           <div className="login-pop glass-sheet w-full max-w-sm rounded-[28px] px-5 py-5" role="alertdialog" aria-modal="true" aria-label="新投票">
