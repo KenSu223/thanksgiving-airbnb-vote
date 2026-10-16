@@ -91,7 +91,7 @@ async function handleSendCode(req, env) {
     if (waitS > 0) return j({ ok: false, error: `刚发过，等 ${waitS} 秒再发` });
   }
   const dev = env.EMAIL_DEV_MODE === '1';
-  if (!dev && !env.RESEND_API_KEY) return j({ ok: false, error: '邮件服务还没配置（需要 Ken 加 RESEND_API_KEY），暂时绑不了' });
+  if (!dev && !env.RESEND_API_KEY) return j({ ok: false, error: '邮件还没配置，暂时绑不了' });
   const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
   // Send first, store after: a stored code always matches an email that
   // actually went out (in dev mode nothing is sent and the code comes
@@ -204,7 +204,7 @@ async function handlePinVerify(req, env) {
   const raw = await env.VOTES_KV.get(key);
   const rec = raw ? JSON.parse(raw) : { tries: 0, lockedUntil: 0 };
   if (rec.lockedUntil > Date.now()) {
-    return j({ ok: false, error: `试太多次了，等 ${Math.ceil((rec.lockedUntil - Date.now()) / 60000)} 分钟再试${user.email ? '（也可以用邮箱验证码登录）' : ''}` });
+    return j({ ok: false, error: `试太多次了，${Math.ceil((rec.lockedUntil - Date.now()) / 60000)} 分钟后再试${user.email ? '，或用邮箱验证码' : ''}` });
   }
   const hash = await hashPin(user.pinSalt, String(body.pin || ''));
   if (hash !== user.pinHash) {

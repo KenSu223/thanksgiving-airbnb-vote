@@ -139,7 +139,7 @@ export default function LoginModal() {
                 <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-[26px] shadow-[0_8px_20px_-6px_rgba(99,60,235,.6),inset_0_1px_0_rgba(255,255,255,.4)]">🔑</span>
                 <div>
                   <h3 className="text-xl font-extrabold leading-tight">输入 PIN</h3>
-                  <p className="mt-0.5 text-sm leading-snug text-slate-500"><b>{challenge.name}</b> 设了 4 位 PIN，这个设备还没验过</p>
+                  <p className="mt-0.5 text-sm leading-snug text-slate-500"><b>{challenge.name}</b> · 这个设备还没验过</p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -150,11 +150,11 @@ export default function LoginModal() {
               </div>
               <div className="mt-3 flex items-center justify-between text-sm">
                 <button onClick={() => setChallenge(null)} className="font-medium text-slate-400 transition hover:text-slate-600">← 换个人</button>
-                <span className="text-slate-400">连错 5 次会锁 10 分钟</span>
+                <span className="text-slate-400">连错 5 次锁 10 分钟</span>
               </div>
               {challenge.canCode && (
                 <button onClick={() => setChallenge({ kind: 'login', name: challenge.name, emailHint: challenge.emailHint, canPin: true })}
-                  className="mt-2.5 w-full text-center text-sm font-medium text-indigo-500 transition hover:text-indigo-700">或者用邮箱验证码验证 →</button>
+                  className="mt-2.5 w-full text-center text-sm font-medium text-indigo-500 transition hover:text-indigo-700">用邮箱验证码 →</button>
               )}
               {msg && <p className="mt-2.5 text-sm font-medium text-rose-600">{msg}</p>}
             </div>
@@ -166,13 +166,13 @@ export default function LoginModal() {
                 <h3 className="text-xl font-extrabold leading-tight">输入验证码</h3>
                 <p className="mt-0.5 text-sm leading-snug text-slate-500">
                   {challenge.kind === 'bind'
-                    ? <>给 <b>{challenge.name}</b> 绑邮箱 {challenge.email}，验一下这个邮箱是你的</>
-                    : <><b>{challenge.name}</b> 绑了邮箱，这个设备还没验过</>}
+                    ? <>确认 <b>{challenge.email}</b> 是你的</>
+                    : <><b>{challenge.name}</b> · 这个设备还没验过</>}
                 </p>
               </div>
             </div>
             {sent ? (
-              <p className="mb-3 text-sm text-slate-500">验证码已发到 <b>{challenge.emailHint || challenge.email}</b>，10 分钟内有效</p>
+              <p className="mb-3 text-sm text-slate-500">已发到 <b>{challenge.emailHint || challenge.email}</b> · 10 分钟内有效</p>
             ) : (
               <button onClick={sendForChallenge} className="btn-primary mb-3 w-full rounded-xl px-5 py-2.5 font-bold">发送验证码</button>
             )}
@@ -191,7 +191,7 @@ export default function LoginModal() {
             </div>
             {challenge.kind === 'login' && challenge.canPin && (
               <button onClick={() => setChallenge({ kind: 'pin', name: challenge.name, emailHint: challenge.emailHint, canCode: true })}
-                className="mt-2.5 w-full text-center text-sm font-medium text-indigo-500 transition hover:text-indigo-700">或者用 PIN 验证 →</button>
+                className="mt-2.5 w-full text-center text-sm font-medium text-indigo-500 transition hover:text-indigo-700">用 PIN 验证 →</button>
             )}
             {msg && <p className="mt-2.5 text-sm font-medium text-rose-600">{msg}</p>}
           </div>
@@ -202,7 +202,7 @@ export default function LoginModal() {
               <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-[26px] shadow-[0_8px_20px_-6px_rgba(99,60,235,.6),inset_0_1px_0_rgba(255,255,255,.4)]">👋</span>
               <div>
                 <h3 className="text-xl font-extrabold leading-tight">你是谁？</h3>
-                <p className="mt-0.5 text-sm leading-snug text-slate-500">选一下你的名字就能登录，投票和记账都会记在你名下</p>
+                <p className="mt-0.5 text-sm leading-snug text-slate-500">选你的名字登录</p>
               </div>
             </div>
             {users.length > 0 && (
@@ -230,7 +230,7 @@ export default function LoginModal() {
                 )}
                 {selUser && (
                   <div className="mb-3 rounded-2xl border border-white/60 bg-white/45 px-3.5 py-2.5">
-                    <p className="mb-1 text-xs font-bold tracking-wide text-slate-500">账号保护 · 绑一个就行，两个都绑也可以</p>
+                    <p className="mb-1 text-xs font-bold tracking-wide text-slate-500">账号保护 · 绑一个就行</p>
                     <div className="flex items-center gap-2 py-1.5">
                       <span className="text-sm font-bold text-slate-700">📧 邮箱</span>
                       {selUser.emailBound
@@ -268,7 +268,7 @@ export default function LoginModal() {
                         <button onClick={startPinSet} disabled={pinVal.length !== 4} className="shrink-0 rounded-xl bg-slate-900/90 px-4 py-2.5 font-bold text-white shadow-[0_8px_20px_-6px_rgba(15,23,42,.5)] transition hover:bg-slate-900 active:scale-[.98] disabled:opacity-40">{selUser.pinBound ? '保存新 PIN' : '设置 PIN'}</button>
                       </div>
                     )}
-                    <p className="mt-1.5 text-[11px] leading-snug text-slate-400">绑了以后，换设备登录要验一下是你本人；这台设备验过一次就不用再验了。</p>
+                    <p className="mt-1.5 text-[11px] leading-snug text-slate-400">换设备登录要验证；这台验过就不用了。</p>
                   </div>
                 )}
                 {(!sel || listOpen) && (
@@ -284,7 +284,7 @@ export default function LoginModal() {
                   <button onClick={join} className="shrink-0 rounded-xl bg-slate-900/90 px-5 py-2.5 font-bold text-white shadow-[0_8px_20px_-6px_rgba(15,23,42,.5)] transition hover:bg-slate-900 active:scale-[.98]">加入</button>
                 </div>
                 <input value={newEmail} onChange={e => setNewEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && join()}
-                  className={field + ' mt-2 w-full'} placeholder="邮箱（可选）：绑上后换设备登录要验证码" inputMode="email" maxLength={120} />
+                  className={field + ' mt-2 w-full'} placeholder="邮箱（可选）" inputMode="email" maxLength={120} />
               </>
             )}
             {msg && <p className="mt-2.5 text-sm font-medium text-rose-600">{msg}</p>}

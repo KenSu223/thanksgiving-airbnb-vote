@@ -24,11 +24,11 @@ export default function BindNag() {
           <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-[26px] shadow-[0_8px_20px_-6px_rgba(99,60,235,.6),inset_0_1px_0_rgba(255,255,255,.4)]">🔒</span>
           <div>
             <h3 className="text-xl font-extrabold leading-tight">「{name}」还没加保护</h3>
-            <p className="mt-0.5 text-sm leading-snug text-slate-500">绑定邮箱或者设置一个 4 位 PIN，换设备登录时验一下，别人就没法冒用你的名字了。绑一个就行。</p>
+            <p className="mt-0.5 text-sm leading-snug text-slate-500">绑邮箱或设个 PIN，换设备登录更安全。绑一个就行。</p>
           </div>
         </div>
         <button onClick={bindNow} className="btn-primary mt-5 w-full rounded-xl px-5 py-3 font-bold">绑定邮箱或设置 PIN</button>
-        <button onClick={dismiss} className="mt-2.5 w-full text-center text-sm font-medium text-slate-400 transition hover:text-slate-600">下次再说（下次登录还会提醒你 😏）</button>
+        <button onClick={dismiss} className="mt-2.5 w-full text-center text-sm font-medium text-slate-400 transition hover:text-slate-600">下次再说</button>
       </div>
     </div>
   );
