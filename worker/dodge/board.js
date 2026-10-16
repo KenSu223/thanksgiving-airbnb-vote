@@ -11,11 +11,9 @@
 //   POST /api/dodge/score { name, token, ticket, events }  -> { ticks, by, best, newBest, rank, board, bot, react }
 //   GET  /api/dodge/board                                  -> { board }
 //   GET  /api/dodge/replay?name=                           -> { name, seed, v, events, ticks, by, stats, bot } (top 3 only)
-//   POST /api/dodge/scrub-user { target, byName, byToken }  (PM only; user deletion reaches in)
-//   GET  /api/dodge/grants?name&token               -> { canBot, isAdmin, grants }
-//   POST /api/dodge/grants { name, token, target, on }  (PM only: who may use the autopilot)
+//   POST /scrub-user { target }  (internal only: a retired account, users/retire.js)
 // Times are in ticks: 60 a second.
-import { getUsers, sameName, cleanName, USER_ADMIN } from '../users/users.js';
+import { getUsers, sameName, cleanName } from '../users/users.js';
 import { j } from '../lib/http.js';
 import { HZ, SIM_VERSION } from '../../web/src/features/dodge/sim.js';
 import { badEvents, replay } from '../../web/src/features/dodge/verify.js';
@@ -27,7 +25,7 @@ const OPEN_REPLAYS = 3;
 
 // Records taken off the board by hand, each exactly once ([flag, key]): the
 // flag is kept, so a later record of the same person is never touched.
-// 2026-10-14: PM's 86.2 s was an autopilot run (bot.js); removed on request.
+// 2026-10-14: PM's 86.2 s was an autopilot run; removed on request.
 const REMOVE_ONCE = [['removed:pm:2026-10-14', 'pm']];
 
 const enc = new TextEncoder(), dec = new TextDecoder();
@@ -38,16 +36,12 @@ export class DodgeBoard {
   constructor(state, env) {
     this.state = state; this.env = env;
     this.best = new Map(); // key -> { name, ticks, runs, at, replay?, bot?, react? }
-    this.grants = new Set(); // lower-cased names PM has allowed the autopilot
     this.loaded = null; this.key = null;
   }
   load() {
-    return this.loaded ||= Promise.all([
-      this.state.storage.list({ prefix: 'p:' }),
-      this.state.storage.get('grants'),
-    ]).then(async ([m, g]) => {
+    return this.loaded ||= this.state.storage.list({ prefix: 'p:' }).then(async m => {
         for (const [k, v] of m) this.best.set(k.slice(2), v);
-        if (Array.isArray(g)) for (const k of g) this.grants.add(k);
+        await this.state.storage.delete('grants'); // the old autopilot's grant list (the autopilot is gone)
         for (const [flag, key] of REMOVE_ONCE) {
           if (await this.state.storage.get(flag)) continue;
           const was = this.best.get(key) || null;
@@ -75,33 +69,23 @@ export class DodgeBoard {
     const url = new URL(request.url), path = url.pathname;
     if (request.method === 'GET' && path === '/api/dodge/board') return j({ ok: true, board: this.top() });
     if (request.method === 'GET' && path === '/api/dodge/replay') return this.replayOf(url.searchParams.get('name'));
-    if (request.method === 'GET' && path === '/api/dodge/grants') {
-      return this.grantsView(await this.caller(url.searchParams.get('name'), url.searchParams.get('token')));
-    }
     // always read the body (answering without it trips the runtime), and only use it if it's an object
     const parsed = request.method === 'POST' ? await request.json().catch(() => null) : null;
     const body = parsed && typeof parsed === 'object' ? parsed : {};
     if (request.method === 'POST' && path === '/api/dodge/start') return this.start(body);
     if (request.method === 'POST' && path === '/api/dodge/score') return this.score(body);
-    if (request.method === 'POST' && path === '/api/dodge/scrub-user') return this.scrubUser(body);
-    if (request.method === 'POST' && path === '/api/dodge/grants') return this.setGrant(body);
+    if (request.method === 'POST' && path === '/scrub-user') return this.scrubUser(body);
     return j({ ok: false, error: '这个版本旧了，刷新一下页面' }, 404);
   }
 
-  // User deletion reaches in: drop the person's board record and saved
-  // replay. Called by admin.js through the binding, but this prefix is
-  // publicly routed too, so the caller has to prove it is PM here.
-  async scrubUser({ target, byName, byToken }) {
-    const users = await getUsers(this.env);
-    const by = users.find(u => sameName(u.name, cleanName(byName)));
-    if (!by || !byToken || by.token !== byToken || !sameName(by.name, USER_ADMIN)) {
-      return j({ ok: false, error: '只有 PM 能清排行榜' }, 403);
-    }
+  // A retired account (users/retire.js): drop their board record and saved
+  // replay. Internal only — the public worker routes /api/dodge/* here, never
+  // /scrub-user, so a request on this path came from inside.
+  async scrubUser({ target }) {
     const key = cleanName(target).toLowerCase();
     if (!key) return j({ ok: true, removed: 0 });
     const removed = this.best.delete(key) ? 1 : 0;
     await this.state.storage.delete(['p:' + key, 'r:' + key]);
-    if (this.grants.delete(key)) await this.state.storage.put('grants', [...this.grants]);
     return j({ ok: true, removed });
   }
 
@@ -110,32 +94,6 @@ export class DodgeBoard {
     const users = await getUsers(this.env);
     const user = users.find(u => sameName(u.name, cleanName(name)));
     return user && token && user.token === token ? user : null;
-  }
-
-  // Who may flip the autopilot on: PM always (he's the admin who hands
-  // it out), plus anyone he has granted. Only PM sees the grant list.
-  async grantsView(me) {
-    const users = await getUsers(this.env);
-    const isAdmin = !!me && sameName(me.name, USER_ADMIN);
-    const nameOf = k => { const u = users.find(x => x.name.toLowerCase() === k); return u ? u.name : k; };
-    return j({
-      ok: true,
-      isAdmin,
-      canBot: isAdmin || (!!me && this.grants.has(me.name.toLowerCase())),
-      grants: isAdmin ? [...this.grants].map(nameOf).sort((a, b) => a.localeCompare(b, 'zh-CN')) : [],
-    });
-  }
-
-  async setGrant({ name, token, target, on }) {
-    const me = await this.caller(name, token);
-    if (!me || !sameName(me.name, USER_ADMIN)) return j({ ok: false, error: '只有 PM 能授权外挂' }, 403);
-    const users = await getUsers(this.env);
-    const t = users.find(u => sameName(u.name, cleanName(target)));
-    if (!t) return j({ ok: false, error: '没有这个人' }, 404);
-    const key = t.name.toLowerCase();
-    if (on) this.grants.add(key); else this.grants.delete(key);
-    await this.state.storage.put('grants', [...this.grants]);
-    return this.grantsView(me);
   }
 
   // A ticket is "<payload>.<signature>": who, which seed, when, which game version.

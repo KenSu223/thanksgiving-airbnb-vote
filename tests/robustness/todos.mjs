@@ -1,5 +1,5 @@
-// To-dos (worker/todos): adding and validation, assigning (owner/admin
-// only), picking up a task yourself and dropping it, ticking done, edit /
+// To-dos (worker/todos): adding and validation, assigning (whoever added it
+// only — Aster too, everyone has the same rights), picking up a task yourself and dropping it, ticking done, edit /
 // delete permissions, and a storm of people picking up the same task at
 // once — every one of them must end up on it.
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/todos.mjs
@@ -8,7 +8,7 @@ const post = async (p, o) => (await fetch(B + p, { method: 'POST', body: JSON.st
 const get = async p => (await fetch(B + p)).json();
 let pass = 0, fail = 0;
 const ck = (n, c, x) => { if (c) pass++; else fail++; console.log(c ? 'OK  ' : 'FAIL', n, c ? '' : JSON.stringify(x ?? '').slice(0, 300)); };
-// test accounts get a Todo prefix so other suites' users don't collide; Aster is the admin
+// test accounts get a Todo prefix so other suites' users don't collide; Aster keeps her real name (she used to be the admin)
 const N = n => (n === 'Aster' ? n : 'Todo' + n);
 const u = {};
 for (const n of ['Aster', 'Ken', 'Peter', 'Nan', 'Cindy', 'Shandra', 'Gu', 'Song']) u[n] = (await post('/api/login', { name: N(n) })).user;
@@ -33,7 +33,9 @@ ck('non-owner cannot assign', r.ok === false, r);
 r = await post('/api/todos/assign', { ...as('Ken'), id: t1.id, assignees: [N('Cindy'), N('Peter')] });
 ck('owner assigns', r.ok && find(r, t1.id).assignees.length === 2, find(r, t1.id));
 r = await post('/api/todos/assign', { ...as('Aster'), id: t1.id, assignees: [N('Shandra')] });
-ck('admin assigns', r.ok && JSON.stringify(find(r, t1.id).assignees) === JSON.stringify([N('Shandra')]), find(r, t1.id));
+ck('Aster cannot assign a task she did not add', r.ok === false, r);
+r = await post('/api/todos/edit', { ...as('Aster'), id: t1.id, title: 'mine now' });
+ck('Aster cannot edit a task she did not add', r.ok === false, r);
 r = await post('/api/todos/edit', { ...as('Peter'), id: t1.id, title: 'hijack' });
 ck('non-owner cannot edit', r.ok === false, r);
 r = await post('/api/todos/edit', { ...as('Ken'), id: t1.id, title: '买 Costco 早餐 + 咖啡', due: '' });

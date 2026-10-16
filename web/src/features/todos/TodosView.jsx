@@ -21,7 +21,6 @@ export default function TodosView({ active }) {
   const [items, setItems] = useState(null);
   const [filter, setFilter] = useState('all');
   const [busy, setBusy] = useState(false);
-  const isAdmin = String(name).toLowerCase() === 'aster';
   const people = users.map(u => u.name);
 
   const load = useCallback(async () => {
@@ -88,7 +87,7 @@ export default function TodosView({ active }) {
               <section key={p.id}>
                 <h2 className="td-phase">{p.name}<span className="td-phase-n">{list.filter(t => !t.done).length || ''}</span><span className="td-phase-hint">{p.hint}</span></h2>
                 <ul className="td-list glass-card rounded-2xl">
-                  {list.map(t => <TodoItem key={t.id + (t.at || '')} t={t} me={name} isAdmin={isAdmin} people={people} today={today} busy={busy} act={act} />)}
+                  {list.map(t => <TodoItem key={t.id + (t.at || '')} t={t} me={name} people={people} today={today} busy={busy} act={act} />)}
                 </ul>
               </section>
             );

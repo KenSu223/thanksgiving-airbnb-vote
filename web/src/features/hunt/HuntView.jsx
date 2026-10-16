@@ -28,7 +28,6 @@ export default function HuntView({ trip, active }) {
   const confirm = useConfirm();
   const { listings, refresh, patch, vote: voteInfo, setVote, loaded } = useListings(trip, token);
   const closed = !!voteInfo && !voteInfo.open;
-  const isAdmin = String(name).toLowerCase() === 'aster';
   // 页面开着的时候到了截止时间：重新拉一次，切到结果面板
   useEffect(() => {
     if (!voteInfo || !voteInfo.open || !voteInfo.voteEndsAt) return;
@@ -126,7 +125,7 @@ export default function HuntView({ trip, active }) {
   }
 
   async function choose(l) {
-    if (!await confirm({ title: '就定这间？', message: '把「' + (l.title || '未命名房源') + '」定为 ' + T.date + ' 的房子？', confirmText: '就定这间' })) return;
+    if (!await confirm({ title: '就定这间？', message: '把「' + (l.title || '未命名房源') + '」定为 ' + T.date + ' 的房子？会写明是你改选的。', confirmText: '就定这间' })) return;
     ensureName(async me => {
       const r = await api('/api/decision', 'POST', { trip, name: me.name, token: me.token, listingId: l.id });
       if (r.ok) { setVote(r.vote); window.scrollTo({ top: 0, behavior: 'smooth' }); } else toast(r.error || '没成功');
@@ -192,7 +191,7 @@ export default function HuntView({ trip, active }) {
             {sec.title && <h2 className="kind-heading">{sec.title}<span className="kind-heading-n">{sec.items.length}</span><span className="kind-heading-sub">{sec.sub}</span></h2>}
             <ListingGrid items={sec.items} T={T} token={token} glowId={glowId} popId={popId} anchorId={anchorId}
               emptyText={emptyText}
-              zones={zoneNames} closed={closed} chosenId={voteInfo?.chosenId} onChoose={closed && isAdmin ? choose : null}
+              zones={zoneNames} closed={closed} chosenId={voteInfo?.chosenId} onChoose={closed ? choose : null}
               onVote={vote} onRemove={remove} onSetArea={setArea} onSetRate={setRate} onHover={setHotId} />
           </div>
         ))}

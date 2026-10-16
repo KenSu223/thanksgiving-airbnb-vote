@@ -1,7 +1,8 @@
 // Car seats and luggage (worker/cars): first come, first served — two
 // people tapping the same seat get exactly one winner, nobody ever holds
-// two seats (even in a storm of everyone grabbing seats at once), only the
-// admin acts for others, and luggage counts are capped to the presets.
+// two seats (even in a storm of everyone grabbing seats at once), nobody acts
+// for anyone else — Aster included (everyone has the same rights) — anyone
+// can name a car, and luggage counts are capped to the presets.
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/cars.mjs
 const B = process.env.TEST_BASE || 'http://localhost:8791';
 const post = async (p, o) => (await fetch(B + p, { method: 'POST', body: JSON.stringify(o) })).json();
@@ -9,7 +10,7 @@ const get = async p => (await fetch(B + p)).json();
 let pass = 0, fail = 0;
 const ck = (n, c, x) => { if (c) pass++; else fail++; console.log(c ? 'OK  ' : 'FAIL', n, c ? '' : JSON.stringify(x ?? '').slice(0, 300)); };
 const u = {};
-// test accounts get a Car prefix so other suites' users don't collide; Aster is the admin
+// test accounts get a Car prefix so other suites' users don't collide; Aster keeps her real name (she used to be the admin)
 const N = n => (n === 'Aster' ? n : 'Car' + n);
 for (const n of ['Aster', 'Ken', 'Peter', 'Nan', 'Cindy', 'Shandra']) u[n] = (await post('/api/login', { name: N(n) })).user;
 const as = n => ({ name: u[n].name, token: u[n].token });
@@ -32,19 +33,20 @@ ck('Ken moves: one seat per person', seatOf(r, N('Ken')) === 'c:rearMiddle' && !
 r = await post('/api/cars/seat', { ...as('Ken'), seat: null });
 ck('Ken gives up seat', !seatOf(r, N('Ken')), r.cars);
 r = await post('/api/cars/seat', { ...as('Ken'), car: 'a', seat: 'front', who: N('Cindy') });
-ck('non-admin cannot seat someone else', !r.ok, r);
+ck('nobody can seat someone else', !r.ok, r);
 r = await post('/api/cars/seat', { ...as('Aster'), car: 'a', seat: 'front', who: N('Cindy') });
-ck('admin seats Cindy', r.ok && seatOf(r, N('Cindy')) === 'a:front', r);
-r = await post('/api/cars/clear', { ...as('Ken'), car: 'a', seat: 'front' });
-ck('non-admin cannot clear', !r.ok, r);
-r = await post('/api/cars/clear', { ...as('Aster'), car: 'a', seat: 'front' });
-ck('admin clears', r.ok && !seatOf(r, N('Cindy')), r);
+ck('Aster cannot seat someone else either', !r.ok && !seatOf(await get('/api/cars'), N('Cindy')), r);
+await post('/api/cars/seat', { ...as('Cindy'), car: 'a', seat: 'front' });
+const clear = await fetch(B + '/api/cars/clear', { method: 'POST', body: JSON.stringify({ ...as('Aster'), car: 'a', seat: 'front' }) }).then(x => x.text());
+ck('nobody can clear another person seat any more', !/"ok":true/.test(clear) && seatOf(await get('/api/cars'), N('Cindy')) === 'a:front', clear.slice(0, 120));
 r = await post('/api/cars/bags', { ...as('Nan'), bags: { large: 2, backpack: 1, skis: 99, bogus: 3 } });
 ck('bags saved, capped, unknown dropped', r.ok && JSON.stringify(r.bags[N('Nan')]) === JSON.stringify({ backpack: 1, large: 2, skis: 6 }), r.bags);
 r = await post('/api/cars/bags', { ...as('Nan'), bags: {} });
 ck('bags cleared', r.ok && !r.bags[N('Nan')], r.bags);
-r = await post('/api/cars/label', { ...as('Aster'), car: 'b', label: 'Sixt · 黑色' });
-ck('admin labels car', r.ok && r.cars[1].label === 'Sixt · 黑色', r.cars);
+r = await post('/api/cars/label', { ...as('Ken'), car: 'b', label: 'Sixt · 黑色' });
+ck('anyone names a car', r.ok && r.cars[1].label === 'Sixt · 黑色', r.cars);
+r = await post('/api/cars/label', { car: 'c', label: 'nope' });
+ck('naming a car needs a login', !r.ok, r);
 r = await post('/api/cars/seat', { ...as('Ken'), car: 'z', seat: 'driver' });
 ck('bad car refused', !r.ok, r);
 // fill the 15 seats in parallel with 6 people each racing for random seats: no one ends up in two seats

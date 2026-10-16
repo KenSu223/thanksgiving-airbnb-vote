@@ -23,13 +23,6 @@ export const nameKey = v => squashName(v).trim().toLowerCase();
 const USERS_KEY = 'users:v1';
 export const sameName = (a, b) => nameKey(a) === nameKey(b);
 
-// User management (deleting accounts) is restricted to this account.
-// PM's token is a real credential — PM is email-bound, so the token is
-// not in the public user list — and the delete endpoint checks the
-// caller's token against it, so the permission can't be borrowed by
-// picking a name from the list.
-export const USER_ADMIN = 'pm';
-
 // First run: build the list from everyone who already voted or was added
 // as a splitwise member, reusing the token from their votes.
 async function buildUsers(env) {
@@ -163,7 +156,7 @@ async function handleMemberAdd(req, env) {
 }
 
 export const routes = {
-  'GET /api/users': async (req, env) => j({ ok: true, users: publicUsers(await getUsers(env)) }),
+  // GET /api/users (the member list) is in retire.js: it also takes retired accounts off first.
   'POST /api/login': handleLogin,
   'POST /api/member': handleMemberAdd,
 };
