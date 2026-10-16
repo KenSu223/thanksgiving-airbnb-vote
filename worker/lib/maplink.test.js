@@ -46,6 +46,7 @@ test('Apple Maps and non-Latin names', () => {
 test("Google's hotel price label", () => {
   assert.deepEqual(readRateLabel('$79 for dates Nov 24 – 25, Hyatt House Denver/Downtown DEAL 23% less than usual'), { nightly: 79, dates: 'Nov 24 – 25', hotel: 'Hyatt House Denver/Downtown' });
   assert.deepEqual(readRateLabel('$1,204 for dates Nov 30 – Dec 1, The Ritz-Carlton, Denver GREAT DEAL 30% less than usual'), { nightly: 1204, dates: 'Nov 30 – Dec 1', hotel: 'The Ritz-Carlton, Denver' });
+  assert.deepEqual(readRateLabel('$86 for dates Nov 26\u2009–\u200929, Hyatt House Denver/Downtown'), { nightly: 86, dates: 'Nov 26 – 29', hotel: 'Hyatt House Denver/Downtown' }, 'thin spaces become plain ones');
   assert.equal(readRateLabel('Original price: $115'), null);
   assert.equal(readRateLabel('$3 for dates Nov 24 – 25, Somewhere'), null, 'not a hotel rate');
   const page = '<div aria-label="Original price: $115"></div><span aria-label="$79 for dates Nov 24 &ndash; 25, Hyatt House Denver/Downtown DEAL 23% less than usual"></span><b aria-label="$127 for dates Nov 2 – 3, "></b>';

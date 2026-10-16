@@ -51,7 +51,8 @@ export function readRateLabel(label) {
   if (!m) return null;
   const nightly = Number(m[1].replace(/,/g, ''));
   if (!(nightly >= 20 && nightly <= 5000)) return null;
-  return { nightly, dates: m[2].trim(), hotel: m[3].replace(/\s+(?:(?:GREAT|GOOD)\s+)?DEAL\b.*$/, '').trim() };
+  // Google now puts thin spaces around the dash ("Nov 26\u2009–\u200929"): keep plain ones
+  return { nightly, dates: m[2].replace(/\s+/g, ' ').trim(), hotel: m[3].replace(/\s+(?:(?:GREAT|GOOD)\s+)?DEAL\b.*$/, '').trim() };
 }
 // Every price label in a piece of the page, in order.
 export function rateLabels(html) {
