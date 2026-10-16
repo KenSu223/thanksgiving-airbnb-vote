@@ -1,14 +1,15 @@
-// To-dos (worker/todos): adding and validation, assigning (owner/admin
-// only), picking up a task yourself and dropping it, ticking done, edit /
-// delete permissions, and a storm of people picking up the same task at
-// once — every one of them must end up on it.
+// To-dos (worker/todos): adding and validation, assigning (whoever added it
+// only — Aster too, everyone has the same rights), picking up a task yourself and dropping it, ticking done, edit /
+// delete permissions, comments and replies (a reply to a reply joins the
+// thread; only your own can go; a comment with replies leaves a marker), and a
+// storm of people picking up the same task at once — every one of them must end up on it.
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/todos.mjs
 const B = process.env.TEST_BASE || 'http://localhost:8791';
 const post = async (p, o) => (await fetch(B + p, { method: 'POST', body: JSON.stringify(o) })).json();
 const get = async p => (await fetch(B + p)).json();
 let pass = 0, fail = 0;
 const ck = (n, c, x) => { if (c) pass++; else fail++; console.log(c ? 'OK  ' : 'FAIL', n, c ? '' : JSON.stringify(x ?? '').slice(0, 300)); };
-// test accounts get a Todo prefix so other suites' users don't collide; Aster is the admin
+// test accounts get a Todo prefix so other suites' users don't collide; Aster keeps her real name (she used to be the admin)
 const N = n => (n === 'Aster' ? n : 'Todo' + n);
 const u = {};
 for (const n of ['Aster', 'Ken', 'Peter', 'Nan', 'Cindy', 'Shandra', 'Gu', 'Song']) u[n] = (await post('/api/login', { name: N(n) })).user;
@@ -33,7 +34,9 @@ ck('non-owner cannot assign', r.ok === false, r);
 r = await post('/api/todos/assign', { ...as('Ken'), id: t1.id, assignees: [N('Cindy'), N('Peter')] });
 ck('owner assigns', r.ok && find(r, t1.id).assignees.length === 2, find(r, t1.id));
 r = await post('/api/todos/assign', { ...as('Aster'), id: t1.id, assignees: [N('Shandra')] });
-ck('admin assigns', r.ok && JSON.stringify(find(r, t1.id).assignees) === JSON.stringify([N('Shandra')]), find(r, t1.id));
+ck('Aster cannot assign a task she did not add', r.ok === false, r);
+r = await post('/api/todos/edit', { ...as('Aster'), id: t1.id, title: 'mine now' });
+ck('Aster cannot edit a task she did not add', r.ok === false, r);
 r = await post('/api/todos/edit', { ...as('Peter'), id: t1.id, title: 'hijack' });
 ck('non-owner cannot edit', r.ok === false, r);
 r = await post('/api/todos/edit', { ...as('Ken'), id: t1.id, title: '买 Costco 早餐 + 咖啡', due: '' });
@@ -55,5 +58,38 @@ r = await post('/api/todos/delete', { ...as('Song'), id: t2.id });
 ck('owner deletes', r.ok && !find(r, t2.id), r.error);
 r = await post('/api/todos/claim', { ...as('Ken'), id: 'gone', claim: true });
 ck('missing task', r.ok === false, r);
+// ---- comments ----
+r = await post('/api/todos', { ...as('Ken'), title: '订餐厅' });
+const t3 = r.items.find(t => t.title === '订餐厅');
+r = await post('/api/todos/comment', { id: t3.id, text: 'hi' });
+ck('commenting needs a login', r.ok === false, r);
+r = await post('/api/todos/comment', { ...as('Nan'), id: t3.id, text: '   ' });
+ck('an empty comment is refused', r.ok === false, r);
+r = await post('/api/todos/comment', { ...as('Nan'), id: t3.id, text: '订哪家？' });
+const c1 = find(r, t3.id).comments[0];
+ck('anyone can comment', r.ok && c1.by === N('Nan') && c1.text === '订哪家？' && c1.replyTo === null, find(r, t3.id).comments);
+r = await post('/api/todos/comment', { ...as('Ken'), id: t3.id, text: '那家烤肉', replyTo: c1.id });
+const c2 = find(r, t3.id).comments.find(c => c.text === '那家烤肉');
+ck('a reply hangs under the comment', r.ok && c2.replyTo === c1.id && c2.replyToName === N('Nan'), c2);
+r = await post('/api/todos/comment', { ...as('Gu'), id: t3.id, text: '+1', replyTo: c2.id });
+const c3 = find(r, t3.id).comments.find(c => c.text === '+1');
+ck('a reply to a reply joins the same thread, says whom it answers', r.ok && c3.replyTo === c1.id && c3.replyToName === N('Ken'), c3);
+r = await post('/api/todos/comment', { ...as('Gu'), id: t3.id, text: 'x', replyTo: 'nope' });
+ck('replying to a missing comment is refused', r.ok === false, r);
+r = await post('/api/todos/comment', { ...as('Gu'), id: t3.id, text: 'y'.repeat(900) });
+ck('a long comment is cut to 500', r.ok && find(r, t3.id).comments.some(c => c.text.length === 500), r.error);
+r = await post('/api/todos/comment-delete', { ...as('Ken'), id: t3.id, commentId: c1.id });
+ck("you can't delete someone else's comment (Aster neither)", r.ok === false && !!find(r, t3.id).comments.find(c => c.id === c1.id && !c.deleted), r.error);
+r = await post('/api/todos/comment-delete', { ...as('Aster'), id: t3.id, commentId: c1.id });
+ck('not even Aster', r.ok === false, r.error);
+r = await post('/api/todos/comment-delete', { ...as('Nan'), id: t3.id, commentId: c1.id });
+const gone1 = find(r, t3.id).comments.find(c => c.id === c1.id);
+ck('deleting a comment with replies leaves a marker, replies stay', r.ok && gone1.deleted && gone1.text === '' && gone1.by === '' && find(r, t3.id).comments.some(c => c.id === c2.id), find(r, t3.id).comments);
+r = await post('/api/todos/comment-delete', { ...as('Ken'), id: t3.id, commentId: c2.id });
+r = await post('/api/todos/comment-delete', { ...as('Gu'), id: t3.id, commentId: c3.id });
+ck('when the last reply goes, the marker goes too', r.ok && !find(r, t3.id).comments.some(c => c.id === c1.id), find(r, t3.id).comments);
+r = await get('/api/todos');
+ck('comments come back on a fresh load', find(r, t3.id).comments.length === 1 && find(r, t3.id).comments[0].text.length === 500);
+
 console.log(`TODOS: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

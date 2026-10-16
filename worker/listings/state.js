@@ -45,7 +45,7 @@ export async function updateState(env, trip, fn) {
 }
 
 // Remove one person's footprint from every trip (used by the thorough
-// user deletion in users/admin.js): their listing votes, their name in
+// user deletion in users/retire.js): their listing votes, their name in
 // the members lists, and their part in the legacy per-trip expenses.
 // Votes match on the account's token, or on the name for votes cast
 // before the device adopted the account. Returns votes removed.

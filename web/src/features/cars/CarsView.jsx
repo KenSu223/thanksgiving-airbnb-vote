@@ -17,9 +17,7 @@ export default function CarsView({ active }) {
   const confirm = useConfirm();
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [helping, setHelping] = useState(''); // 管理员帮别人选座、填行李
-  const isAdmin = String(name).toLowerCase() === 'aster';
-  const actingFor = (isAdmin && helping) || name;
+  const actingFor = name; // 每个人只管自己的座位和行李
 
   const load = useCallback(async () => {
     try { const r = await api('/api/cars'); if (r.ok) setData(r); } catch (e) {}
@@ -43,24 +41,21 @@ export default function CarsView({ active }) {
 
   function onSeat(car, seat, who) {
     ensureName(async me => {
-      const forWho = (isAdmin && helping) || me.name;
-      const helpingOther = forWho !== me.name;
+      const forWho = me.name;
       const where = carName(car, data.cars.indexOf(car)) + ' 的' + seatName(seat);
       if (who && who === forWho) {
-        if (!await confirm({ title: '让出这个座位？', message: (helpingOther ? forWho + ' ' : '你') + '会离开' + where + '，别人就可以坐了。', confirmText: '让出' })) return;
-        post('/api/cars/seat', { seat: null, ...(helpingOther ? { who: forWho } : {}) }, me);
+        if (!await confirm({ title: '让出这个座位？', message: '你会离开' + where + '，别人就可以坐了。', confirmText: '让出' })) return;
+        post('/api/cars/seat', { seat: null }, me);
       } else if (who) {
-        if (!isAdmin) { toast(who + ' 已经坐在' + where + '了'); return; }
-        if (!await confirm({ title: '清空这个座位？', message: '把 ' + who + ' 从' + where + '挪走。', confirmText: '清空', danger: true })) return;
-        post('/api/cars/clear', { car: car.id, seat }, me);
+        toast(who + ' 已经坐在' + where + '了');
       } else {
-        const ok = await post('/api/cars/seat', { car: car.id, seat, ...(helpingOther ? { who: forWho } : {}) }, me);
-        if (ok) toast((helpingOther ? forWho + ' ' : '') + '坐好了：' + where + (seat === 'driver' ? ' · 记得带驾照 🪪' : ''));
+        const ok = await post('/api/cars/seat', { car: car.id, seat }, me);
+        if (ok) toast('坐好了：' + where + (seat === 'driver' ? ' · 记得带驾照 🪪' : ''));
       }
     });
   }
 
-  // 管理员给车起名（租车公司、颜色、车牌…），空着就用默认的
+  // 谁都可以给车起名（租车公司、颜色、车牌…），空着就用默认的
   function onLabel(car, label) {
     if (label !== (car.label || '')) post('/api/cars/label', { car: car.id, label }, { name, token });
   }
@@ -75,14 +70,14 @@ export default function CarsView({ active }) {
   const bags = draft || mineBags;
   function bump(id, d) {
     ensureName(me => {
-      const forWho = (isAdmin && helping) || me.name;
+      const forWho = me.name;
       const cur = draftRef.current || (data && data.bags[forWho]) || {};
       const next = { ...cur, [id]: Math.max(0, Math.min(6, (cur[id] || 0) + d)) };
       draftRef.current = next;
       setDraft(next);
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
-        await post('/api/cars/bags', { bags: next, ...(forWho !== me.name ? { who: forWho } : {}) }, me);
+        await post('/api/cars/bags', { bags: next }, me);
         if (draftRef.current === next) { draftRef.current = null; setDraft(null); }
       }, 600);
     });
@@ -109,19 +104,11 @@ export default function CarsView({ active }) {
             : <span className="text-slate-600">登录后点空位就能坐下，先到先得</span>}
         </div>
         <span className="text-sm text-slate-400">还剩 <b className="text-slate-700 tabular-nums">{free}</b> 个空位</span>
-        {isAdmin && (
-          <label className="ml-auto text-sm text-slate-500 flex items-center gap-2">帮谁选
-            <select value={helping} onChange={e => setHelping(e.target.value)} className="glass-pill rounded-full px-3 py-1 text-sm">
-              <option value="">我自己</option>
-              {data.people.filter(p => p !== name).map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </label>
-        )}
       </section>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {data.cars.map((c, i) => (
-          <CarCard key={c.id} car={c} index={i} me={name} actingFor={actingFor} isAdmin={isAdmin} bags={allBags} busy={busy} onSeat={onSeat} onLabel={onLabel} />
+          <CarCard key={c.id} car={c} index={i} me={name} actingFor={actingFor} bags={allBags} busy={busy} onSeat={onSeat} onLabel={onLabel} />
         ))}
       </section>
 

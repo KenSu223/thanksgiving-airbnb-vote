@@ -21,7 +21,6 @@ export default function TodosView({ active }) {
   const [items, setItems] = useState(null);
   const [filter, setFilter] = useState('all');
   const [busy, setBusy] = useState(false);
-  const isAdmin = String(name).toLowerCase() === 'aster';
   const people = users.map(u => u.name);
 
   const load = useCallback(async () => {
@@ -34,11 +33,12 @@ export default function TodosView({ active }) {
     return () => clearInterval(id);
   }, [active, load]);
 
-  // 所有改动走这里：没登录先登录；opts.confirm 是要删的标题（先确认）
+  // 所有改动走这里：没登录先登录；opts.confirm 是要删的标题（先确认），opts.confirmComment 删评论前确认
   function act(path, payload, opts = {}) {
     return new Promise(resolve => {
       ensureName(async me => {
         if (opts.confirm && !await confirm({ title: '删掉这条待办？', message: '「' + opts.confirm + '」删掉后大家都看不到了。', confirmText: '删除', danger: true })) return resolve(false);
+        if (opts.confirmComment && !await confirm({ title: '删掉这条评论？', message: '删掉后大家都看不到了。', confirmText: '删除', danger: true })) return resolve(false);
         setBusy(true);
         try {
           const r = await api(path, 'POST', { name: me.name, token: me.token, ...payload });
@@ -88,7 +88,7 @@ export default function TodosView({ active }) {
               <section key={p.id}>
                 <h2 className="td-phase">{p.name}<span className="td-phase-n">{list.filter(t => !t.done).length || ''}</span><span className="td-phase-hint">{p.hint}</span></h2>
                 <ul className="td-list glass-card rounded-2xl">
-                  {list.map(t => <TodoItem key={t.id + (t.at || '')} t={t} me={name} isAdmin={isAdmin} people={people} today={today} busy={busy} act={act} />)}
+                  {list.map(t => <TodoItem key={t.id + (t.at || '')} t={t} me={name} people={people} today={today} busy={busy} act={act} />)}
                 </ul>
               </section>
             );

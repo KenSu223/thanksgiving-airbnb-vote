@@ -16,7 +16,7 @@
 // page reload must not cost anyone their seat mid-game, so a socket that proves
 // who it is (identify) goes straight back to that person's seat, and several
 // tabs of one person can all hold it. `boardSort` orders their leaderboard (by wins).
-import { getUsers, sameName, cleanName, USER_ADMIN } from '../users/users.js';
+import { getUsers, sameName, cleanName } from '../users/users.js';
 import { noteReaction, freshReactions } from './reactions.js';
 import { j } from '../lib/http.js';
 
@@ -51,17 +51,12 @@ export class TableHall {
     this.board.set(s.key, rec);
     this.state.storage.put('p:' + s.key, rec);
   }
-  // Internal, called by POST /api/users/delete through the object
-  // binding — the public worker never routes this path. The caller
-  // still has to prove it is PM, in case routing ever changes.
-  // Removes the deleted person's saved points (their 豆子榜 row).
+  // Internal only: a retired account's records (users/retire.js) through the
+  // object binding. The public worker routes only /api/<game> here, never
+  // /scrub-user, so a request on this path came from inside.
+  // Removes the person's saved points (their 豆子榜 row).
   async scrubUser(request) {
     const body = await request.json().catch(() => null) || {};
-    const users = await getUsers(this.env);
-    const by = users.find(u => sameName(u.name, cleanName(body.byName)));
-    if (!by || !body.byToken || by.token !== body.byToken || !sameName(by.name, USER_ADMIN)) {
-      return j({ ok: false, error: '只有 PM 能清游戏记录' }, 403);
-    }
     await this.load();
     const key = cleanName(body.target).toLowerCase();
     if (!key) return j({ ok: true, removed: 0 });
@@ -77,7 +72,7 @@ export class TableHall {
   clampRoom(r, fallback = 1) { return Math.min(this.rooms, Math.max(1, Number(r) || fallback)); }
 
   async fetch(request) {
-    if (request.method === 'POST' && new URL(request.url).pathname.endsWith('/scrub-user')) return this.scrubUser(request);
+    if (request.method === 'POST' && new URL(request.url).pathname === '/scrub-user') return this.scrubUser(request);
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a WebSocket', { status: 426 });
     await this.load();
     const room = this.clampRoom(new URL(request.url).searchParams.get('room'));
@@ -152,7 +147,7 @@ export class TableHall {
         if (!this.rejoin) for (const [other, o] of this.sockets) if (other !== ws && o.key === key) o.key = null; // a newer tab takes the seat
         err = here.sit(key, user.name, this.board.get(key), m);
         info.room = room;
-        info.key = err ? null : key;
+        info.key = err && !here.has(key) ? null : key; // a refused sit / seat change leaves you where you were
         if (!err) info.as = { key, name: user.name }; // sitting proves identity too (for reactions)
       }
     } else if (!info.key) {

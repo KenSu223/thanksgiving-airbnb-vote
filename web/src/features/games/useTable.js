@@ -64,8 +64,8 @@ export function useTable(active, { path, roomKey, noHint }) {
     else { actions.current.extra = extra; actions.current.connect(); }
   };
 
-  // sit()（牌桌）或 sit({ seat })（派对游戏选座位）；onClick 直接传进来的点击事件不算
-  const sit = extra => ensureName(me => actions.current.sit(me, Number.isInteger(extra?.seat) ? { seat: extra.seat } : null));
+  // sit()（牌桌）、sit({ seat })（派对游戏选座位）或 sit({ host: true })（谁是卧底的主持位）；onClick 直接传进来的点击事件不算
+  const sit = extra => ensureName(me => actions.current.sit(me, Number.isInteger(extra?.seat) ? { seat: extra.seat } : extra?.host === true ? { host: true } : null));
   // 站起来：服务器这时才保存豆子（这局打到一半的话，托管打完再存）
   const standUp = useCallback(() => {
     send({ type: 'leave' });

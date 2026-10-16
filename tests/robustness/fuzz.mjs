@@ -89,7 +89,7 @@ const postPaths = ['/api/login', '/api/vote', '/api/add', '/api/add-manual', '/a
   '/api/food/add', '/api/food/vote', '/api/food/remove', '/api/food/photos', '/api/activity-add', '/api/activity-vote',
   '/api/activity-remove', '/api/activity-place', '/api/activity-image', '/api/expense', '/api/expense-update',
   '/api/expense-remove', '/api/flights', '/api/flights/pickup', '/api/angel/prefs',
-  '/api/angel/exclude', '/api/angel/draw', '/api/angel/admin', '/api/decision', '/api/booking',
+  '/api/angel/exclude', '/api/angel/draw', '/api/decision', '/api/booking',
   '/api/zones', '/api/area', '/api/prices', '/api/enrich'];
 for (const p of postPaths) {
   for (const [label, raw, ct] of [
@@ -139,7 +139,7 @@ for (const e of exList.json.expenses.filter(x => String(x.description).startsWit
 
 // --- protected endpoints reject strangers
 check('angel prefs without login', isErr(await J('POST', '/api/angel/prefs', { name: 'NotARealPerson999', wishes: 'x' })));
-check('angel draw without admin', isErr(await J('POST', '/api/angel/draw', { name: 'NotARealPerson999' })));
+check('angel draw without a login', isErr(await J('POST', '/api/angel/draw', { name: 'NotARealPerson999' })));
 check('decision close without chooser', (await J('POST', '/api/decision', { trip: 'nov26', name: '', action: 'close' })).json?.ok === false);
 check('decision unknown action', (await J('POST', '/api/decision', { trip: 'nov26', name: 'FuzzAlice', action: 'explode' })).json?.ok === false);
 

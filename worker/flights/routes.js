@@ -133,7 +133,7 @@ function handleAirports(req, env, url) {
 }
 
 // Remove one person's saved flights entirely (thorough user deletion,
-// users/admin.js), and clear their name from anyone's pickup claim.
+// users/retire.js), and clear their name from anyone's pickup claim.
 export async function scrubUserFromFlights(env, user) {
   const key = user.name.toLowerCase();
   await updateFlights(env, all => {

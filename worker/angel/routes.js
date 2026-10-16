@@ -1,5 +1,6 @@
-// Secret Angel: everyone saves gift preferences; once they're all in, the
-// admin draws who gives a gift to whom. Each person is only ever sent their
+// Secret Angel: everyone saves gift preferences; then anyone draws who
+// gives a gift to whom (everyone has the same rights — there's no admin;
+// the draw, a reshuffle and leaving someone out are logged with who did it). Each person is only ever sent their
 // own match. Stored in the store (worker/store) under angel:v1 — its old
 // KV key, imported on first read — keyed by lower-cased user name.
 import { j } from '../lib/http.js';
@@ -8,11 +9,7 @@ import { cleanName, getUsers, sameName } from '../users/users.js';
 import { drawCycle } from './draw.js';
 
 const ANGEL_KEY = 'angel:v1';
-// The admin is a real role stored in the doc (not just this constant):
-// the constant is only who starts with it. The admin — and only the
-// admin — runs the draw/reshuffle and the exclusions, and can hand
-// the role to another member (POST /api/angel/admin).
-const DEFAULT_ADMIN = 'aster';
+const KEEP_LOG = 20;
 const PICK_VALUES = ['love', 'nope'];
 
 const emptyAngel = () => ({ prefs: {}, excluded: [], draw: null });
@@ -21,7 +18,8 @@ const normalizeAngel = a => {
   if (!a.prefs) a.prefs = {};
   if (!Array.isArray(a.excluded)) a.excluded = [];
   if (!('draw' in a)) a.draw = null;
-  if (!a.admin) a.admin = DEFAULT_ADMIN;
+  if (!Array.isArray(a.log)) a.log = [];
+  delete a.admin; // the old admin role (gone: everyone can draw)
   return a;
 };
 
@@ -49,7 +47,10 @@ async function caller(env, name, token) {
   return user && token && user.token === token ? { users, user, key: user.name.toLowerCase() } : { users };
 }
 
-// Who's in: every user the admin hasn't excluded.
+// Who did what, newest last (shown under the draw).
+const note = (a, by, what) => { a.log.push({ by, what, at: Date.now() }); if (a.log.length > KEEP_LOG) a.log.splice(0, a.log.length - KEEP_LOG); };
+
+// Who's in: every user nobody has left out.
 const roster = (users, a) => users
   .map(u => ({ key: u.name.toLowerCase(), name: u.name }))
   .filter(u => !a.excluded.includes(u.key))
@@ -58,17 +59,15 @@ const roster = (users, a) => users
 function view(users, a, me) {
   const people = users.map(u => {
     const key = u.name.toLowerCase();
-    return { name: u.name, submitted: !!a.prefs[key], excluded: a.excluded.includes(key), isAdmin: key === a.admin };
+    return { name: u.name, submitted: !!a.prefs[key], excluded: a.excluded.includes(key) };
   }).sort((x, y) => x.name.localeCompare(y.name, 'zh-CN'));
   const masterKey = me && a.draw ? a.draw.pairs[me] : null;
   const master = masterKey ? users.find(u => u.name.toLowerCase() === masterKey) : null;
-  const adminUser = users.find(u => u.name.toLowerCase() === a.admin);
   return {
     ok: true,
     people,
-    isAdmin: !!me && me === a.admin,
-    adminName: adminUser ? adminUser.name : a.admin,
-    drawn: !!a.draw, drawnAt: a.draw ? a.draw.at : null,
+    drawn: !!a.draw, drawnAt: a.draw ? a.draw.at : null, drawnBy: a.draw?.by || null,
+    log: a.log.slice(-8),
     inDraw: !!(me && a.draw && a.draw.pairs[me]),
     mine: me ? a.prefs[me] || null : null,
     master: master ? { name: master.name, prefs: a.prefs[masterKey] || null } : null,
@@ -97,24 +96,26 @@ async function handlePrefs(req, env) {
   return j(view(users, a, key));
 }
 
-// Admin: leave someone out (or back in), e.g. a name on the list who isn't coming.
+// Anyone: leave someone out (or back in), e.g. a name on the list who isn't coming.
 async function handleExclude(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const { users, key } = await caller(env, body.name, body.token);
+  const { users, user, key } = await caller(env, body.name, body.token);
   const target = cleanName(body.target).toLowerCase();
   const out = await updateAngel(env, a => {
-    if (!key || key !== a.admin) return { error: '只有管理员可以操作' };
-    if (!users.some(u => u.name.toLowerCase() === target)) return { error: '没有这个人' };
+    if (!key) return { error: '先登录' };
+    const t = users.find(u => u.name.toLowerCase() === target);
+    if (!t) return { error: '没有这个人' };
     a.excluded = a.excluded.filter(k => k !== target);
     if (body.excluded) a.excluded.push(target);
+    note(a, user.name, (body.excluded ? '把 ' + t.name + ' 排除了' : '把 ' + t.name + ' 加回来了'));
     return { a };
   });
   if (out.error) return j({ ok: false, error: out.error });
   return j(view(users, out.a, key));
 }
 
-// Admin: draw (or redraw / reshuffle). The pool is whoever is in AND
+// Anyone: draw (or redraw / reshuffle). The pool is whoever is in AND
 // has saved preferences — no need to wait for stragglers: anyone who
 // hasn't filled theirs in yet sits this round out, and a redraw after
 // they submit pools them in. A redraw only replaces the pairings;
@@ -122,43 +123,24 @@ async function handleExclude(req, env) {
 async function handleDraw(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const { users, key } = await caller(env, body.name, body.token);
+  const { users, user, key } = await caller(env, body.name, body.token);
   const out = await updateAngel(env, a => {
-    if (!key || key !== a.admin) return { error: '只有管理员可以抽签' };
+    if (!key) return { error: '先登录再抽签' };
     const pool = roster(users, a).filter(p => a.prefs[p.key]);
     if (pool.length < 2) return { error: '至少要有两个人选好愿望才能抽（现在 ' + pool.length + ' 人）' };
     const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
     const pairs = drawCycle(pool.map(p => p.key), rand);
     if (!pairs) return { error: '至少要两个人才能抽' };
-    a.draw = { at: Date.now(), pairs };
+    note(a, user.name, a.draw ? '重新 Shuffle 了（' + pool.length + ' 人）' : '抽了签（' + pool.length + ' 人）');
+    a.draw = { at: Date.now(), pairs, by: user.name };
     return { a };
   });
   if (out.error) return j({ ok: false, error: out.error });
   return j(view(users, out.a, key));
 }
 
-// Admin: hand the admin role to another member. This is what makes
-// the role an identity instead of a hardcoded name — if the admin is
-// away, they pass it on and the new admin can reshuffle right away.
-async function handleAdmin(req, env) {
-  let body = {};
-  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const { users, key } = await caller(env, body.name, body.token);
-  const target = cleanName(body.target).toLowerCase();
-  const out = await updateAngel(env, a => {
-    if (!key || key !== a.admin) return { error: '只有当前管理员可以转让管理员' };
-    if (!users.some(u => u.name.toLowerCase() === target)) return { error: '没有这个人' };
-    a.admin = target;
-    return { a };
-  });
-  if (out.error) return j({ ok: false, error: out.error });
-  return j(view(users, out.a, key));
-}
-
-// Remove one person from Secret Angel entirely (thorough user
-// deletion, users/admin.js): their saved prefs, any exclusion entry,
-// and the admin hat if they somehow hold it (falls back to the default
-// admin). If a draw exists, their seat is spliced out of the cycle —
+// Remove one person from Secret Angel entirely (a retired account,
+// users/retire.js): their saved prefs and any exclusion entry. If a draw exists, their seat is spliced out of the cycle —
 // whoever was giving to them now gives to their person — so the rest
 // of the circle stays intact; with fewer than two left, the draw goes.
 export async function scrubUserFromAngel(env, user) {
@@ -166,7 +148,6 @@ export async function scrubUserFromAngel(env, user) {
   await updateAngel(env, a => {
     delete a.prefs[key];
     a.excluded = a.excluded.filter(k => k !== key);
-    if (a.admin === key) a.admin = DEFAULT_ADMIN;
     if (a.draw && a.draw.pairs && key in a.draw.pairs) {
       const pairs = a.draw.pairs;
       const next = pairs[key];
@@ -184,5 +165,4 @@ export const routes = {
   'POST /api/angel/prefs': handlePrefs,
   'POST /api/angel/exclude': handleExclude,
   'POST /api/angel/draw': handleDraw,
-  'POST /api/angel/admin': handleAdmin,
 };
