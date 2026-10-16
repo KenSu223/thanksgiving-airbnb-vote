@@ -89,7 +89,14 @@ export function SessionProvider({ children }) {
     if (!r.ok) return r.error || '登录失败';
     if (r.needCode) {
       if (r.users) setUsers(r.users);
-      setChallenge({ kind: 'login', name: r.name, emailHint: r.emailHint });
+      // 邮箱和 PIN 是平行的两种验证：两个都设了，挑战里带上 canPin，
+      // 验证码视图里能一键换成输 PIN。
+      setChallenge({ kind: 'login', name: r.name, emailHint: r.emailHint, canPin: !!r.needPin });
+      return null;
+    }
+    if (r.needPin) {
+      if (r.users) setUsers(r.users);
+      setChallenge({ kind: 'pin', name: r.name });
       return null;
     }
     adopt(r);
@@ -122,6 +129,43 @@ export function SessionProvider({ children }) {
     return null;
   }, [challenge, token, adopt]);
 
+  // 校验 PIN（challenge 是 kind:'pin' 时用）：过关 = 拿到该账号 token，
+  // 和验证码登录一样直接换上返回的身份。
+  const verifyPin = useCallback(async pin => {
+    if (!challenge) return '先选好你的名字';
+    let r;
+    try {
+      r = await api('/api/auth/pin/verify', 'POST', {
+        name: challenge.name, pin, deviceToken: token,
+      });
+    } catch (e) { return '网络有点问题，稍后再试'; }
+    if (!r.ok) return r.error || '验证失败';
+    adopt(r);
+    return null;
+  }, [challenge, token, adopt]);
+
+  // 给账号设 / 改 4 位 PIN：要出示该账号当前的 token（没保护的账号
+  // token 还在名单里，选了名字就有；有保护的得是本人登录着）。成功后
+  // 服务器会轮换 token，返回的新身份直接换上（和绑邮箱一样）。
+  const setAccountPin = useCallback(async (targetName, pin, presented) => {
+    let r;
+    try { r = await api('/api/auth/pin/set', 'POST', { name: targetName, token: presented, pin }); }
+    catch (e) { return '网络有点问题，稍后再试'; }
+    if (!r.ok) return r.error || '没设上';
+    adopt(r);
+    return null;
+  }, [adopt]);
+
+  // 去掉自己的 PIN（回到没保护的账号）：只认当前会话的 token。
+  const removeAccountPin = useCallback(async () => {
+    let r;
+    try { r = await api('/api/auth/pin/remove', 'POST', { name, token }); }
+    catch (e) { return '网络有点问题，稍后再试'; }
+    if (!r.ok) return r.error || '没去掉';
+    if (r.users) setUsers(r.users);
+    return null;
+  }, [name, token]);
+
   // 新人加入并顺手绑邮箱：先建号登录，再发绑定验证码，进入验证码视图。
   const joinWithEmail = useCallback(async (input, email) => {
     const n = String(input || '').trim();
@@ -138,6 +182,6 @@ export function SessionProvider({ children }) {
     return null;
   }, [token, sendAuthCode]);
 
-  const value = { name, token, users, setUsers, loadUsers, loginOpen, openLogin, closeLogin, ensureName, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, loginTick, bindIntent, openBind };
+  const value = { name, token, users, setUsers, loadUsers, loginOpen, openLogin, closeLogin, ensureName, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, verifyPin, setAccountPin, removeAccountPin, joinWithEmail, loginTick, bindIntent, openBind };
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
