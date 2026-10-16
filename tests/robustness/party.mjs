@@ -189,6 +189,7 @@ await ww[0].until(t => t.phase === 'result', 'result', 30000);
 const wres = ww[0].t().result;
 ck('night 2 kills the last 村民: wolves win (屠边)', wres.good === false && /村民全部出局/.test(wres.title), JSON.stringify(wres).slice(0, 160));
 ck('the winners are the two wolves', JSON.stringify([...wres.winners].sort()) === JSON.stringify(wolves));
+await all(ww, t => t.phase === 'result', 'everyone sees the end', 10000); // each socket gets it in its own time
 ck('every role and each night are shown at the end', ww[3].t().reveal.roles.filter(Boolean).length === 6 && ww[3].t().reveal.history.length === 2);
 ck('the werewolf board counts it (each sees their own place)', wn.every((n, i) => placeOf(ww[i], n)?.wins === (wolves.includes(i) ? 1 : 0)) && ww.every(c => c.st.board.length <= 3));
 await Promise.all(ww.map(c => c.close()));
