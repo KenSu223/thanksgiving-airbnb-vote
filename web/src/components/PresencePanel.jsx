@@ -3,8 +3,9 @@ import { usePresence } from '../session/PresenceContext.jsx';
 import { useSession } from '../session/SessionContext.jsx';
 import './presence.css';
 
-// 大家的在线状态：绿点 = 此刻开着 App；不在线就写最后一次在线是多久
-// 以前（刚刚 / N 分钟前 / N 小时前 / N 天前；从没来过就写「还没来过」）。
+// 大家的在线状态：绿点 = 此刻开着 App，在线的就只有这个点、不写字；
+// 不在线的在右边用小灰字写最后一次在线是多久以前（刚刚 / N 分钟前 /
+// N 小时前 / N 天前；从没来过就写「还没来过」）。
 // 名单是服务器排好的（在线的在前，再按最近在线排）。每 30 秒自己
 // 重算一次「多久以前」，页面开着放着数字也会往前走。
 export function agoText(lastSeen, now) {
@@ -51,7 +52,7 @@ export default function PresencePanel({ fold = false }) {
           <li key={u.name} className="presence-row">
             <span className={'presence-dot' + (u.online ? ' on' : '')} aria-hidden="true" />
             <span className="presence-name">{u.name}{u.name === name ? '（我）' : ''}</span>
-            <span className="presence-when">{u.online ? '在线' : agoText(u.lastSeen, now)}</span>
+            {!u.online && <span className="presence-when">{agoText(u.lastSeen, now)}</span>}
           </li>
         ))}
       </ul>
