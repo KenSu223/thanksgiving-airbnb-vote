@@ -8,6 +8,7 @@ import GuandanView from '../guandan/GuandanView.jsx';
 import MahjongView from '../mahjong/MahjongView.jsx';
 import DodgeView from '../dodge/DodgeView.jsx';
 import G2048View from '../g2048/G2048View.jsx';
+import GomokuView from '../gomoku/GomokuView.jsx';
 import AvalonView from '../party/AvalonView.jsx';
 import WerewolfView from '../party/WerewolfView.jsx';
 import UndercoverView from '../party/UndercoverView.jsx';
@@ -21,6 +22,7 @@ const GAMES = [
   { key: 'mj', label: '🀄 川麻', View: MahjongView },
   { key: 'dodge', label: '🎯 鲁班躲技能', View: DodgeView },
   { key: '2048', label: '🔢 2048', View: G2048View },
+  { key: 'gomoku', label: '⚫ 五子棋', View: GomokuView },
   { key: 'uc', label: '🕵️ 谁是卧底', View: UndercoverView },
   { key: 'av', label: '🏰 阿瓦隆', View: AvalonView },
   { key: 'ww', label: '🐺 狼人杀', View: WerewolfView },

@@ -27,6 +27,7 @@ export { Board2048 } from './g2048/board.js';
 export { UndercoverHall, AvalonHall, WerewolfHall } from './party/halls.js';
 export { PresenceDO } from './presence/presence.js';
 export { ChatRoom } from './chat/room.js';
+export { GomokuHall } from './gomoku/hall.js';
 
 const ROUTES = { ...listingRoutes, ...userRoutes, ...authRoutes, ...retireRoutes, ...splitRoutes, ...foodRoutes, ...angelRoutes, ...weatherRoutes, ...activityRoutes, ...flightRoutes, ...pollRoutes, ...carRoutes, ...todoRoutes };
 
@@ -49,6 +50,8 @@ export default {
     if (url.pathname === '/api/undercover') return env.UC_HALL.get(env.UC_HALL.idFromName('hall')).fetch(request);
     if (url.pathname === '/api/avalon') return env.AV_HALL.get(env.AV_HALL.idFromName('hall')).fetch(request);
     if (url.pathname === '/api/werewolf') return env.WW_HALL.get(env.WW_HALL.idFromName('hall')).fetch(request);
+    // 五子棋: one WebSocket endpoint, its hall holds three tables and saves them as they go.
+    if (url.pathname === '/api/gomoku') return env.GM_HALL.get(env.GM_HALL.idFromName('hall')).fetch(request);
     // The group chat: one WebSocket endpoint, one room.
     if (url.pathname === '/api/chat') return env.CHAT.get(env.CHAT.idFromName('room')).fetch(request);
     const handler = ROUTES[request.method + ' ' + url.pathname];

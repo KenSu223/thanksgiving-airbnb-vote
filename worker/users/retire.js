@@ -58,7 +58,7 @@ export async function removeUser(env, target) {
     scrubGame(env.DDZ_HALL, 'hall'), scrubGame(env.GD_HALL, 'hall'), scrubGame(env.MJ_HALL, 'hall'),
     scrubGame(env.BJ_TABLE, 'main'), scrubGame(env.DODGE, 'board'), scrubGame(env.G2048, 'board'),
     scrubGame(env.UC_HALL, 'hall'), scrubGame(env.AV_HALL, 'hall'), scrubGame(env.WW_HALL, 'hall'),
-    scrubGame(env.CHAT, 'room'),
+    scrubGame(env.GM_HALL, 'hall'), scrubGame(env.CHAT, 'room'),
   ]);
 }
 
