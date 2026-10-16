@@ -8,3 +8,12 @@
 /* 顶部的关闭钮：小玻璃圆，悬停时转个角度给点反馈 */
 .login-close { transition: transform .25s, background .2s, color .2s; }
 .login-close:hover { transform: rotate(90deg); }
+/* 选人名单：一行一个人（头像 + 名字 + 状态），点谁就登谁；人多了名单自己滚 */
+.login-users { display: flex; flex-direction: column; gap: 0.4rem; max-height: 38vh; overflow-y: auto; padding: 0.15rem; margin-left: -0.15rem; margin-right: -0.15rem; scrollbar-width: thin; }
+.login-user { display: flex; align-items: center; gap: 0.65rem; width: 100%; text-align: left; padding: 0.5rem 0.7rem; border-radius: 1rem; border: 1px solid rgba(255,255,255,.65); background: rgba(255,255,255,.55); box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 1px 3px rgba(15,23,42,.05); cursor: pointer; transition: background .15s, transform .1s, box-shadow .15s; }
+.login-user:hover { background: rgba(255,255,255,.92); }
+.login-user:active { transform: scale(.985); }
+.login-user.sel { background: rgba(238,242,255,.95); box-shadow: 0 0 0 2px #818cf8, inset 0 1px 0 rgba(255,255,255,.9); }
+.login-user-av { width: 2.15rem; height: 2.15rem; font-size: 0.9rem; flex: none; }
+.login-user-name { font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.login-user .presence-dot { margin-left: auto; }
