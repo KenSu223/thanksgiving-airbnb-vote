@@ -109,3 +109,10 @@ test('提示 steps to the next option on each press, and starts over when the ta
   g.trick = { play: legalPlay(['A♠1'], null, g.level), cards: ['A♠1'], by };
   assert.deepEqual(g.hint('a'), [], 'nothing beats it');
 });
+
+test('the bot (and 托管) also carries the smallest spare pair on 三带二: 33344, not 333AA', () => {
+  const hand = H('3♠ 3♣ 3♦ 4♠ 4♣ A♠ A♦ 9♠', 10);
+  const prev = legalPlay(H('2♠ 2♣ 2♦ 5♠ 5♣', 10), null, 10);
+  assert.equal(show(beaters(hand, prev, 10, 0)[0].cards, 10), '3 3 3 4 4');
+  assert.equal(show(choosePlay(hand, prev, 10, { partnerOwns: false, oppMin: 20 }), 10), '3 3 3 4 4');
+});

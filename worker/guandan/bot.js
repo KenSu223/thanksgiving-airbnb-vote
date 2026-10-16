@@ -54,10 +54,15 @@ function* shapes(g, type, maxWild) {
   } else if (type === 'triple') {
     yield* sets(g, 3, maxWild);
   } else if (type === 'full') {
+    // the pair it carries: the cheapest spare one — an exact pair before splitting a triple, a bomb
+    // last, smaller before bigger (the hand is held big to small, so "the first pair" was the biggest)
+    const pairs = [...g.byRank].filter(([, list]) => list.length >= 2)
+      .sort(([, a], [, b]) => (a.length >= 4) - (b.length >= 4) || (a.length > 2) - (b.length > 2) || value(a[0], g.level) - value(b[0], g.level));
     for (const t of sets(g, 3, maxWild)) {
       const tr = rankOf(t.find(c => !isWild(c, g.level)) || t[0]);
       const usedW = t.filter(c => g.wilds.includes(c)).length;
-      for (const [r, list] of g.byRank) if (r !== tr && list.length >= 2) { yield t.concat(list.slice(0, 2)); break; }
+      const kick = pairs.find(([r]) => r !== tr);
+      if (kick) yield t.concat(kick[1].slice(0, 2));
       if (g.sj.length === 2) yield t.concat(g.sj);
       if (g.bj.length === 2) yield t.concat(g.bj);
       if (usedW === 0 && maxWild >= 1) for (const [r, list] of g.byRank) if (r !== tr && list.length === 1 && g.wilds.length) { yield t.concat(list[0], g.wilds[0]); break; }
