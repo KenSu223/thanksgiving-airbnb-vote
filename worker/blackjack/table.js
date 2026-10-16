@@ -2,6 +2,7 @@ import { BJ, BlackjackGame } from './game.js';
 import { cleanName, getUsers, sameName } from '../users/users.js';
 import { noteReaction, freshReactions } from '../games/reactions.js';
 import { j } from '../lib/http.js';
+import { topFor } from '../lib/board.js';
 
 // The Durable Object: WebSockets in, game state out. Every client gets the
 // whole table after each change. Saved chips live in this object's storage
@@ -125,14 +126,15 @@ export class BlackjackTable {
   // Ranked by what you've actually won: chips now minus everything you were
   // handed (1000 to start + 1000 per 补给). It goes negative, so going broke and
   // getting refilled over and over doesn't climb the board.
-  leaderboard() {
+  // Everyone, best first: [key, row]. Only the top 3 go out, plus each viewer's own place (lib/board.js).
+  ranking() {
     const rows = new Map(this.board);
     for (const s of this.game.seats) rows.set(s.key, { name: s.name, chips: s.chips, refills: s.refills, seated: true });
-    return [...rows.values()].map(r => ({ ...r, net: r.chips - BJ.startChips * (1 + (r.refills || 0)) }))
-      .sort((a, b) => b.net - a.net || b.chips - a.chips).slice(0, 30);
+    return [...rows].map(([k, r]) => [k, { ...r, net: r.chips - BJ.startChips * (1 + (r.refills || 0)) }])
+      .sort(([, a], [, b]) => b.net - a.net || b.chips - a.chips);
   }
   send(ws, extra) {
-    try { ws.send(JSON.stringify({ type: 'state', table: this.game.view(), you: this.sockets.get(ws), reactions: freshReactions(this.reactions, Date.now()), board: this.leaderboard(), ...extra })); }
+    try { ws.send(JSON.stringify({ type: 'state', table: this.game.view(), you: this.sockets.get(ws), reactions: freshReactions(this.reactions, Date.now()), ...topFor(this.ranking(), this.ident.get(ws)?.key || this.sockets.get(ws)), ...extra })); }
     catch (e) { /* socket already gone; its close handler cleans up */ }
   }
   broadcast(skip) { for (const ws of this.sockets.keys()) if (ws !== skip) this.send(ws); }

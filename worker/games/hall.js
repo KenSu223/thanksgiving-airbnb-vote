@@ -4,7 +4,8 @@
 // gets their own view of the table after every change. Points (豆子) are saved
 // in this object's storage under p:<name> when a player stands up or
 // disconnects, never per hand, so a game never touches the KV write budget.
-// Every game has its own hall, so its leaderboard is its own.
+// Every game has its own hall, so its leaderboard is its own; only its top 3
+// go out, plus each viewer's own place (lib/board.js).
 //
 // A game class needs: sit(key, name, saved), leave(key), disconnect(key),
 // has(key), humans(), waitlist, seats, phase, sweepIdle(), view(key). The
@@ -19,6 +20,7 @@
 import { getUsers, sameName, cleanName } from '../users/users.js';
 import { noteReaction, freshReactions } from './reactions.js';
 import { j } from '../lib/http.js';
+import { topFor } from '../lib/board.js';
 
 const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
 
@@ -191,10 +193,12 @@ export class TableHall {
       bots: t.seats.filter(s => s && s.bot).length,
     }));
   }
-  leaderboard() {
+  // Everyone, best first: [key, row]
+  ranking() {
     const rows = new Map(this.board);
     for (const t of this.tables) for (const s of t.humans().concat(t.waitlist)) rows.set(s.key, { name: s.name, points: s.points, refills: s.refills, games: s.games, wins: s.wins, seated: true });
-    return [...rows.values()].sort(this.boardSort || ((a, b) => b.points - a.points)).slice(0, 30);
+    const sort = this.boardSort || ((a, b) => b.points - a.points);
+    return [...rows].sort(([, a], [, b]) => sort(a, b));
   }
   send(ws, extra) {
     const info = this.sockets.get(ws);
@@ -203,7 +207,7 @@ export class TableHall {
     try {
       ws.send(JSON.stringify({ type: 'state', room: info.room, seatedAt, you: info.key,
         reactions: freshReactions(this.reactions.get(info.room) || [], Date.now()),
-        table: this.tables[info.room - 1].view(info.key), lobby: this.lobby(), board: this.leaderboard(), ...extra }));
+        table: this.tables[info.room - 1].view(info.key), lobby: this.lobby(), ...topFor(this.ranking(), info.as?.key || info.key), ...extra }));
     } catch (e) { /* socket already gone; its close handler cleans up */ }
   }
   broadcast(skip) { for (const ws of this.sockets.keys()) if (ws !== skip) this.send(ws); }

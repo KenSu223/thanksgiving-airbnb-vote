@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTable, useCountdown, secondsLeft } from '../games/useTable.js';
 import { RoomPicker } from '../games/TableFrame.jsx';
 import { ReactBubbles, reactionsFor } from '../games/Reactions.jsx';
+import { BoardRows, place, TOP_NOTE } from '../games/TopBoard.jsx';
 import { useAnnouncer, useVoiceSetting, useWakeLock, canSpeak, unlockVoice } from './voice.js';
 import './party.css';
 
@@ -173,17 +174,17 @@ export function LogList({ log }) {
   );
 }
 
-export function WinsBoard({ title, rows, children }) {
+export function WinsBoard({ title, rows, me, children }) {
   return (
     <aside className="glass-card rounded-2xl p-5 self-start">
       <h2 className="font-bold text-lg mb-1">🏆 {title}</h2>
-      <p className="text-xs text-slate-500 mb-3">按赢的局数排 · 一样多比胜率</p>
-      {rows.length ? rows.map((r, i) => (
-        <div key={r.name} className="flex items-center justify-between gap-2 border-b py-1.5 text-sm">
-          <span className="truncate">{i < 3 ? ['🥇', '🥈', '🥉'][i] : (i + 1) + '.'} {r.name}{r.seated && <span className="text-xs text-emerald-600"> 在桌上</span>}</span>
+      <p className="text-xs text-slate-500 mb-3">按赢的局数排 · 一样多比胜率 · {TOP_NOTE}</p>
+      <BoardRows rows={rows} me={me} row={(r, i, isMe) => (
+        <div key={isMe ? 'me' : r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (isMe ? ' font-bold text-indigo-700' : '')}>
+          <span className="truncate">{place(i)} {r.name}{r.seated && <span className="text-xs text-emerald-600"> 在桌上</span>}</span>
           <span className="font-bold tabular-nums whitespace-nowrap">{r.wins || 0} 胜<span className="text-xs font-normal text-slate-400"> / {r.games || 0} 局</span></span>
         </div>
-      )) : <p className="text-sm text-slate-400">还没人玩过</p>}
+      )} />
       <div className="text-xs text-slate-500 mt-4 leading-relaxed">{children}</div>
     </aside>
   );

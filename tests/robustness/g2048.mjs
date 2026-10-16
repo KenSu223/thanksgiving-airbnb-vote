@@ -93,7 +93,8 @@ const c = await open();
 c.send({ type: 'hello', name: u.name, token: u.token });
 const back = await c.next(m => m.game, 'game after reconnect');
 ck('after every tab closed, logging in again resumes the same game', JSON.stringify(back.game.grid) === JSON.stringify(g.grid) && back.game.moves === g.moves && back.game.score === g.score, JSON.stringify(back.game));
-ck('the board shows my biggest tile', (back.board || []).some(r => r.name === u.name && r.tile === Math.max(maxOf(g), hi.best.tile)), JSON.stringify(back.board).slice(0, 300));
+ck('the board (or my own place below it) shows my biggest tile', [...(back.board || []), back.boardMe].some(r => r && r.name === u.name && r.tile === Math.max(maxOf(g), hi.best.tile)), JSON.stringify([back.board, back.boardMe]).slice(0, 300));
+ck('the board is the top 3 only', (back.board || []).length <= 3);
 
 c.send({ type: 'new' });
 const nw = await c.next(m => m.game && m.game.moves === 0, 'new game');
