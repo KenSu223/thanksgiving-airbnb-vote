@@ -61,9 +61,10 @@ export class DodgeBoard {
   ranked() {
     return [...this.best].sort(([, a], [, b]) => b.ticks - a.ticks || a.at - b.at);
   }
-  // The top 3 and the viewer's own place, as rows
+  // The top 3 and the viewer's own place, as rows. How many runs someone has
+  // played stays private (still counted in p:<name>), only the best time shows.
   boardFor(key) {
-    return topFor(this.ranked().map(([k, r], i) => [k, { name: r.name, ticks: r.ticks, runs: r.runs, at: r.at, replay: i < OPEN_REPLAYS && !!r.replay, bot: !!r.bot, react: r.react ?? null }]), key);
+    return topFor(this.ranked().map(([k, r], i) => [k, { name: r.name, ticks: r.ticks, at: r.at, replay: i < OPEN_REPLAYS && !!r.replay, bot: !!r.bot, react: r.react ?? null }]), key);
   }
 
   async fetch(request) {

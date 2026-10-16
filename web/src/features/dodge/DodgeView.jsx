@@ -253,7 +253,7 @@ export default function DodgeView({ active }) {
               <span className="truncate">{place(i)} {r.name}
                 {r.bot && <span className="dg-bot-mark" title={BOT_NOTE(r.react)} aria-label={BOT_NOTE(r.react)}> 🤖</span>}</span>
               <span className="flex items-center gap-1.5">
-                <span className="tabular-nums whitespace-nowrap">{secs(r.ticks)} 秒<span className="text-xs font-normal text-slate-400"> · {r.runs} 局</span></span>
+                <span className="tabular-nums whitespace-nowrap">{secs(r.ticks)} 秒</span>
                 {/* only the top 3's replays are public (the server hands out no others); below that, an empty slot keeps the times lined up */}
                 {i >= 3 ? <span className="dg-watch dg-watch-none" aria-hidden="true" />
                   : r.replay
