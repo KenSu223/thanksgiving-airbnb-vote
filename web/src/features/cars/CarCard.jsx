@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BAGS, carLoad, carName, seatName, seatShort } from './bags.js';
-import { modelName, rowsText, seatCount, seatIds, trunkOf } from './models.js';
+import { modelById, modelName, rowsText, seatCount, seatIds, trunkOf } from './models.js';
 import BagIcon from './BagIcon.jsx';
 
 // 俯视图的尺寸：车头朝上，左舵（主驾在左前）。第一排在 y=148，往后每排隔 rowGap；最后一排后面
@@ -90,7 +90,7 @@ export default function CarCard({ car, index, me, actingFor, bags, busy, canRemo
 
       <div className="mt-4">
         <div className="flex items-baseline justify-between text-sm mb-1.5">
-          <span className="font-medium text-slate-600">后备箱 <span className="text-xs font-normal text-slate-400">约 {trunk} 升</span></span>
+          <span className="font-medium text-slate-600">{modelById(car.model)?.bed ? '车斗' : '后备箱'} <span className="text-xs font-normal text-slate-400">约 {trunk} 升</span></span>
           <span className={'tabular-nums trunk-' + tone}>{load.pieces ? load.pieces + ' 件 · 约 ' + pct + '%' : '还没人填行李'}</span>
         </div>
         <div className="trunk-bar"><span className={'trunk-fill trunk-' + tone} style={{ width: Math.min(pct, 100) + '%' }} /></div>
