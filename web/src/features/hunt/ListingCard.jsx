@@ -15,7 +15,7 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
   const hotel = l.kind === 'hotel';
   const votes = l.votes || [];
   const { name: myName } = useSession();
-  // A vote is mine by token OR by account name — tokens rotate (email bind).
+  // A vote is mine by token OR by account name — tokens rotate (setting a PIN).
   const voted = votes.some(v => v.token === token || (!!myName && String(v.name || '').toLowerCase() === myName.toLowerCase()));
   const pics = l.images && l.images.length ? l.images : l.image ? [l.image] : [];
   return (

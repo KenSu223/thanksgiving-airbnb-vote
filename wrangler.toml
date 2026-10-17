@@ -2,13 +2,6 @@ name = "denver-thanksgiving-airbnb-vote"
 main = "worker/index.js"
 compatibility_date = "2026-10-01"
 
-# Sender for verification-code email. peterming.net is verified in Resend
-# (DKIM/SPF records in its Route 53 zone), so codes can go to any member's
-# inbox; without this var the worker falls back to Resend's shared
-# onboarding@resend.dev, which may only deliver to the account owner.
-[vars]
-EMAIL_FROM = "Denver Thanksgiving <noreply@peterming.net>"
-
 # `wrangler deploy` / `wrangler dev` build the React frontend into ./dist first.
 [build]
 command = "npm run build"

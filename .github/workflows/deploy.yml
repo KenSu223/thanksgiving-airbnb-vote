@@ -43,20 +43,21 @@ jobs:
       - name: Install
         run: npm ci
 
-      # Optional: if the repo has a RESEND_API_KEY secret (repo Settings →
-      # Secrets and variables → Actions), sync it into the worker so the
-      # email-code login can send mail. Skipped silently when unset.
-      - name: Sync email secret (optional)
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: 988374702c17cd8942be6b35f8361735
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-        if: env.RESEND_API_KEY != ''
-        run: printf '%s' "$RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY
-
       # wrangler.toml's [build] step runs `npm run build` (the React frontend) first.
       - name: Deploy with Wrangler
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 988374702c17cd8942be6b35f8361735
+
+      # One-time cleanup after email binding was removed: delete the worker's old
+      # RESEND_API_KEY secret through the Cloudflare API. After the first run it
+      # answers 404 (already gone), which is fine; this step can go later.
+      - name: Remove old email secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          code=$(curl -s -o del.json -w '%{http_code}' -X DELETE \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/988374702c17cd8942be6b35f8361735/workers/scripts/denver-thanksgiving-airbnb-vote/secrets/RESEND_API_KEY")
+          echo "delete RESEND_API_KEY: HTTP $code"; head -c 300 del.json; echo
