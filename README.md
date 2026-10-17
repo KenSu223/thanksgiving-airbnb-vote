@@ -64,9 +64,9 @@ works for any group picking a place together.
 - Flights: everyone enters their arrival and departure flights; a route map
   (arrivals and departures separately), an airport pickup list people can
   claim, and suggested times to be at the airport for departures
-- Secret Angel: flip through ten question cards and answer five (what you
-  can't be given, plus fun ones like "if you opened a little shop, what would
-  it be?") so a stranger can pick your gift, then anyone draws who secretly gives a gift to
+- Secret Angel: pick five of ten question cards (what you can't be given,
+  plus fun ones like "if you opened a little shop, what would it be?"), then
+  answer them one card at a time, so a stranger can pick your gift, then anyone draws who secretly gives a gift to
   whom; everyone only sees their own match
 - No passwords, no database server
 

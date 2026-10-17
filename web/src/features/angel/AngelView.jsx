@@ -3,15 +3,16 @@ import { api } from '../../lib/api.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
-import { answersError, cleanAnswers } from './questions.js';
+import { QUESTIONS, answersError, cleanAnswers } from './questions.js';
+import QuestionPicker from './QuestionPicker.jsx';
 import QuestionDeck from './QuestionDeck.jsx';
 import AnswerCards from './AnswerCards.jsx';
 import People from './People.jsx';
 import RevealCard from './RevealCard.jsx';
 import './angel.css';
 
-// Secret Angel：大家可能互相不熟，所以每人翻十张问题卡片、答满五张（「不能送的」必答，questions.js；
-// QuestionDeck 一次一张，AnswerCards 是答好的五张），天使拿着答案挑礼物；然后谁都可以抽签（没有管理员，大家一样；抽签、重抽、排除谁都会记下是谁做的），
+// Secret Angel：大家可能互相不熟，所以每人先从十张问题卡片里挑五张（QuestionPicker，「不能送的」必答，
+// questions.js），再一张一张回答（QuestionDeck），最后看答好的五张（AnswerCards）；天使拿着答案挑礼物；然后谁都可以抽签（没有管理员，大家一样；抽签、重抽、排除谁都会记下是谁做的），
 // 每个人只看得到自己要送给谁。不用等人齐：谁交了谁进池，没交的人这轮不参加；重抽按当前已交的人重新
 // 分配，不清任何人的答案。（以前是选礼物分类；那时交过的人照样在池子里，答了题天使就能看到。）
 export default function AngelView({ active }) {
@@ -21,8 +22,10 @@ export default function AngelView({ active }) {
   const [data, setData] = useState(null);
   const [answers, setAnswers] = useState({});
   const [dirty, setDirty] = useState(false);
-  const [deck, setDeck] = useState(false); // 正在翻卡片（换题重答）
-  const [deckRound, setDeckRound] = useState(0); // 每次重新翻都从第一张开始
+  // 三步：'pick' 挑五张题 → 'answer' 一张一张回答 → 看答好的五张（stage 为 null 时：有答案就看答案，没有就挑题）
+  const [stage, setStage] = useState(null);
+  const [selected, setSelected] = useState(['nogo']); // 挑中的题；「不能送的」一开始就选好
+  const [deckRound, setDeckRound] = useState(0); // 每次进回答都从第一张开始
   const [msg, setMsg] = useState('');
 
   const apply = useCallback(r => {
@@ -47,7 +50,7 @@ export default function AngelView({ active }) {
     try { return apply(await api(path, 'POST', { name, token, ...body })); } catch (e) { setMsg('网络有点问题，稍后再试'); return false; }
   };
   async function submit() {
-    if (await post('/api/angel/prefs', { answers: cleanAnswers(answers) })) { setDirty(false); setDeck(false); toast(answered ? '答案更新好了 ✨' : '答好了，等抽签吧 😇'); }
+    if (await post('/api/angel/prefs', { answers: cleanAnswers(answers) })) { setDirty(false); setStage(null); toast(answered ? '答案更新好了 ✨' : '答好了，等抽签吧 😇'); }
   }
   async function draw() {
     const ok = data.drawn
@@ -76,9 +79,13 @@ export default function AngelView({ active }) {
   const waiting = people.filter(p => !p.inPool);
   const filled = people.filter(p => p.inPool);
   const wrong = answersError(answers);
-  const hasAnswers = Object.keys(cleanAnswers(answers)).length > 0;
-  // 还没答过（也没在这台设备上答到一半）的人直接翻卡片；答好的看五张卡片
-  const showDeck = deck || (!answered && !hasAnswers);
+  const answeredIds = Object.keys(cleanAnswers(answers));
+  const view = stage || (answeredIds.length ? 'review' : 'pick');
+  const deckIds = QUESTIONS.filter(q => selected.includes(q.id)).map(q => q.id); // 「不能送的」排第一
+  const startAnswering = () => {
+    setAnswers(a => Object.fromEntries(Object.entries(a).filter(([k]) => selected.includes(k)))); // 换掉的题不留答案
+    setDeckRound(n => n + 1); setStage('answer');
+  };
   return (
     <div className="space-y-5">
       {data.drawn && (data.master
@@ -89,27 +96,32 @@ export default function AngelView({ active }) {
         <div className="mb-4">
           <h2 className="font-bold text-lg">🎁 让天使认识你</h2>
           <p className="text-sm text-slate-500">
-            {showDeck ? '十张问题卡片一张一张翻，答满五张就好，每张一句话；第一张「不能送的」必答。抽到你的天使会看到你的答案。'
-              : answered && !dirty ? '你的五张卡片，抽到你的天使会看到。点「改」能改一句，也可以换题重答。'
+            {view === 'pick' ? '先从十张问题卡片里挑 5 张你想回答的（「不能送的」必答，已经帮你选好），再一张一张回答。抽到你的天使会看到你的答案。'
+              : view === 'answer' ? '一张一张回答，每张一句话就行。'
+              : answered && !dirty ? '你的五张卡片，抽到你的天使会看到。点「改」能改一句，也可以换题。'
               : '五张都答好了，看一眼就交吧。'}
           </p>
-          {mine && !answered && <p className="angel-notice">礼物分类改成了问答卡片：答好五张，你的天使才看得到你想要什么。</p>}
+          {mine && !answered && <p className="angel-notice">礼物分类改成了问答卡片：挑五张答好，你的天使才看得到你想要什么。</p>}
         </div>
-        {showDeck
-          ? <QuestionDeck key={deckRound} onDone={next => { setAnswers(next); setDirty(true); setDeck(false); }}
-              onCancel={hasAnswers ? () => setDeck(false) : undefined} />
-          : (
-            <>
-              <AnswerCards answers={answers} onChange={a => { setDirty(true); setAnswers(a); }} />
-              <div className="flex flex-wrap items-center gap-3 mt-4">
-                <button onClick={submit} disabled={!!wrong || (answered && !dirty)} className="bg-gradient-to-r from-indigo-600 to-pink-500 disabled:opacity-40 text-white font-bold rounded-xl px-6 py-2 shadow">
-                  {answered ? (dirty ? '保存修改' : '已保存 ✓') : '交答案 😇'}
-                </button>
-                <button onClick={() => { setDeckRound(n => n + 1); setDeck(true); }} className="text-sm border-2 border-slate-200 hover:border-indigo-400 rounded-full px-4 py-1.5">🔁 换题重答</button>
-                <span className="text-sm text-rose-600">{wrong || msg}</span>
-              </div>
-            </>
-          )}
+        {view === 'pick' && <QuestionPicker selected={selected} onChange={setSelected} onNext={startAnswering} />}
+        {view === 'answer' && (
+          <QuestionDeck key={deckRound} ids={deckIds} answers={answers}
+            onDone={next => { setAnswers(next); setDirty(true); setStage(null); }}
+            onBack={kept => { setAnswers(kept); setStage('pick'); }} />
+        )}
+        {view === 'review' && (
+          <>
+            <AnswerCards answers={answers} onChange={a => { setDirty(true); setAnswers(a); }} />
+            <div className="flex flex-wrap items-center gap-3 mt-4">
+              <button onClick={submit} disabled={!!wrong || (answered && !dirty)} className="bg-gradient-to-r from-indigo-600 to-pink-500 disabled:opacity-40 text-white font-bold rounded-xl px-6 py-2 shadow">
+                {answered ? (dirty ? '保存修改' : '已保存 ✓') : '交答案 😇'}
+              </button>
+              <button onClick={() => { setSelected(answeredIds.includes('nogo') ? answeredIds : ['nogo', ...answeredIds]); setStage('pick'); }}
+                className="text-sm border-2 border-slate-200 hover:border-indigo-400 rounded-full px-4 py-1.5">🔁 换题</button>
+              <span className="text-sm text-rose-600">{wrong || msg}</span>
+            </div>
+          </>
+        )}
       </section>
 
       <People people={data.people} onExclude={exclude} />
