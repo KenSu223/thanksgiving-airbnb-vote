@@ -1,17 +1,20 @@
-// 俯视的车身，车头朝上、左舵：每个级别一个样子——轿车、掀背、跑车（两座的是中置引擎，
-// 2+2 的是溜背）、五座 / 三排 SUV（方正、车顶行李架）、MPV（短车头、滑门轨）、皮卡
-// （驾驶室 + 露天车斗）、面包车（方盒子、一排侧窗）。都画在 200 宽的 viewBox 里；
-// 座位的纵向位置（第一排 first、往后每排 gap）也由这里定，CarCard 按同样的数摆座位按钮。
+// 俯视的车，车头朝上、左舵，像租车 App 选座那样「掀了车顶」：银白车漆带金属光泽（不上颜色），
+// 前挡风 / 后窗是深色玻璃（带一道反光），LED 大灯、贯穿式红尾灯，车里看得见仪表台、
+// 中控和座位（座位按钮由 CarCard 摆上去），四个轮胎带胎纹露在车身外。每个级别一个样子：
+// 轿车、掀背、跑车（两座的是中置引擎：进气口、百叶引擎盖、尾翼；2+2 的是溜背）、
+// 五座 / 三排 SUV（方正、黑色护杠）、MPV（短车头、滑门）、皮卡（驾驶室 + 车斗）、
+// 面包车（方盒子）。都画在 200 宽的 viewBox 里；座位的纵向位置（第一排 first、往后每排
+// gap）也由这里定，CarCard 按同样的数摆座位按钮。
 
 const GEOM = {
-  sedan: { first: 150, tail: 132 },
-  hatch: { first: 142, tail: 104 },
-  coupe: { first: 182, tail: 118 }, // 长车头；两座的车尾更长（中置引擎），见 carGeometry
-  suv: { first: 146, tail: 126 },
-  suv3: { first: 146, tail: 122 },
-  mpv: { first: 124, tail: 116 },   // 车头短
-  truck: { first: 146, tail: 212 }, // 驾驶室后面是车斗
-  bus: { first: 118, tail: 108 },
+  sedan: { first: 160, tail: 130 },
+  hatch: { first: 152, tail: 100 },
+  coupe: { first: 190, tail: 120 }, // 长车头；两座的车尾更长（中置引擎），见 carGeometry
+  suv: { first: 156, tail: 128 },
+  suv3: { first: 156, tail: 122 },
+  mpv: { first: 136, tail: 116 },   // 车头短
+  truck: { first: 154, tail: 214 }, // 驾驶室后面是车斗
+  bus: { first: 128, tail: 104 },
 };
 export const bodyKinds = Object.keys(GEOM);
 
@@ -20,22 +23,40 @@ export function carGeometry(kind, rows) {
   const g = GEOM[kind] || GEOM.sedan;
   const gap = kind === 'coupe' || rows.length >= 4 ? 70 : 79;
   const last = g.first + (rows.length - 1) * gap;
-  const tail = kind === 'coupe' && rows.length === 1 ? 156 : g.tail;
+  const tail = kind === 'coupe' && rows.length === 1 ? 158 : g.tail;
   return { first: g.first, gap, last, H: last + tail };
 }
 
-// 车身轮廓：从车头 yF 到车尾 yB，中间一串 [y, 半宽]（右半边，左边对称），
-// 用平滑曲线连起来。
+// 车身轮廓：从车头 yF 到车尾 yB，中间一串 [y, 半宽]（右半边，左边对称）
 const PROFILE = {
-  sedan: (F, L, H) => ({ yF: 6, yB: H - 5, pts: [[24, 58], [58, 70], [100, 74], [H - 60, 74], [H - 28, 69]] }),
+  sedan: (F, L, H) => ({ yF: 6, yB: H - 5, pts: [[24, 58], [60, 70], [104, 74], [H - 62, 74], [H - 28, 69]] }),
   hatch: (F, L, H) => ({ yF: 8, yB: H - 5, pts: [[24, 58], [58, 70], [100, 74], [H - 34, 74], [H - 14, 70]] }),
-  coupe: (F, L, H) => ({ yF: 4, yB: H - 6, pts: [[14, 38], [34, 56], [64, 74], [102, 72], [F - 34, 65], [F + 8, 65], [L + 46, 76], [H - 48, 78], [H - 20, 72]] }),
+  coupe: (F, L, H) => ({ yF: 4, yB: H - 6, pts: [[14, 38], [34, 56], [64, 74], [104, 72], [F - 36, 65], [F + 8, 65], [L + 46, 76], [H - 48, 78], [H - 20, 72]] }),
   suv: (F, L, H) => ({ yF: 5, yB: H - 4, pts: [[14, 64], [36, 72], [80, 74], [H - 22, 74], [H - 10, 71]] }),
   suv3: (F, L, H) => ({ yF: 5, yB: H - 4, pts: [[14, 64], [36, 72], [80, 74], [H - 22, 74], [H - 10, 71]] }),
   mpv: (F, L, H) => ({ yF: 7, yB: H - 4, pts: [[20, 58], [48, 70], [86, 75], [H - 20, 75], [H - 9, 71]] }),
   truck: (F, L, H) => ({ yF: 5, yB: H - 4, pts: [[14, 64], [38, 73], [80, 74], [H - 14, 74], [H - 8, 72]] }),
   bus: (F, L, H) => ({ yF: 5, yB: H - 4, pts: [[12, 68], [30, 75], [H - 14, 75], [H - 7, 72]] }),
 };
+
+// 车里各部分的位置：前挡风 ws、车厢到哪 cab、后窗 rg、前后轴 axles
+function layout(k, F, L, H, oneRow) {
+  switch (k) {
+    case 'hatch': return { ws: [F - 78, F - 40], cab: L + 40, rg: [L + 40, L + 68], axles: [F - 82, L + 50] };
+    case 'coupe': return oneRow
+      ? { ws: [F - 98, F - 42], cab: L + 28, rg: [L + 28, L + 38], axles: [66, L + 104] }
+      : { ws: [F - 98, F - 42], cab: L + 30, rg: [L + 30, L + 74], axles: [66, L + 62] };
+    case 'suv': case 'suv3': return { ws: [F - 74, F - 40], cab: H - 62, rg: [H - 62, H - 34], axles: [F - 88, L + (k === 'suv' ? 56 : 52)] };
+    case 'mpv': return { ws: [F - 80, F - 40], cab: H - 58, rg: [H - 58, H - 28], axles: [F - 84, L + 62] };
+    case 'truck': return { ws: [F - 74, F - 40], cab: L + 34, rg: [L + 34, L + 44], axles: [F - 90, L + 158] };
+    case 'bus': return { ws: [F - 66, F - 40], cab: H - 42, rg: [H - 42, H - 20], axles: [F - 78, L + 50] };
+    default: return { ws: [F - 80, F - 40], cab: L + 44, rg: [L + 44, L + 72], axles: [F - 86, L + 56] };
+  }
+}
+
+// 车漆（银白，不上颜色）：[边、中间、高光、描边]
+const PAINT = ['#c3cad7', '#e9edf3', '#ffffff', '#a7b1c2'];
+const GLASS_TOP = '#525a6a', GLASS_BOTTOM = '#20242d', INTERIOR = '#eef0f5', DASH = '#d6dbe4', TRIM = '#262c38', TIRE = '#1d222d';
 
 const f1 = n => Math.round(n * 10) / 10;
 // 一圈平滑的轮廓：车头中点 → 右边 → 车尾中点 → 左边，每个点的切线顺着前后两个点
@@ -63,109 +84,152 @@ const halfWidth = (pts, y) => {
   return pts[pts.length - 1][1];
 };
 
-// 前挡风：上边往前拱；后窗：下边往后拱。a / b 是上 / 下边的半宽
-const front = (y1, y2, a, b, k) => `M${f1(100 - a)} ${y1}C${f1(100 - a / 2)} ${y1 - k} ${f1(100 + a / 2)} ${y1 - k} ${f1(100 + a)} ${y1}L${f1(100 + b)} ${y2}C${f1(100 + b / 2)} ${f1(y2 - k * 0.7)} ${f1(100 - b / 2)} ${f1(y2 - k * 0.7)} ${f1(100 - b)} ${y2}Z`;
-const rear = (y1, y2, a, b, k) => `M${f1(100 - a)} ${y1}C${f1(100 - a / 2)} ${y1 + k} ${f1(100 + a / 2)} ${y1 + k} ${f1(100 + a)} ${y1}L${f1(100 + b)} ${y2}C${f1(100 + b / 2)} ${f1(y2 + k * 1.2)} ${f1(100 - b / 2)} ${f1(y2 + k * 1.2)} ${f1(100 - b)} ${y2}Z`;
-
-const GLASS = '#c9d3e6', LINE = '#d8dfeb', EDGE = '#cdd5e3', TIRE = '#4a5370', TRIM = '#97a3ba';
+// 一块横跨车身的板（玻璃、车厢）：上下两条边各自往外拱 k1 / k2，左右两边顺着半宽 w(y)
+function band(y1, y2, w, k1, k2, steps = 6) {
+  const side = [];
+  for (let i = 0; i <= steps; i++) { const y = y1 + (y2 - y1) * i / steps; side.push([f1(100 + w(y)), f1(y)]); }
+  const [x1] = side[0], [x2] = side[side.length - 1];
+  return `M${f1(200 - x1)} ${f1(y1)}C${f1(100 - (x1 - 100) / 2)} ${f1(y1 - k1)} ${f1(100 + (x1 - 100) / 2)} ${f1(y1 - k1)} ${x1} ${f1(y1)}`
+    + side.slice(1).map(([x, y]) => `L${x} ${y}`).join('')
+    + `C${f1(100 + (x2 - 100) / 2)} ${f1(y2 + k2)} ${f1(100 - (x2 - 100) / 2)} ${f1(y2 + k2)} ${f1(200 - x2)} ${f1(y2)}`
+    + side.slice(0, -1).reverse().map(([x, y]) => `L${f1(200 - x)} ${y}`).join('') + 'Z';
+}
 
 export default function CarBody({ kind, rows, id }) {
   const k = GEOM[kind] ? kind : 'sedan';
-  const { first: F, last: L, H } = carGeometry(k, rows);
+  const { first: F, gap, last: L, H } = carGeometry(k, rows);
   const shape = PROFILE[k](F, L, H);
   const hw = y => halfWidth(shape.pts, y);
   const oneRow = rows.length === 1;
+  const P = layout(k, F, L, H, oneRow);
+  const [edge, mid, light, line] = PAINT;
+  const uid = 'cb' + String(id).replace(/[^\w-]/g, '');
+  const body = outline(shape);
+  const SILL = k === 'bus' || k === 'mpv' ? 9 : 11; // 车门的厚度（车身到车厢）
+  const out = [];
+  const add = el => out.push(el);
 
-  // 车轮：前后两个轴，轮胎从车身两侧露出一点
-  const axles = {
-    sedan: [F - 80, L + 56], hatch: [F - 76, L + 50], suv: [F - 82, L + 54], suv3: [F - 82, L + 52],
-    mpv: [F - 76, L + 60], truck: [F - 84, L + 156], bus: [F - 72, L + 48],
-    coupe: [64, oneRow ? L + 98 : L + 60],
-  }[k];
-  const [tw, th] = k === 'coupe' ? [13, 36] : k === 'bus' || k === 'truck' ? [12, 32] : [11, 30];
-  const tires = axles.flatMap(y => [-1, 1].map(s => (
-    <rect key={y + ':' + s} x={f1(100 + s * (hw(y) - 3) - tw / 2)} y={y - th / 2} width={tw} height={th} rx="4" fill={TIRE} />
-  )));
-
-  // 前挡风（跑车更斜更长，面包车平）和后视镜
-  const [w1, w2, wk] = k === 'coupe' ? [F - 82, F - 26, 16] : k === 'bus' ? [F - 54, F - 28, 6] : k === 'mpv' ? [F - 64, F - 24, 12] : [F - 58, F - 22, k === 'sedan' || k === 'hatch' ? 12 : 8];
-  const inset = k === 'bus' ? [9, 11] : k === 'coupe' ? [30, 24] : [16, 22];
-  const mirrorY = w2 - 6;
-  const detail = [];
-  detail.push(<path key="ws" d={front(w1, w2, hw(w1) - inset[0], hw(w2) - inset[1], wk)} fill={GLASS} />);
-  detail.push(<path key="mir" d={`M${f1(100 - hw(mirrorY))} ${mirrorY}l-12 4M${f1(100 + hw(mirrorY))} ${mirrorY}l12 4`} stroke={EDGE} strokeWidth="5" strokeLinecap="round" />);
-
-  if (k === 'sedan' || k === 'hatch') {
-    const [g1, g2] = k === 'sedan' ? [L + 44, L + 74] : [L + 44, L + 76];
-    detail.push(<path key="rg" d={rear(g1, g2, hw(g1) - 24, hw(g2) - 20, 8)} fill={GLASS} />);
-    detail.push(<path key="grille" d="M70 20h60" stroke={LINE} strokeWidth="2" strokeLinecap="round" />);
-    if (k === 'sedan') detail.push(<path key="trunk" d={`M${f1(100 - hw(H - 30) + 18)} ${H - 30}C80 ${H - 25} 120 ${H - 25} ${f1(100 + hw(H - 30) - 18)} ${H - 30}`} stroke={LINE} strokeWidth="2" fill="none" />);
-    else detail.push(<path key="lip" d={`M${f1(100 - hw(L + 40) + 18)} ${L + 39}h${f1(2 * hw(L + 40) - 36)}`} stroke={TRIM} strokeWidth="3" strokeLinecap="round" />);
+  // 轮胎：前后两个轴，从车身两侧露出一点；胎纹三道
+  const [tw, th] = k === 'coupe' ? [14, 38] : k === 'bus' || k === 'truck' ? [13, 34] : [12, 32];
+  for (const y of P.axles) for (const s of [-1, 1]) {
+    const x = f1(100 + s * (hw(y) - 3) - tw / 2);
+    add(<g key={'t' + y + s}>
+      <rect x={x} y={y - th / 2} width={tw} height={th} rx="4.5" fill={TIRE} />
+      <path d={`M${x + 2} ${y - th / 4}h${tw - 4}M${x + 2} ${y}h${tw - 4}M${x + 2} ${y + th / 4}h${tw - 4}`} stroke="#3a4152" strokeWidth="1.6" />
+    </g>);
   }
 
+  // 车身 + 金属光泽
+  add(<path key="body" d={body} fill={`url(#${uid}p)`} stroke={line} strokeWidth="1.6" />);
+  add(<g key="sheen" clipPath={`url(#${uid}c)`}>
+    <ellipse cx="100" cy={f1(P.ws[0] / 2 + 4)} rx={f1(hw(P.ws[0] / 2) * 0.2)} ry={f1(P.ws[0] / 2 - 10)} fill="#fff" opacity=".14" />
+    {!(k === 'coupe' && oneRow) && <ellipse cx="100" cy={f1((P.rg[1] + H) / 2)} rx={f1(hw(H - 30) * 0.22)} ry={f1(Math.max(5, (H - P.rg[1]) / 2 - 9))} fill="#fff" opacity=".1" />}
+  </g>);
+
+  // 灯：车头白色 LED（贴着车头的两角），车尾一条细细的红灯
+  const lampDepth = { coupe: 40, suv: 18, suv3: 18, truck: 16, bus: 14, mpv: 22 }[k] || 22;
+  const tailCorners = k === 'truck' || k === 'bus';
+  add(<g key="lamps">
+    <path d={body} fill="none" stroke="#fbfcfe" strokeWidth="6" clipPath={`url(#${uid}hl)`} />
+    <path d={body} fill="none" stroke="#aeb8c8" strokeWidth="1.6" clipPath={`url(#${uid}hl)`} />
+    <path d={body} fill="none" stroke="#d92f3f" strokeWidth="6" clipPath={`url(#${uid}tl)`} />
+    <path d={body} fill="none" stroke="#ff8f99" strokeWidth="1.4" clipPath={`url(#${uid}tl)`} />
+  </g>);
+  // 越野感：SUV / 皮卡车头一块黑色格栅（带三道横条），SUV 车尾一道黑色护杠
+  if (k === 'suv' || k === 'suv3' || k === 'truck') {
+    add(<rect key="grille" x="68" y={shape.yF + 4} width="64" height="9" rx="3.5" fill={TRIM} />);
+    add(<path key="grillebars" d={`M74 ${shape.yF + 7}h52M74 ${shape.yF + 10}h52`} stroke="#4a5266" strokeWidth="1" />);
+  }
+  if (k === 'suv' || k === 'suv3') add(<rect key="rearbumper" x="66" y={H - 11} width="68" height="5" rx="2.5" fill={TRIM} />);
+
+  // 引擎盖：两道棱
+  const [w1, w2] = P.ws;
+  add(<path key="hood" d={`M${f1(100 - hw(w1) + 22)} ${w1 - 6}C${f1(100 - hw(30) + 26)} ${f1(w1 * 0.6)} ${f1(100 - hw(30) + 26)} 34 ${f1(100 - hw(24) + 30)} 22M${f1(100 + hw(w1) - 22)} ${w1 - 6}C${f1(100 + hw(30) - 26)} ${f1(w1 * 0.6)} ${f1(100 + hw(30) - 26)} 34 ${f1(100 + hw(24) - 30)} 22`} stroke={line} strokeOpacity=".35" strokeWidth="1.4" fill="none" />);
+
+  // 前挡风：深色玻璃 + 一道反光
+  const wsInset = k === 'coupe' ? [28, 13] : k === 'bus' ? [9, 9] : [15, 12];
+  const wsTop = hw(w1) - wsInset[0], wsBot = hw(w2) - wsInset[1];
+  add(<path key="ws" d={band(w1, w2, y => wsTop + (wsBot - wsTop) * (y - w1) / (w2 - w1), k === 'bus' ? 4 : 12, k === 'bus' ? -2 : -8)} fill={`url(#${uid}g)`} />);
+  add(<path key="wsr" d={`M${f1(100 - wsTop * 0.55)} ${w1 + 6}l${f1(wsTop * 0.35)} 0l-14 ${f1(w2 - w1 - 12)}h-10Z`} fill="#fff" opacity=".13" />);
+
+  // 车厢（掀了车顶）：内饰底色、仪表台 + 中控屏、两侧车门的接缝、前排中间的扶手
+  const cabW = y => hw(y) - SILL;
+  add(<path key="cab" d={band(w2, P.cab, cabW, -8, 6)} fill={INTERIOR} stroke={line} strokeOpacity=".45" strokeWidth="1.2" />);
+  add(<path key="dash" d={band(w2, w2 + 11, cabW, -8, -4)} fill={DASH} />);
+  add(<rect key="screen" x="84" y={w2 + 2.5} width="32" height="5.5" rx="2.5" fill="#2a2f3a" />);
+  if (rows[0] === 2 && k !== 'bus' && k !== 'mpv') add(<rect key="console" x="94.5" y={F - 16} width="11" height={k === 'coupe' && oneRow ? 36 : 42} rx="5.5" fill={DASH} />);
+  for (let r = 0; r < rows.length - 1; r++) {
+    const y = f1(F + r * gap + gap / 2 + 4);
+    add(<path key={'seam' + r} d={`M${f1(100 - hw(y) + 2)} ${y}h${SILL - 3}M${f1(100 + hw(y) - 2)} ${y}h-${SILL - 3}`} stroke={line} strokeOpacity=".5" strokeWidth="1.4" strokeLinecap="round" />);
+  }
+
+  // 后窗
+  if (P.rg) {
+    const [r1, r2] = P.rg, top = cabW(r1), bot = hw(r2) - (k === 'coupe' ? 30 : 17);
+    add(<path key="rg" d={band(r1, r2, y => top + (bot - top) * (y - r1) / (r2 - r1), -6, 6)} fill={`url(#${uid}g)`} />);
+    add(<path key="rgr" d={`M${f1(100 + top * 0.3)} ${r1 + 4}h${f1(top * 0.3)}l-8 ${f1(r2 - r1 - 8)}h-8Z`} fill="#fff" opacity=".1" />);
+  }
+
+  // 后视镜
+  const my = w2 - 2;
+  add(<path key="mirrors" d={`M${f1(100 - hw(my) + 1)} ${my}l-13 -4q-4 0 -3.5 5l15.5 4.5ZM${f1(100 + hw(my) - 1)} ${my}l13 -4q4 0 3.5 5l-15.5 4.5Z`} fill={mid} stroke={line} strokeWidth="1.2" strokeLinejoin="round" />);
+
+  // ---- 各级别的细节 ----
+  if (k === 'sedan') add(<path key="trunk" d={`M${f1(100 - hw(H - 32) + 16)} ${H - 32}C80 ${H - 26} 120 ${H - 26} ${f1(100 + hw(H - 32) - 16)} ${H - 32}`} stroke={line} strokeOpacity=".4" strokeWidth="1.4" fill="none" />);
+  if (k === 'hatch') add(<path key="lip" d={band(P.rg[0] - 5, P.rg[0], cabW, -6, 6)} fill={TRIM} />);
+
   if (k === 'coupe') {
-    // 前大灯、引擎盖上两道棱
-    detail.push(<path key="lamps" d="M49 44Q54 29 72 21L75 27Q61 33 54 47ZM151 44Q146 29 128 21L125 27Q139 33 146 47Z" fill={TRIM} />);
-    detail.push(<path key="crease" d={`M88 30L80 ${w1 - 12}M112 30L120 ${w1 - 12}`} stroke={LINE} strokeWidth="2" strokeLinecap="round" />);
-    detail.push(<path key="hoodvent" d={`M88 ${w1 - 40}h24M90 ${w1 - 32}h20`} stroke={GLASS} strokeWidth="2.5" strokeLinecap="round" />);
+    add(<rect key="hoodvent" x="84" y={w1 - 34} width="32" height="12" rx="4" fill={TRIM} opacity=".85" />);
+    add(<path key="hoodslat" d={`M88 ${w1 - 28}h24`} stroke="#4a5266" strokeWidth="1.5" />);
     if (oneRow) {
-      // 中置引擎：座位后面是引擎盖（百叶）、两侧进气口，车尾一道尾翼
-      const e1 = L + 40, e2 = H - 40;
-      detail.push(<path key="intake" d={`M${f1(100 - hw(L + 24) + 3)} ${L + 20}l10 7v22l-10-5ZM${f1(100 + hw(L + 24) - 3)} ${L + 20}l-10 7v22l10-5Z`} fill={TRIM} />);
-      detail.push(<path key="engine" d={rear(e1, e2, hw(e1) - 30, hw(e2) - 28, 6)} fill="#dfe5ef" stroke={EDGE} strokeWidth="1.5" />);
-      for (let i = 0; i < 4; i++) {
-        const y = e1 + 12 + i * ((e2 - e1 - 18) / 3);
-        detail.push(<path key={'vent' + i} d={`M${f1(100 - hw(y) + 42)} ${f1(y)}h${f1(2 * hw(y) - 84)}`} stroke={GLASS} strokeWidth="3" strokeLinecap="round" />);
+      const e1 = L + 46, e2 = H - 40;
+      add(<path key="intake" d={`M${f1(100 - hw(L + 24) + 3)} ${L + 18}l11 8v22l-11-5ZM${f1(100 + hw(L + 24) - 3)} ${L + 18}l-11 8v22l11-5Z`} fill={TRIM} />);
+      for (let i = 0; i < 5; i++) {
+        const y = f1(e1 + i * (e2 - e1) / 4);
+        add(<path key={'louvre' + i} d={`M${f1(100 - hw(y) + 30)} ${y}h${f1(2 * hw(y) - 60)}`} stroke={TRIM} strokeWidth="3.2" strokeLinecap="round" opacity=".85" />);
       }
-      detail.push(<rect key="wing" x="34" y={H - 26} width="132" height="8" rx="4" fill={TRIM} />);
+      add(<rect key="wing" x="30" y={H - 27} width="140" height="9" rx="3" fill={TRIM} />);
+      add(<path key="plates" d={`M33 ${H - 31}v16M167 ${H - 31}v16`} stroke={TRIM} strokeWidth="4" strokeLinecap="round" />);
+      add(<path key="exhaust" d={`M93 ${H - 6}h0.1M107 ${H - 6}h0.1`} stroke="#aab2c0" strokeWidth="6" strokeLinecap="round" />);
     } else {
-      // 2+2：溜背的长后窗、鸭尾
-      const g1 = L + 40, g2 = L + 76;
-      detail.push(<path key="rg" d={rear(g1, g2, hw(g1) - 30, hw(g2) - 40, 8)} fill={GLASS} />);
-      detail.push(<path key="duck" d={`M${f1(100 - hw(H - 16) + 14)} ${H - 16}C80 ${H - 10} 120 ${H - 10} ${f1(100 + hw(H - 16) - 14)} ${H - 16}`} stroke={TRIM} strokeWidth="4" strokeLinecap="round" fill="none" />);
+      add(<path key="duck" d={`M${f1(100 - hw(H - 18) + 12)} ${H - 18}C80 ${H - 12} 120 ${H - 12} ${f1(100 + hw(H - 18) - 12)} ${H - 18}`} stroke={TRIM} strokeWidth="3" strokeLinecap="round" fill="none" />);
+      add(<path key="exhaust" d={`M78 ${H - 6}h4M118 ${H - 6}h4`} stroke="#aab2c0" strokeWidth="5" strokeLinecap="round" />);
     }
   }
 
-  if (k === 'suv' || k === 'suv3') {
-    const g1 = H - 64, g2 = H - 32;
-    detail.push(<path key="rails" d={`M${f1(100 - hw(F) + 15)} ${w2 + 8}V${g1 - 8}M${f1(100 + hw(F) - 15)} ${w2 + 8}V${g1 - 8}`} stroke="#c3ccdb" strokeWidth="3" strokeLinecap="round" />);
-    detail.push(<path key="rg" d={rear(g1, g2, hw(g1) - 22, hw(g2) - 20, 4)} fill={GLASS} />);
-    detail.push(<path key="grille" d="M64 15h72" stroke={LINE} strokeWidth="2.5" strokeLinecap="round" />);
-  }
-
   if (k === 'mpv') {
-    const g1 = H - 58, g2 = H - 24;
-    detail.push(<path key="track" d={`M${f1(100 - hw(F + 40) + 3)} ${F + 34}V${F + 112}M${f1(100 + hw(F + 40) - 3)} ${F + 34}V${F + 112}`} stroke={LINE} strokeWidth="2.5" strokeLinecap="round" />);
-    detail.push(<path key="rg" d={rear(g1, g2, hw(g1) - 18, hw(g2) - 16, 5)} fill={GLASS} />);
+    const y1 = F + 26, y2 = F + gap + 14;
+    add(<path key="slide" d={`M${f1(100 - hw(y1) + 4)} ${y1}V${y2}M${f1(100 + hw(y1) - 4)} ${y1}V${y2}`} stroke={TRIM} strokeOpacity=".55" strokeWidth="1.6" strokeLinecap="round" />);
   }
 
   if (k === 'truck') {
-    // 驾驶室后窗；车斗：开口的箱子、底板棱、尾门
-    const b1 = L + 52, b2 = H - 14, bw = hw(b1) - 9;
-    detail.push(<path key="cabglass" d={rear(L + 26, L + 40, hw(L + 26) - 24, hw(L + 40) - 24, 3)} fill={GLASS} />);
-    detail.push(<rect key="bed" x={f1(100 - bw)} y={b1} width={f1(2 * bw)} height={b2 - b1} rx="6" fill="#dde3ee" stroke={EDGE} strokeWidth="1.5" />);
-    for (const dx of [-26, 0, 26]) detail.push(<path key={'rib' + dx} d={`M${100 + dx} ${b1 + 10}V${b2 - 10}`} stroke="#cfd7e4" strokeWidth="2.5" strokeLinecap="round" />);
-    detail.push(<path key="gate" d={`M${f1(100 - bw + 6)} ${H - 9}h${f1(2 * bw - 12)}`} stroke={TRIM} strokeWidth="3" strokeLinecap="round" />);
-    detail.push(<path key="grille" d="M64 14h72" stroke={LINE} strokeWidth="2.5" strokeLinecap="round" />);
+    const b1 = L + 54, b2 = H - 16, bw = hw(b1) - 10;
+    add(<rect key="bed" x={f1(100 - bw)} y={b1} width={f1(2 * bw)} height={b2 - b1} rx="5" fill="#363d4c" stroke={line} strokeWidth="1.4" />);
+    for (const dx of [-30, -10, 10, 30]) add(<path key={'rib' + dx} d={`M${100 + dx} ${b1 + 8}V${b2 - 8}`} stroke="#4b5467" strokeWidth="2.4" strokeLinecap="round" />);
+    add(<rect key="handle" x="90" y={H - 12} width="20" height="4" rx="2" fill={TRIM} />);
   }
 
   if (k === 'bus') {
-    // 两侧一长条窗、后窗
-    detail.push(<path key="sides" d={`M${f1(100 - hw(F) + 7)} ${w2 + 14}V${H - 46}M${f1(100 + hw(F) - 7)} ${w2 + 14}V${H - 46}`} stroke={GLASS} strokeWidth="6" strokeLinecap="round" />);
-    detail.push(<path key="rg" d={rear(H - 38, H - 18, hw(H - 38) - 14, hw(H - 18) - 14, 3)} fill={GLASS} />);
-    detail.push(<path key="grille" d="M62 13h76" stroke={LINE} strokeWidth="2.5" strokeLinecap="round" />);
+    const y = F + gap + 6;
+    add(<path key="door" d={`M${f1(100 + hw(y) - 3)} ${y}V${y + gap - 8}`} stroke={TRIM} strokeOpacity=".5" strokeWidth="1.6" strokeLinecap="round" />);
   }
 
   return (
     <svg viewBox={'0 0 200 ' + H} className="car-body" aria-hidden="true">
       <defs>
-        <linearGradient id={'paint' + id} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#e7ebf3" /><stop offset=".5" stopColor="#ffffff" /><stop offset="1" stopColor="#e7ebf3" />
+        <linearGradient id={uid + 'p'} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor={edge} /><stop offset=".2" stopColor={mid} /><stop offset=".5" stopColor={light} /><stop offset=".8" stopColor={mid} /><stop offset="1" stopColor={edge} />
         </linearGradient>
+        <linearGradient id={uid + 'g'} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={GLASS_TOP} /><stop offset="1" stopColor={GLASS_BOTTOM} />
+        </linearGradient>
+        <clipPath id={uid + 'c'}><path d={body} /></clipPath>
+        <clipPath id={uid + 'hl'}><rect x="0" y="0" width="74" height={lampDepth} /><rect x="126" y="0" width="74" height={lampDepth} /></clipPath>
+        <clipPath id={uid + 'tl'}>{tailCorners
+          ? <><rect x="0" y={H - 14} width="62" height="14" /><rect x="138" y={H - 14} width="62" height="14" /></>
+          : <rect x="0" y={H - (k === 'coupe' ? 22 : 16)} width="200" height="22" />}</clipPath>
       </defs>
-      {tires}
-      <path d={outline(shape)} fill={'url(#paint' + id + ')'} stroke={EDGE} strokeWidth="2" />
-      {detail}
+      {out}
     </svg>
   );
 }

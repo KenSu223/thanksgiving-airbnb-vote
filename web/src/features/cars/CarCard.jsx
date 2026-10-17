@@ -4,7 +4,7 @@ import { kindOf, modelById, modelName, rowsText, seatCount, seatIds, trunkOf } f
 import BagIcon from './BagIcon.jsx';
 import CarBody, { carGeometry } from './CarBody.jsx';
 
-// 俯视图：车头朝上，左舵（主驾在左前）。车身按级别画（CarBody.jsx：轿车、跑车、SUV、皮卡…），
+// 俯视图：车头朝上，左舵（主驾在左前），像选座图那样掀了车顶。车身按级别画（CarBody.jsx：轿车、跑车、SUV、皮卡…），
 // 每排座位的纵向位置也跟着车身走（第一排 first，往后每排 gap）。
 // 每排几个座 → 从左到右的横向位置（%）
 const XS = { 1: [50], 2: [30, 70], 3: [27, 50, 73], 4: [22, 40.7, 59.3, 78] };
