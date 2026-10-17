@@ -73,8 +73,8 @@ await Promise.all(users.slice(0, 8).map(u => J('POST', '/api/flights', { name: u
 const fl2 = await J('GET', '/api/flights');
 storm('flight saves (8 parallel)', 8, fl2.json.people.filter(p => users.slice(0, 8).some(u => u.name === p.name) && p.arrival).length);
 
-// --- angel prefs: 8 people submit wishes at once (one shared doc)
-await Promise.all(users.slice(0, 8).map(u => J('POST', '/api/angel/prefs', { name: u.name, token: u.token, picks: { snacks: 'love', books: 'like' }, note: `storm ${tag}` })));
+// --- angel prefs: 8 people submit their answers at once (one shared doc)
+await Promise.all(users.slice(0, 8).map(u => J('POST', '/api/angel/prefs', { name: u.name, token: u.token, answers: { nogo: `storm ${tag}`, travel: '耳机', rich: '旅行', shop: '咖啡店', snack: '黑巧' } })));
 const angel = await J('GET', '/api/angel');
 const submitted = angel.json.people.filter(p => p.submitted && users.slice(0, 8).some(u => u.name === p.name)).length;
 storm('angel prefs (8 parallel)', 8, submitted);

@@ -86,9 +86,9 @@ const astMsg = await until(() => astChat.got.find(m => m.type === 'msg' && m.msg
 ck('retiree chatted and was @-ed', !!astMsg && astMsg.msg.mentions.includes(VICTIM.toLowerCase()), JSON.stringify(astMsg?.msg));
 
 // ---- Secret Angel: no admin; a plain member draws, with the retiree in the circle ----
-await J('POST', '/api/angel/prefs', { name: VICTIM, token: vic.token, picks: { gear: 'love' } });
-await J('POST', '/api/angel/prefs', { name: 'PM', token: pm.token, picks: { gear: 'love' } });
-await J('POST', '/api/angel/prefs', { name: 'Aster', token: ast.token, picks: { food: 'love' } });
+await J('POST', '/api/angel/prefs', { name: VICTIM, token: vic.token, answers: { nogo: '无', travel: '耳机', rich: '旅行', shop: '咖啡店', snack: '黑巧' } });
+await J('POST', '/api/angel/prefs', { name: 'PM', token: pm.token, answers: { nogo: '无', travel: '耳机', rich: '旅行', shop: '咖啡店', snack: '黑巧' } });
+await J('POST', '/api/angel/prefs', { name: 'Aster', token: ast.token, answers: { nogo: '无', travel: '耳机', rich: '旅行', shop: '咖啡店', snack: '黑巧' } });
 const anon = await J('POST', '/api/angel/draw', {});
 ck('drawing needs a login', anon.ok === false, JSON.stringify(anon));
 const draw = await J('POST', '/api/angel/draw', { name: 'PM', token: pm.token });

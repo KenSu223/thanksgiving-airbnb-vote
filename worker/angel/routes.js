@@ -1,4 +1,6 @@
-// Secret Angel: everyone saves gift preferences; then anyone draws who
+// Secret Angel: everyone answers a few questions about themselves (five of
+// the ten in web/src/features/angel/questions.js, "what can't I be given"
+// always among them) so a stranger can pick them a gift; then anyone draws who
 // gives a gift to whom (everyone has the same rights — there's no admin;
 // the draw, a reshuffle and leaving someone out are logged with who did it). Each person is only ever sent their
 // own match. Stored in the store (worker/store) under angel:v1 — its old
@@ -7,10 +9,10 @@ import { j } from '../lib/http.js';
 import { readDoc, transact } from '../lib/store.js';
 import { cleanName, getUsers, sameName } from '../users/users.js';
 import { drawCycle } from './draw.js';
+import { cleanAnswers, answersError } from '../../web/src/features/angel/questions.js';
 
 const ANGEL_KEY = 'angel:v1';
 const KEEP_LOG = 20;
-const PICK_VALUES = ['love', 'nope'];
 
 const emptyAngel = () => ({ prefs: {}, excluded: [], draw: null });
 const normalizeAngel = a => {
@@ -56,10 +58,17 @@ const roster = (users, a) => users
   .filter(u => !a.excluded.includes(u.key))
   .sort((x, y) => x.name.localeCompare(y.name, 'zh-CN'));
 
+// What the page gets of someone's saved wishes: their answers. Wishes saved
+// before the questions (gift categories, picks) show only their note, until
+// that person answers the questions.
+const shownPrefs = p => (p ? { answers: p.answers || null, note: p.answers ? '' : p.note || '', updatedAt: p.updatedAt || 0 } : null);
+
 function view(users, a, me) {
+  // submitted: answered the questions. inPool: has saved anything (old category
+  // wishes too), so a reshuffle never drops someone who joined before the questions.
   const people = users.map(u => {
     const key = u.name.toLowerCase();
-    return { name: u.name, submitted: !!a.prefs[key], excluded: a.excluded.includes(key) };
+    return { name: u.name, submitted: !!a.prefs[key]?.answers, inPool: !!a.prefs[key], excluded: a.excluded.includes(key) };
   }).sort((x, y) => x.name.localeCompare(y.name, 'zh-CN'));
   const masterKey = me && a.draw ? a.draw.pairs[me] : null;
   const master = masterKey ? users.find(u => u.name.toLowerCase() === masterKey) : null;
@@ -69,8 +78,8 @@ function view(users, a, me) {
     drawn: !!a.draw, drawnAt: a.draw ? a.draw.at : null, drawnBy: a.draw?.by || null,
     log: a.log.slice(-8),
     inDraw: !!(me && a.draw && a.draw.pairs[me]),
-    mine: me ? a.prefs[me] || null : null,
-    master: master ? { name: master.name, prefs: a.prefs[masterKey] || null } : null,
+    mine: me ? shownPrefs(a.prefs[me]) : null,
+    master: master ? { name: master.name, prefs: shownPrefs(a.prefs[masterKey]) } : null,
   };
 }
 
@@ -84,13 +93,11 @@ async function handlePrefs(req, env) {
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { users, key } = await caller(env, body.name, body.token);
   if (!key) return j({ ok: false, error: '先登录' });
-  const picks = {};
-  for (const [cat, v] of Object.entries(body.picks || {}).slice(0, 40)) {
-    if (/^[a-z_]{1,24}$/.test(cat) && PICK_VALUES.includes(v)) picks[cat] = v;
-  }
-  if (!Object.values(picks).includes('love')) return j({ ok: false, error: '至少选一样想要的 💖' });
+  const answers = cleanAnswers(body.answers);
+  const wrong = answersError(answers);
+  if (wrong) return j({ ok: false, error: wrong });
   const a = await updateAngel(env, a => {
-    a.prefs[key] = { picks, note: String(body.note || '').trim().slice(0, 200), updatedAt: Date.now() };
+    a.prefs[key] = { answers, updatedAt: Date.now() }; // replaces any old category wishes
     return a;
   });
   return j(view(users, a, key));
@@ -127,7 +134,7 @@ async function handleDraw(req, env) {
   const out = await updateAngel(env, a => {
     if (!key) return { error: '先登录再抽签' };
     const pool = roster(users, a).filter(p => a.prefs[p.key]);
-    if (pool.length < 2) return { error: '至少要有两个人选好愿望才能抽（现在 ' + pool.length + ' 人）' };
+    if (pool.length < 2) return { error: '至少要有两个人答好题才能抽（现在 ' + pool.length + ' 人）' };
     const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
     const pairs = drawCycle(pool.map(p => p.key), rand);
     if (!pairs) return { error: '至少要两个人才能抽' };

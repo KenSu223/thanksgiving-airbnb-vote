@@ -1,28 +1,14 @@
 /* ---------- Secret Angel ---------- */
-.angel-deck { position:relative; width:min(78vw, 300px); height:380px; }
-.angel-card { position:absolute; inset:0; border-radius:1.5rem; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:1.5rem;
-  box-shadow:0 18px 40px -12px rgba(30,27,75,.45); }
-.angel-card.under { opacity:.7; transition: transform .3s ease; }
-.angel-card.top { cursor:grab; touch-action:none; user-select:none; }
-.angel-card.top:active { cursor:grabbing; }
-.angel-card.top.settle { transition: transform .28s cubic-bezier(.2,.8,.2,1); }
-.angel-stamp { position:absolute; top:1.2rem; padding:.2rem .7rem; border:3px solid #fff; border-radius:.6rem; font-weight:900; font-size:1.2rem; background:rgba(255,255,255,.2); }
-.angel-stamp.love { left:1rem; transform:rotate(-12deg); }
-.angel-stamp.nope { right:1rem; transform:rotate(12deg); }
-.angel-round { width:3.75rem; height:3.75rem; border-radius:9999px; box-shadow:0 6px 16px -4px rgba(15,23,42,.3); transition: transform .15s; }
-.angel-round.small { width:3rem; height:3rem; }
-.angel-round:hover { transform: scale(1.1); }
-.angel-round:active { transform: scale(.92); }
-
-.angel-tile { position:relative; display:flex; flex-direction:column; align-items:center; padding:.9rem .5rem 2rem; border-radius:1rem; border:2px solid #e2e8f0; background:#fff; transition: transform .15s, box-shadow .2s; }
-.angel-tile:hover { transform: translateY(-2px); box-shadow:0 8px 20px -8px rgba(15,23,42,.25); }
-.angel-tile:active { transform: scale(.96); }
-.angel-tile.love { color:#fff; border-color:transparent; animation: angel-pop .3s ease; }
-.angel-tile.nope { background:#f8fafc; color:#94a3b8; }
-.angel-tile.nope > span:first-child { filter: grayscale(1); opacity:.5; }
-.angel-badge { position:absolute; bottom:.5rem; font-size:.7rem; font-weight:700; padding:.1rem .5rem; border-radius:9999px; background:rgba(15,23,42,.06); }
-.angel-tile.love .angel-badge { background:rgba(255,255,255,.25); }
-@keyframes angel-pop { 0% { transform:scale(.9); } 60% { transform:scale(1.06); } 100% { transform:scale(1); } }
+/* 十道题：两列（窄屏一列），答了的那道亮起来；「不能送的」没答时描一圈红 */
+.angel-qs { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap:.6rem; margin:0; padding:0; list-style:none; }
+.angel-q { display:flex; flex-direction:column; gap:.4rem; padding:.75rem .85rem; border-radius:1rem; border:1.5px solid #e2e8f0; background:rgba(255,255,255,.7); transition: border-color .15s, background .15s; }
+.angel-q.done { border-color:#c7d2fe; background:#eef2ff; }
+.angel-q.must:not(.done) { border-color:#fecdd3; }
+.angel-q-text { display:flex; align-items:baseline; gap:.4rem; font-weight:700; font-size:.92rem; color:#1e293b; line-height:1.35; }
+.angel-req { flex-shrink:0; font-size:.68rem; font-weight:800; color:#e11d48; background:#ffe4e6; border-radius:999px; padding:.05rem .45rem; }
+.angel-q-input { width:100%; border:1px solid #cbd5e1; border-radius:.7rem; padding:.45rem .7rem; font-size:.95rem; background:#fff; outline:none; }
+.angel-q-input:focus { border-color:#818cf8; box-shadow:0 0 0 3px rgba(129,140,248,.2); }
+.angel-notice { margin-top:.5rem; font-size:.85rem; color:#92400e; background:#fffbeb; border-radius:.75rem; padding:.45rem .75rem; }
 
 .angel-reveal-wrap { perspective: 1200px; display:flex; justify-content:center; }
 /* Both faces sit in the same grid cell, so the card is as tall as its longer side. */
@@ -33,9 +19,14 @@
 .angel-reveal .front { color:#fff; background: radial-gradient(90% 70% at 80% 0%, rgba(236,72,153,.6), transparent 60%), linear-gradient(160deg, #312e81, #6d28d9); }
 .angel-reveal:not(.open) .front { animation: angel-wiggle 2.4s ease-in-out infinite; }
 .angel-reveal .back { background:#fff; transform: rotateY(180deg); }
-.angel-pill { font-size:.8rem; background:#ffe4e6; color:#9f1239; border-radius:9999px; padding:.15rem .6rem; }
-.angel-pill.nope { background:#f1f5f9; color:#64748b; text-decoration: line-through; }
+/* 拆开的信封里：ta 答的题，一问一答；「不能送的」标红 */
+.angel-answers { width:100%; margin:.6rem 0 0; display:grid; gap:.45rem; text-align:left; }
+.angel-answer { padding:.5rem .75rem; border-radius:.8rem; background:#f8fafc; }
+.angel-answer dt { font-size:.75rem; font-weight:600; color:#64748b; }
+.angel-answer dd { margin:.1rem 0 0; font-weight:700; color:#1e293b; overflow-wrap:anywhere; }
+.angel-answer.nogo { background:#fff1f2; }
+.angel-answer.nogo dt { color:#be123c; }
 @keyframes angel-wiggle { 0%, 80%, 100% { transform: rotate(0); } 85% { transform: rotate(-2deg); } 90% { transform: rotate(2deg); } 95% { transform: rotate(-1deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .angel-reveal { transition:none; } .angel-reveal:not(.open) .front, .angel-tile.love { animation:none; }
+  .angel-reveal { transition:none; } .angel-reveal:not(.open) .front { animation:none; }
 }

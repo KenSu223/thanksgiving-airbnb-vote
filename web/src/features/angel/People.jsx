@@ -1,4 +1,4 @@
-// 谁选好了。谁都可以把不参加的人排除掉（或者加回来），点之前会确认。
+// 谁交了答案（以前选礼物分类、还没答题的显示 …）。谁都可以把不参加的人排除掉（或者加回来），点之前会确认。
 export default function People({ people, onExclude }) {
   const inPeople = people.filter(p => !p.excluded);
   const done = inPeople.filter(p => p.submitted).length;

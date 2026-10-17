@@ -64,9 +64,10 @@ works for any group picking a place together.
 - Flights: everyone enters their arrival and departure flights; a route map
   (arrivals and departures separately), an airport pickup list people can
   claim, and suggested times to be at the airport for departures
-- Secret Angel: swipe through gift categories to say what you'd love (or
-  not), then the admin draws who secretly gives a gift to whom; everyone only
-  sees their own match
+- Secret Angel: answer five of ten quick questions (what you can't be given,
+  plus fun ones like "if you opened a little shop, what would it be?") so a
+  stranger can pick your gift, then anyone draws who secretly gives a gift to
+  whom; everyone only sees their own match
 - No passwords, no database server
 
 ## How it works
