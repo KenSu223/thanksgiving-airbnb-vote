@@ -1,13 +1,34 @@
 /* ---------- Secret Angel ---------- */
-/* 十道题：两列（窄屏一列），答了的那道亮起来；「不能送的」没答时描一圈红 */
-.angel-qs { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap:.6rem; margin:0; padding:0; list-style:none; }
-.angel-q { display:flex; flex-direction:column; gap:.4rem; padding:.75rem .85rem; border-radius:1rem; border:1.5px solid #e2e8f0; background:rgba(255,255,255,.7); transition: border-color .15s, background .15s; }
-.angel-q.done { border-color:#c7d2fe; background:#eef2ff; }
-.angel-q.must:not(.done) { border-color:#fecdd3; }
-.angel-q-text { display:flex; align-items:baseline; gap:.4rem; font-weight:700; font-size:.92rem; color:#1e293b; line-height:1.35; }
-.angel-req { flex-shrink:0; font-size:.68rem; font-weight:800; color:#e11d48; background:#ffe4e6; border-radius:999px; padding:.05rem .45rem; }
-.angel-q-input { width:100%; border:1px solid #cbd5e1; border-radius:.7rem; padding:.45rem .7rem; font-size:.95rem; background:#fff; outline:none; }
-.angel-q-input:focus { border-color:#818cf8; box-shadow:0 0 0 3px rgba(129,140,248,.2); }
+/* 一叠问题卡片：上面一张能答，后面两张露个边；答了往上飞走，跳过往左飞走 */
+.angel-dots { display:flex; gap:.4rem; margin-bottom:.5rem; }
+.angel-dots span { width:.7rem; height:.7rem; border-radius:999px; background:#e2e8f0; transition: background .25s, transform .25s; }
+.angel-dots span.on { background:linear-gradient(135deg, #6366f1, #ec4899); transform:scale(1.15); }
+.angel-deck { position:relative; width:min(86vw, 320px); height:340px; }
+.angel-card { position:absolute; inset:0; border-radius:1.5rem; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:1.5rem 1.25rem;
+  box-shadow:0 18px 40px -12px rgba(30,27,75,.45); }
+.angel-card.under { opacity:.75; transition: transform .3s ease; }
+.angel-card.top { animation: angel-deal .3s ease; transition: transform .26s ease-in, opacity .26s ease-in; }
+.angel-card.top.fly-answer { transform: translate(40px, -420px) rotate(12deg); opacity:0; }
+.angel-card.top.fly-skip { transform: translate(-460px, 30px) rotate(-14deg); opacity:0; }
+.angel-card-q { font-size:1.25rem; font-weight:900; line-height:1.35; text-wrap:balance; text-shadow:0 1px 8px rgba(0,0,0,.18); }
+.angel-card-input { width:100%; margin-top:1.1rem; border:0; border-radius:.9rem; padding:.7rem .9rem; font-size:1rem; color:#1e293b; background:rgba(255,255,255,.92); outline:none;
+  box-shadow:inset 0 1px 3px rgba(15,23,42,.12); }
+.angel-card-input:focus { box-shadow:0 0 0 3px rgba(255,255,255,.55); }
+.angel-card-input::placeholder { color:#94a3b8; }
+.angel-must { position:absolute; top:1rem; right:1rem; font-size:.72rem; font-weight:800; background:rgba(255,255,255,.25); border:1.5px solid rgba(255,255,255,.7); border-radius:999px; padding:.1rem .55rem; }
+.angel-btn { min-width:7.5rem; border-radius:999px; padding:.65rem 1.2rem; font-weight:800; transition: transform .15s, opacity .15s; }
+.angel-btn:active:not(:disabled) { transform:scale(.95); }
+.angel-btn:disabled { opacity:.35; cursor:not-allowed; }
+.angel-btn.ghost { background:#fff; color:#475569; box-shadow:0 4px 14px -6px rgba(15,23,42,.3); }
+.angel-btn.solid { color:#fff; background:linear-gradient(90deg, #4f46e5, #ec4899); box-shadow:0 8px 20px -8px rgba(236,72,153,.6); }
+@keyframes angel-deal { from { transform: translateY(14px) scale(.95); } to { transform:none; } }
+/* 答好的五张：摊开的小卡片（两列，窄屏一列） */
+.angel-minis { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap:.6rem; margin:0; padding:0; list-style:none; }
+.angel-mini { border-radius:1rem; padding:.8rem .9rem; color:#fff; box-shadow:0 10px 24px -14px rgba(30,27,75,.6); }
+.angel-mini-q { flex:1; font-size:.8rem; font-weight:700; opacity:.92; line-height:1.35; }
+.angel-mini-a { margin-top:.45rem; font-size:1.02rem; font-weight:800; overflow-wrap:anywhere; text-shadow:0 1px 6px rgba(0,0,0,.15); }
+.angel-mini-edit { flex-shrink:0; font-size:.75rem; font-weight:800; background:rgba(255,255,255,.25); border-radius:999px; padding:.1rem .6rem; }
+.angel-mini-edit:hover { background:rgba(255,255,255,.4); }
 .angel-notice { margin-top:.5rem; font-size:.85rem; color:#92400e; background:#fffbeb; border-radius:.75rem; padding:.45rem .75rem; }
 
 .angel-reveal-wrap { perspective: 1200px; display:flex; justify-content:center; }
@@ -28,5 +49,6 @@
 .angel-answer.nogo dt { color:#be123c; }
 @keyframes angel-wiggle { 0%, 80%, 100% { transform: rotate(0); } 85% { transform: rotate(-2deg); } 90% { transform: rotate(2deg); } 95% { transform: rotate(-1deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .angel-reveal { transition:none; } .angel-reveal:not(.open) .front { animation:none; }
+  .angel-reveal { transition:none; } .angel-reveal:not(.open) .front, .angel-card.top { animation:none; }
+  .angel-card.top { transition:none; }
 }

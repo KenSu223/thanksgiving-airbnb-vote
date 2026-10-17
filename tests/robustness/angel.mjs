@@ -1,5 +1,5 @@
 // Secret Angel's questions (worker/angel/routes.js + web/src/features/angel/questions.js):
-// five of the ten answered, "what can't I be given" among them; old gift-category
+// exactly five of the ten answered, "what can't I be given" among them; old gift-category
 // wishes are refused; a draw shows each angel the answers of the person they give to.
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/angel.mjs
 const B = process.env.TEST_BASE || 'http://localhost:8791';
@@ -25,11 +25,13 @@ r = await J('POST', '/api/angel/prefs', { ...as(A), answers: { travel: 'a', rich
 ck('"what can\'t I be given" is required', r.ok === false && /不能送/.test(r.error), r.error);
 r = await J('POST', '/api/angel/prefs', { ...as(A), answers: { nogo: 'x', travel: 'a', rich: 'b', shop: '   ' } });
 ck('fewer than five (blanks don\'t count) is refused', r.ok === false && /再答 2 道/.test(r.error), r.error);
-r = await J('POST', '/api/angel/prefs', { ...as(A), answers: { ...FIVE, bogus: 'nope', room: 'x'.repeat(200) } });
+r = await J('POST', '/api/angel/prefs', { ...as(A), answers: { ...FIVE, room: '懒人沙发' } });
+ck('more than five is refused (exactly five, not all ten)', r.ok === false && /只答 5 道/.test(r.error), r.error);
+r = await J('POST', '/api/angel/prefs', { ...as(A), answers: { ...FIVE, travel: 'x'.repeat(200), bogus: 'nope' } });
 ck('five answers save; unknown questions dropped; answers capped at 60', r.ok === true && r.mine?.answers?.nogo === '不喝酒'
-  && !('bogus' in r.mine.answers) && r.mine.answers.room.length === 60, JSON.stringify(r.mine));
+  && !('bogus' in r.mine.answers) && r.mine.answers.travel.length === 60, JSON.stringify(r.mine));
 ck('they show as done', r.people.find(p => p.name === A.name)?.submitted === true && r.people.find(p => p.name === A.name)?.inPool === true);
-r = await J('POST', '/api/angel/prefs', { ...as(Bu), answers: { ...FIVE, nogo: '对坚果过敏', world: '吉卜力' } });
+r = await J('POST', '/api/angel/prefs', { ...as(Bu), answers: { nogo: '对坚果过敏', travel: '润唇膏', rich: '开花店', shop: '花店', world: '吉卜力' } });
 ck('a second person answers', r.ok === true);
 
 // Only these two are in this suite's draw if nobody else answered; other suites may add people,
