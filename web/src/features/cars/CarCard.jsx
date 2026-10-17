@@ -1,25 +1,24 @@
 import { useState } from 'react';
 import { BAGS, carLoad, carName, seatName, seatShort } from './bags.js';
-import { modelById, modelName, rowsText, seatCount, seatIds, trunkOf } from './models.js';
+import { kindOf, modelById, modelName, rowsText, seatCount, seatIds, trunkOf } from './models.js';
 import BagIcon from './BagIcon.jsx';
+import CarBody, { carGeometry } from './CarBody.jsx';
 
-// 俯视图的尺寸：车头朝上，左舵（主驾在左前）。第一排在 y=148，往后每排隔 rowGap；最后一排后面
-// 留 133 给后窗和车尾（两排的车正好是原来 200×360 的图）。排数多（面包车）排得紧一点。
-const FIRST_ROW = 148, TAIL = 133;
-const rowGap = n => (n >= 4 ? 70 : 79);
+// 俯视图：车头朝上，左舵（主驾在左前）。车身按级别画（CarBody.jsx：轿车、跑车、SUV、皮卡…），
+// 每排座位的纵向位置也跟着车身走（第一排 first，往后每排 gap）。
 // 每排几个座 → 从左到右的横向位置（%）
 const XS = { 1: [50], 2: [30, 70], 3: [27, 50, 73], 4: [22, 40.7, 59.3, 78] };
 const FRONT_XS = { 1: [31], 2: [31, 69], 3: [27, 50, 73] };
 const initials = n => (/^[A-Za-z0-9]/.test(n) ? n.slice(0, 2) : n.slice(-2)).toUpperCase(); // 英文名取头两个字母，中文名取最后两个字
 
 // 座位 id → 在俯视图上的位置
-function spots(rows) {
-  const H = FIRST_ROW + (rows.length - 1) * rowGap(rows.length) + TAIL;
+function spots(rows, kind) {
+  const { first, gap, H } = carGeometry(kind, rows);
   const ids = seatIds(rows), out = {};
   let k = 0;
   rows.forEach((n, r) => {
     const xs = (r === 0 ? FRONT_XS : XS)[n] || XS[3];
-    for (let i = 0; i < n; i++) out[ids[k++]] = { left: xs[i] + '%', top: ((FIRST_ROW + r * rowGap(rows.length)) / H * 100).toFixed(2) + '%' };
+    for (let i = 0; i < n; i++) out[ids[k++]] = { left: xs[i] + '%', top: ((first + r * gap) / H * 100).toFixed(2) + '%' };
   });
   return { H, out };
 }
@@ -29,7 +28,8 @@ export default function CarCard({ car, index, me, actingFor, bags, busy, canRemo
   const rows = car.rows;
   const ids = seatIds(rows);
   const total = seatCount(rows);
-  const { H, out: SPOT } = spots(rows);
+  const kind = kindOf(car);
+  const { H, out: SPOT } = spots(rows, kind);
   const trunk = trunkOf(car);
   const load = carLoad(car, bags);
   const pct = Math.round((load.liters / trunk) * 100);
@@ -59,18 +59,7 @@ export default function CarCard({ car, index, me, actingFor, bags, busy, canRemo
       </p>
 
       <div className={'car-top' + (rows.some(n => n >= 4) ? ' dense' : '')} style={{ aspectRatio: '200 / ' + H }}>
-        <svg viewBox={'0 0 200 ' + H} className="car-body" aria-hidden="true">
-          <defs>
-            <linearGradient id={'paint' + car.id} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" stopColor="#e7ebf3" /><stop offset=".5" stopColor="#ffffff" /><stop offset="1" stopColor="#e7ebf3" />
-            </linearGradient>
-          </defs>
-          <path d={`M100 6C142 6 166 18 170 52L174 110V${H - 60}C174 ${H - 24} 156 ${H - 8} 100 ${H - 6}C44 ${H - 8} 26 ${H - 24} 26 ${H - 60}V110L30 52C34 18 58 6 100 6Z`} fill={'url(#paint' + car.id + ')'} stroke="#cdd5e3" strokeWidth="2" />
-          <path d="M44 104C70 92 130 92 156 104L150 128C120 120 80 120 50 128Z" fill="#c9d3e6" />
-          <path d={`M52 ${H - 70}C80 ${H - 62} 120 ${H - 62} 148 ${H - 70}L154 ${H - 48}C120 ${H - 38} 80 ${H - 38} 46 ${H - 48}Z`} fill="#c9d3e6" />
-          <path d="M26 118 14 122M174 118 186 122" stroke="#cdd5e3" strokeWidth="5" strokeLinecap="round" />
-          <path d="M68 22h64" stroke="#d8dfeb" strokeWidth="2" strokeLinecap="round" />
-        </svg>
+        <CarBody kind={kind} rows={rows} id={car.id} />
         {ids.map(id => {
           const who = car.seats[id];
           const mine = !!who && who === actingFor;
