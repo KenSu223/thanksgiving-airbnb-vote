@@ -232,8 +232,10 @@ export class GomokuHall {
       watching: this.watchers(i + 1).n,
     }));
   }
+  // How many games someone played stays private (still counted in p:<name>, and
+  // still breaks ties by win rate); the board shows wins and draws only.
   ranking() {
-    return [...this.records].sort(byWins).map(([k, r]) => [k, { name: r.name, wins: r.wins, games: r.games, draws: r.draws || 0 }]);
+    return [...this.records].sort(byWins).map(([k, r]) => [k, { name: r.name, wins: r.wins, draws: r.draws || 0 }]);
   }
   send(ws, extra = {}, shared = null) {
     const info = this.sockets.get(ws);

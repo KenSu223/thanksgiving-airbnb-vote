@@ -161,7 +161,8 @@ ck('a move after the end is refused', (await a.next(m => m.error, 'after end')).
 b.send({ type: 'undo' });
 ck('no 悔棋 against a person', (await b.next(m => m.error, 'undo vs person')).error === '和人下不能悔棋');
 const rec = await a.until(m => rowOf(m, A.name), 'A on the board');
-ck('the board counts it: A 1 win / 1 game', rowOf(rec, A.name).wins === 1 && rowOf(rec, A.name).games === 1, JSON.stringify(rowOf(rec, A.name)));
+ck('the board counts it: A 1 win', rowOf(rec, A.name).wins === 1, JSON.stringify(rowOf(rec, A.name)));
+ck('how many games someone played is not on the board', rec.board.every(r => !('games' in r)), JSON.stringify(rec.board[0]));
 
 // 再来一局 swaps the colours; 认输
 b.send({ type: 'start' });
@@ -236,7 +237,7 @@ d.send({ type: 'leave' }); e.send({ type: 'leave' });
 c.send({ type: 'watch', room: 1 });
 const cb = await c.until(m => m.boardMe, 'C own place');
 ck('only the top 3 go out', cb.board.length === 3 && cb.board.every((r, i) => i === 0 || r.wins <= cb.board[i - 1].wins), JSON.stringify(cb.board));
-ck('C (0 wins) gets their own place below them', cb.boardMe.name === C.name && cb.boardMe.rank >= 4 && cb.boardMe.wins === 0 && cb.boardMe.games === 2, JSON.stringify(cb.boardMe)); // 重新开一局 (认输) + 认输
+ck('C (0 wins) gets their own place below them', cb.boardMe.name === C.name && cb.boardMe.rank >= 4 && cb.boardMe.wins === 0 && !('games' in cb.boardMe), JSON.stringify(cb.boardMe)); // lost 重新开一局 (认输) + 认输
 ck('a spectator not signed in has no own place', s.last().boardMe === null);
 ck('nobody\'s board has a row past the top 3', [a, s, w, c].every(x => x.last().board.length <= 3));
 
