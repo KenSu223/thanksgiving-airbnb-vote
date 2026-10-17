@@ -45,7 +45,7 @@ export default function RevealCard({ master, drawnAt, me }) {
             <dl className="angel-answers">
               {answered.map(q => (
                 <div key={q.id} className={'angel-answer' + (q.required ? ' nogo' : '')}>
-                  <dt>{q.required ? '🙅 ' : ''}{q.text}</dt>
+                  <dt>{q.emoji} {q.text}</dt>
                   <dd>{prefs.answers[q.id]}</dd>
                 </div>
               ))}

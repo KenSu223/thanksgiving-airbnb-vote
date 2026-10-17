@@ -1,5 +1,5 @@
-// Secret Angel: everyone answers a few questions about themselves (five of
-// the ten in web/src/features/angel/questions.js, "what can't I be given"
+// Secret Angel: everyone answers exactly five of ten question cards about
+// themselves (web/src/features/angel/questions.js, "what can't I be given"
 // always among them) so a stranger can pick them a gift; then anyone draws who
 // gives a gift to whom (everyone has the same rights — there's no admin;
 // the draw, a reshuffle and leaving someone out are logged with who did it). Each person is only ever sent their
