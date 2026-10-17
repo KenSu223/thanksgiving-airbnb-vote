@@ -257,7 +257,7 @@ export default function GomokuView({ active }) {
           <BoardRows rows={st?.board || []} me={st?.boardMe} empty="还没人下完过一局" row={(r, i, isMe) => (
             <div key={isMe ? 'me' : r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (isMe ? ' font-bold text-indigo-700' : '')}>
               <span className="truncate">{place(i)} {r.name}</span>
-              <span className="font-bold tabular-nums whitespace-nowrap">{r.wins} 胜<span className="text-xs font-normal text-slate-400"> / {r.games} 局{r.draws ? ' · 和 ' + r.draws : ''}</span></span>
+              <span className="font-bold tabular-nums whitespace-nowrap">{r.wins} 胜{r.draws ? <span className="text-xs font-normal text-slate-400"> · 和 {r.draws}</span> : null}</span>
             </div>
           )} />
           <div className="text-xs text-slate-400 mt-4 leading-relaxed">
