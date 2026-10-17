@@ -43,6 +43,11 @@ span.trunk-ok { color:#64748b; } span.trunk-tight { color:#b45309; } span.trunk-
 .car-add:hover { background:rgba(255,255,255,.7); border-color:#6366f1; }
 
 /* 挑车型 */
+.mp-chips { display:flex; flex-shrink:0; gap:.35rem; margin-top:.6rem; overflow-x:auto; padding-bottom:.15rem; scrollbar-width:none; }
+.mp-chips::-webkit-scrollbar { display:none; }
+.mp-chip { flex-shrink:0; padding:.3rem .75rem; border-radius:999px; font-size:.8rem; font-weight:700; color:#475569; background:rgba(255,255,255,.7); transition:background .15s; }
+.mp-chip:hover { background:#e0e7ff; }
+.mp-chip.on { background:#4f46e5; color:#fff; }
 .mp-cls { margin:0 0 .35rem .1rem; font-size:.78rem; font-weight:800; color:#64748b; letter-spacing:.02em; }
 .mp-row { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.55rem .7rem; border-radius:.9rem; background:rgba(255,255,255,.6); }
 .mp-row + .mp-row { margin-top:.35rem; }

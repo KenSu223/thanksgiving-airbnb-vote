@@ -161,7 +161,7 @@ export default function CarsView({ active }) {
           <button onClick={onAdd} className="car-add rounded-3xl">
             <span className="text-3xl leading-none">＋</span>
             <span className="font-bold">加一辆车</span>
-            <span className="text-xs text-slate-400">挑车型：轿车、SUV、7/8 座、商务车、12–15 座面包车</span>
+            <span className="text-xs text-slate-400">挑车型：轿车、跑车、SUV、7/8 座、商务车、皮卡、12–15 座面包车</span>
           </button>
         )}
       </section>

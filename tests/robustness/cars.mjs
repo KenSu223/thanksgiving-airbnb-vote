@@ -64,6 +64,9 @@ ck('storm: nobody holds two seats', occ.length === new Set(occ).size, r.cars);
 const M = await import('../../web/src/features/cars/models.js');
 ck('catalog: every layout has distinct, named seats; every model has a class and a trunk', M.MODELS.every(m => m.liters > 0 && M.CLASSES.some(c => c.id === m.cls)
   && [m.rows, m.alt].filter(Boolean).every(rows => { const ids = M.seatIds(rows); return new Set(ids).size === ids.length && ids.length === M.seatCount(rows) && ids.every(id => M.seatName(id, rows) !== id); })));
+ck('catalog: model ids are unique; sports cars, pickups and every class are there', new Set(M.MODELS.map(m => m.id)).size === M.MODELS.length
+  && ['corvette', 'miata', 'f150', 'cybertruck', 'suburban', 'x5'].every(id => M.modelById(id)) && M.CLASSES.every(c => c.short && M.MODELS.some(m => m.cls === c.id)), M.MODELS.length);
+ck('catalog: Chinese make names find the car', M.modelSearchText(M.modelById('corvette')).includes('雪佛兰') && M.modelSearchText(M.modelById('gls')).includes('奔驰'));
 ck('catalog: the old X5 seats keep their ids', JSON.stringify(M.seatIds([2, 3])) === JSON.stringify(['driver', 'front', 'rearLeft', 'rearMiddle', 'rearRight']));
 ck('catalog: other-model seat counts lay out right', [2, 3, 4, 5, 6, 7, 8, 12, 15].every(n => M.seatCount(M.rowsForSeats(n)) === n));
 r = await get('/api/cars');
@@ -91,6 +94,13 @@ r = await post('/api/cars/model', { ...as('Nan'), car: 'c', model: 'camry' });
 const camry = r.cars?.find(c => c.id === 'c');
 ck('shrinking: two of the third row move (back middle, then front), one picks again, driver seat left alone',
   r.ok && r.moved?.length === 2 && r.unseated?.length === 1 && !camry.seats.driver && camry.seats.rearMiddle && camry.seats.front && Object.values(camry.seats).filter(Boolean).length === 4, [r.moved, r.unseated, camry?.seats]);
+// a two-seat Corvette: the front passenger stays, nobody is moved into the driver's seat, the rest pick again
+r = await post('/api/cars/model', { ...as('Nan'), car: 'c', model: 'corvette' });
+const vette = r.cars?.find(c => c.id === 'c');
+ck('a 2-seat Corvette: front passenger stays, the back riders pick again', r.ok && JSON.stringify(vette.rows) === '[2]' && vette.seats.front && !vette.seats.driver && r.unseated?.length === 3, [r.error, vette?.seats, r.unseated]);
+r = await post('/api/cars/model', { ...as('Nan'), car: 'c', model: 'f150' });
+const pickup = r.cars?.find(c => c.id === 'c');
+ck('a pickup: five seats, the bed as its trunk', r.ok && pickup.model === 'f150' && JSON.stringify(pickup.rows) === '[2,3]' && M.modelById('f150').bed && M.trunkOf(pickup) > M.trunkOf({ model: 'camry' }), [r.error, pickup]);
 const occ2 = r.cars.flatMap(c => Object.values(c.seats).filter(Boolean));
 ck('nobody holds two seats after a model change', occ2.length === new Set(occ2).size, r.cars);
 r = await post('/api/cars/model', { ...as('Peter'), car: 'b', model: 'custom', custom: { name: '', seats: 8 } });

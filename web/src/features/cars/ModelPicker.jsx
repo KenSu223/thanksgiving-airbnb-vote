@@ -1,16 +1,26 @@
 import { useState } from 'react';
-import { CLASSES, MODELS, TRUNKS, MIN_SEATS, MAX_SEATS, seatCount, rowsText, rowsForSeats } from './models.js';
-import { LARGE_LITERS } from './bags.js';
+import { CLASSES, MODELS, TRUNKS, MIN_SEATS, MAX_SEATS, seatCount, rowsText, rowsForSeats, modelById, modelSearchText } from './models.js';
+import { BAGS, LARGE_LITERS } from './bags.js';
 
-const bigBags = liters => Math.max(1, Math.round(liters / LARGE_LITERS));
+const CARRYON_LITERS = BAGS.find(b => b.id === 'carryon').liters;
+// 放得下几个箱子：放得下 28 寸大箱就按大箱算，跑车那种小后备箱按登机箱算；皮卡是车斗
+function roomText(m) {
+  const where = m.bed ? '车斗' : '后备箱';
+  return m.liters >= LARGE_LITERS ? where + '能放约 ' + Math.round(m.liters / LARGE_LITERS) + ' 个 28 寸大箱'
+    : where + '只放得下约 ' + Math.max(1, Math.round(m.liters / CARRYON_LITERS)) + ' 个登机箱';
+}
+// 每个级别里按品牌、车型名排
+const byName = (a, b) => a.make.localeCompare(b.make) || a.name.localeCompare(b.name, undefined, { numeric: true });
 
-// 挑车型：按级别分组的常见租车车型（7 座 / 8 座两种排法都能挑），找不到就写「其他车型」。
+// 挑车型：美国市场的车按级别分组（7 座 / 8 座两种排法都能挑），上面一排按级别筛，也能搜
+// （中文品牌名也行），找不到就写「其他车型」。打开时先显示现在这辆车的级别。
 // 选好了 onPick({ model, v }) 或 onPick({ model: 'custom', custom: { name, seats, trunk } })。
 export default function ModelPicker({ title, current, onPick, onClose }) {
   const [q, setQ] = useState('');
+  const [cls, setCls] = useState(() => modelById(current?.model)?.cls || 'all');
   const [custom, setCustom] = useState(() => (current?.model === 'custom' && current.custom) || { name: '', seats: 7, trunk: 'M' });
   const s = q.trim().toLowerCase();
-  const hit = m => !s || (m.make + ' ' + m.name).toLowerCase().includes(s);
+  const hit = m => !s || modelSearchText(m).includes(s);
   const isCur = (m, v) => current && current.model === m.id && (current.v || 0) === v;
   const found = MODELS.some(hit);
   return (
@@ -22,11 +32,16 @@ export default function ModelPicker({ title, current, onPick, onClose }) {
           <button onClick={onClose} aria-label="关闭" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/60 text-lg text-slate-500 transition hover:bg-white">✕</button>
         </div>
         <p className="mt-1 text-xs text-slate-500">租车订的是级别，到店给的是「这款或同级车型」，挑最接近的就行。座位和后备箱会跟着变。</p>
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="搜车型，比如 Suburban、Sienna" aria-label="搜车型"
+        <input value={q} onChange={e => { setQ(e.target.value); if (e.target.value.trim()) setCls('all'); }} placeholder="搜车型或品牌，比如 Suburban、Corvette、丰田" aria-label="搜车型"
           className="mt-3 w-full rounded-xl border border-slate-300/70 bg-white/75 px-3.5 py-2.5 text-[15px] outline-none focus:border-indigo-400 focus:bg-white" />
+        <div className="mp-chips" role="tablist" aria-label="级别">
+          {[{ id: 'all', short: '全部' }, ...CLASSES].map(c => (
+            <button key={c.id} role="tab" aria-selected={cls === c.id} className={'mp-chip' + (cls === c.id ? ' on' : '')} onClick={() => setCls(c.id)}>{c.short}</button>
+          ))}
+        </div>
         <div className="mt-3 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-          {CLASSES.map(c => {
-            const list = MODELS.filter(m => m.cls === c.id && hit(m));
+          {CLASSES.filter(c => cls === 'all' || c.id === cls).map(c => {
+            const list = MODELS.filter(m => m.cls === c.id && hit(m)).sort(byName);
             if (!list.length) return null;
             return (
               <section key={c.id}>
@@ -35,7 +50,7 @@ export default function ModelPicker({ title, current, onPick, onClose }) {
                   <div key={m.id} className="mp-row">
                     <div className="min-w-0">
                       <div className="font-semibold">{m.make} {m.name}</div>
-                      <div className="text-xs text-slate-500">后备箱能放约 {bigBags(m.liters)} 个 28 寸大箱</div>
+                      <div className="text-xs text-slate-500">{roomText(m)}</div>
                     </div>
                     <div className="mp-opts">
                       {[m.rows, m.alt].filter(Boolean).map((rows, v) => (
@@ -51,6 +66,7 @@ export default function ModelPicker({ title, current, onPick, onClose }) {
             );
           })}
           {!found && <p className="text-sm text-slate-500">没找到「{q.trim()}」，用下面的「其他车型」写上就行。</p>}
+          {found && cls !== 'all' && !MODELS.some(m => m.cls === cls && hit(m)) && <p className="text-sm text-slate-500">这个级别里没有，点「全部」看看。</p>}
           <section>
             <h4 className="mp-cls">其他车型</h4>
             <div className="mp-custom">
