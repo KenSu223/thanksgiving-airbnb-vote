@@ -1,10 +1,10 @@
-// 俯视的车，车头朝上、左舵，像租车 App 选座那样「掀了车顶」：车漆是带金属光泽的渐变，
+// 俯视的车，车头朝上、左舵，像租车 App 选座那样「掀了车顶」：银白车漆带金属光泽（不上颜色），
 // 前挡风 / 后窗是深色玻璃（带一道反光），LED 大灯、贯穿式红尾灯，车里看得见仪表台、
 // 中控和座位（座位按钮由 CarCard 摆上去），四个轮胎带胎纹露在车身外。每个级别一个样子：
 // 轿车、掀背、跑车（两座的是中置引擎：进气口、百叶引擎盖、尾翼；2+2 的是溜背）、
 // 五座 / 三排 SUV（方正、黑色护杠）、MPV（短车头、滑门）、皮卡（驾驶室 + 车斗）、
 // 面包车（方盒子）。都画在 200 宽的 viewBox 里；座位的纵向位置（第一排 first、往后每排
-// gap）也由这里定，CarCard 按同样的数摆座位按钮。车漆颜色按第几辆车轮换（tone）。
+// gap）也由这里定，CarCard 按同样的数摆座位按钮。
 
 const GEOM = {
   sedan: { first: 160, tail: 130 },
@@ -54,16 +54,9 @@ function layout(k, F, L, H, oneRow) {
   }
 }
 
-// 车漆：[边、中间、高光、描边]
-const PAINTS = [
-  ['#2b3d6b', '#46609f', '#7f98d4', '#1f2d52'], // 午夜蓝
-  ['#c9d0dc', '#eef1f6', '#ffffff', '#aeb7c6'], // 珍珠白
-  ['#8e1f2c', '#c83443', '#ef7a85', '#6d1621'], // 赛道红
-  ['#3d4350', '#626a7a', '#97a0b1', '#2b3039'], // 石墨灰
-  ['#8d97a8', '#c3cad6', '#eef1f6', '#77818f'], // 银
-  ['#245e66', '#3f8790', '#86c3c8', '#1a464c'], // 湖蓝
-];
-const GLASS_TOP = '#46577a', GLASS_BOTTOM = '#1b2438', INTERIOR = '#eef0f5', DASH = '#d6dbe4', TRIM = '#262c38', TIRE = '#1d222d';
+// 车漆（银白，不上颜色）：[边、中间、高光、描边]
+const PAINT = ['#c3cad7', '#e9edf3', '#ffffff', '#a7b1c2'];
+const GLASS_TOP = '#525a6a', GLASS_BOTTOM = '#20242d', INTERIOR = '#eef0f5', DASH = '#d6dbe4', TRIM = '#262c38', TIRE = '#1d222d';
 
 const f1 = n => Math.round(n * 10) / 10;
 // 一圈平滑的轮廓：车头中点 → 右边 → 车尾中点 → 左边，每个点的切线顺着前后两个点
@@ -102,14 +95,14 @@ function band(y1, y2, w, k1, k2, steps = 6) {
     + side.slice(0, -1).reverse().map(([x, y]) => `L${f1(200 - x)} ${y}`).join('') + 'Z';
 }
 
-export default function CarBody({ kind, rows, id, tone = 0 }) {
+export default function CarBody({ kind, rows, id }) {
   const k = GEOM[kind] ? kind : 'sedan';
   const { first: F, gap, last: L, H } = carGeometry(k, rows);
   const shape = PROFILE[k](F, L, H);
   const hw = y => halfWidth(shape.pts, y);
   const oneRow = rows.length === 1;
   const P = layout(k, F, L, H, oneRow);
-  const [edge, mid, light, line] = PAINTS[((tone % PAINTS.length) + PAINTS.length) % PAINTS.length];
+  const [edge, mid, light, line] = PAINT;
   const uid = 'cb' + String(id).replace(/[^\w-]/g, '');
   const body = outline(shape);
   const SILL = k === 'bus' || k === 'mpv' ? 9 : 11; // 车门的厚度（车身到车厢）
@@ -133,12 +126,12 @@ export default function CarBody({ kind, rows, id, tone = 0 }) {
     {!(k === 'coupe' && oneRow) && <ellipse cx="100" cy={f1((P.rg[1] + H) / 2)} rx={f1(hw(H - 30) * 0.22)} ry={f1(Math.max(5, (H - P.rg[1]) / 2 - 9))} fill="#fff" opacity=".1" />}
   </g>);
 
-  // 灯：车头 LED（贴着车头的两角），车尾一条贯穿的红灯
+  // 灯：车头白色 LED（贴着车头的两角），车尾一条细细的红灯
   const lampDepth = { coupe: 40, suv: 18, suv3: 18, truck: 16, bus: 14, mpv: 22 }[k] || 22;
   const tailCorners = k === 'truck' || k === 'bus';
   add(<g key="lamps">
-    <path d={body} fill="none" stroke="#e9f3ff" strokeWidth="6" clipPath={`url(#${uid}hl)`} />
-    <path d={body} fill="none" stroke="#7fb4ff" strokeWidth="1.6" clipPath={`url(#${uid}hl)`} />
+    <path d={body} fill="none" stroke="#fbfcfe" strokeWidth="6" clipPath={`url(#${uid}hl)`} />
+    <path d={body} fill="none" stroke="#aeb8c8" strokeWidth="1.6" clipPath={`url(#${uid}hl)`} />
     <path d={body} fill="none" stroke="#d92f3f" strokeWidth="6" clipPath={`url(#${uid}tl)`} />
     <path d={body} fill="none" stroke="#ff8f99" strokeWidth="1.4" clipPath={`url(#${uid}tl)`} />
   </g>);
@@ -163,7 +156,7 @@ export default function CarBody({ kind, rows, id, tone = 0 }) {
   const cabW = y => hw(y) - SILL;
   add(<path key="cab" d={band(w2, P.cab, cabW, -8, 6)} fill={INTERIOR} stroke={line} strokeOpacity=".45" strokeWidth="1.2" />);
   add(<path key="dash" d={band(w2, w2 + 11, cabW, -8, -4)} fill={DASH} />);
-  add(<rect key="screen" x="84" y={w2 + 2.5} width="32" height="5.5" rx="2.5" fill="#222b40" />);
+  add(<rect key="screen" x="84" y={w2 + 2.5} width="32" height="5.5" rx="2.5" fill="#2a2f3a" />);
   if (rows[0] === 2 && k !== 'bus' && k !== 'mpv') add(<rect key="console" x="94.5" y={F - 16} width="11" height={k === 'coupe' && oneRow ? 36 : 42} rx="5.5" fill={DASH} />);
   for (let r = 0; r < rows.length - 1; r++) {
     const y = f1(F + r * gap + gap / 2 + 4);
