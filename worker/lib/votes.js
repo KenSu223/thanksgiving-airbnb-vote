@@ -1,6 +1,6 @@
 // Vote identity. A vote belongs to an ACCOUNT, and accounts are keyed by
-// name (unique, case-insensitive). Tokens are NOT stable identity: binding
-// an email rotates a user's token, and devices remember different tokens
+// name (unique, case-insensitive). Tokens are NOT stable identity: setting
+// a PIN rotates a user's token, and devices remember different tokens
 // over time. Matching votes by token alone let one person hold two votes
 // on the same item — one per token they ever had. Always match name OR
 // token, and collapse duplicates when reading or writing.

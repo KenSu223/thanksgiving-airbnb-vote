@@ -39,12 +39,18 @@ async function buildUsers(env) {
   return users;
 }
 
+// Email binding was removed (only the PIN protects an account now): a list
+// that still carries emails from back then drops them, once, here.
+const hasEmail = users => users.some(u => 'email' in u);
+const dropEmails = users => { for (const u of users) delete u.email; };
+
 export async function getUsers(env) {
   const { doc } = await readDoc(env, USERS_KEY);
-  if (doc) return doc;
-  // Persist the built list once, through the versioned write path.
+  if (doc && !hasEmail(doc)) return doc;
+  // Persist the built list once (or the list without emails), through the versioned write path.
   return transact(env, USERS_KEY, async current => {
-    if (current) return { result: current };
+    if (current && !hasEmail(current)) return { result: current };
+    if (current) { dropEmails(current); return { doc: current, result: current }; }
     const users = await buildUsers(env);
     return { doc: users, result: users };
   });
@@ -56,33 +62,19 @@ export async function getUsers(env) {
 export async function updateUsers(env, fn) {
   return transact(env, USERS_KEY, async doc => {
     const users = doc || await buildUsers(env);
+    dropEmails(users);
     const result = await fn(users);
     return { doc: users, result };
   });
 }
 
-// Emails are stored normalized (trimmed, lowercased). A bound email is
-// never shown in full — only a hint like "k•••@gmail.com" for the
-// "we sent a code to…" line.
-export const cleanEmail = v => String(v || '').trim().toLowerCase().slice(0, 120);
-export const validEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
-export const maskEmail = email => {
-  const [local, domain] = String(email || '').split('@');
-  return domain ? `${local.slice(0, 1)}•••@${domain}` : '';
-};
-
 // The public shape of the user list. SECURITY: a user who protected
-// their account (bound an email, or set a PIN) no longer has their token
-// exposed here — otherwise anyone could grab it from this list and the
-// protection would be pointless. Unprotected users keep the old behavior
-// (their token travels with the list, so picking their name on any
-// device just works).
-export const publicUsers = users => users.map(u => (u.email || u.pinHash)
-  ? {
-    name: u.name,
-    ...(u.email ? { emailBound: true, emailHint: maskEmail(u.email) } : {}),
-    ...(u.pinHash ? { pinBound: true } : {}),
-  }
+// their account with a PIN no longer has their token exposed here —
+// otherwise anyone could grab it from this list and the PIN would be
+// pointless. Unprotected users keep the old behavior (their token travels
+// with the list, so picking their name on any device just works).
+export const publicUsers = users => users.map(u => u.pinHash
+  ? { name: u.name, pinBound: true }
   : { name: u.name, token: u.token })
   .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
 // The user list's spelling of a name ("ken" -> "Ken"), or the name as given.
@@ -131,24 +123,12 @@ async function handleLogin(req, env) {
   if (!name) return j({ ok: false, error: '名字是必填的' });
   const allUsers = await getUsers(env); // also makes sure the first-run build exists
   const existing = allUsers.find(u => sameName(u.name, name));
-  // A user who protected their account must prove it's them — unless
-  // this device already holds their token (the normal "still logged in"
-  // case, e.g. a refresh: never interrupted). The two protections are
-  // parallel: a bound email proves it with a code (needCode, answered by
-  // the send-code / verify flow in users/auth.js), a PIN proves it with
-  // the 4 digits (needPin, answered by /api/auth/pin/verify) — and when
-  // both are set, both flags come back and the person picks which one
-  // to use on this device.
-  if (existing && String(body.token || '') !== existing.token) {
-    if (existing.email && existing.pinHash) {
-      return j({ ok: true, needCode: true, needPin: true, name: existing.name, emailHint: maskEmail(existing.email), users: publicUsers(allUsers) });
-    }
-    if (existing.email) {
-      return j({ ok: true, needCode: true, name: existing.name, emailHint: maskEmail(existing.email), users: publicUsers(allUsers) });
-    }
-    if (existing.pinHash) {
-      return j({ ok: true, needPin: true, name: existing.name, users: publicUsers(allUsers) });
-    }
+  // A user who set a PIN must prove it's them — unless this device
+  // already holds their token (the normal "still logged in" case, e.g. a
+  // refresh: never interrupted). needPin is answered by
+  // /api/auth/pin/verify (users/auth.js).
+  if (existing && existing.pinHash && String(body.token || '') !== existing.token) {
+    return j({ ok: true, needPin: true, name: existing.name, users: publicUsers(allUsers) });
   }
   const { user, users } = await updateUsers(env, users => {
     let user = users.find(u => sameName(u.name, name));

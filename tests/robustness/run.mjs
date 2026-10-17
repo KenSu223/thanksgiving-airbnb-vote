@@ -22,14 +22,11 @@ const PORT = process.env.TEST_PORT || '8791';
 const BASE = `http://localhost:${PORT}`;
 const persist = mkdtempSync(join(tmpdir(), 'robustness-state-'));
 
-// EMAIL_DEV_MODE=1 makes the email-code endpoints return codes in their
-// responses instead of sending mail (worker/users/auth.js) so the email
-// suite can run end to end. Local test instance only — never production.
 // PARTY_SPEED=20 runs the party games' clocks (狼人杀 nights, speaking turns) 20x
 // faster so whole games fit in the suite (worker/games/hall.js).
 // RETIRE=Retiree puts a test account on the retired list (worker/users/retire.js),
 // so users.mjs can check an account comes off cleanly.
-const server = spawn('npx', ['wrangler', 'dev', '--port', PORT, '--local', '--compatibility-date', '2026-05-03', '--persist-to', persist, '--var', 'EMAIL_DEV_MODE:1', '--var', 'PARTY_SPEED:20', '--var', 'RETIRE:Retiree'], {
+const server = spawn('npx', ['wrangler', 'dev', '--port', PORT, '--local', '--compatibility-date', '2026-05-03', '--persist-to', persist, '--var', 'PARTY_SPEED:20', '--var', 'RETIRE:Retiree'], {
   detached: true, stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverLog = '';
@@ -80,10 +77,8 @@ try {
     console.error('worker did not come up; wrangler output tail:\n' + serverLog.slice(-2000));
   } else {
     const fuzz = await runSuite('fuzz.mjs');
-    // The email-flow suite ships with the email-binding feature; run it
-    // when present so this runner works before and after that lands.
-    const emailPath = new URL('email.mjs', import.meta.url).pathname;
-    const email = existsSync(emailPath) ? await runSuite('email.mjs') : true;
+    // Account protection (the PIN; email binding is gone).
+    const pin = await runSuite('pin.mjs');
     // Same for the user-management suite (PM-only deletion).
     const usersPath = new URL('users.mjs', import.meta.url).pathname;
     const users = existsSync(usersPath) ? await runSuite('users.mjs') : true;
@@ -117,7 +112,7 @@ try {
     // Party games (谁是卧底 / 阿瓦隆 / 狼人杀): whole games over real sockets.
     const party = await runSuite('party.mjs');
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && leaderboards && polls && google && cars && reactions && todos && chat && g2048 && gomoku && presence && party && storms;
+    ok = fuzz && pin && users && leaderboards && polls && google && cars && reactions && todos && chat && g2048 && gomoku && presence && party && storms;
   }
 } finally {
   stopServer();
