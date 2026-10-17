@@ -1,5 +1,5 @@
-// Retired accounts: names that come off the member list for good, with
-// everything recorded under them. Nobody can delete accounts from the app
+// Retired accounts: accounts that come off the member list, with everything
+// recorded under them. Nobody can delete accounts from the app
 // (everyone has the same rights); a name goes on RETIRED here instead, and
 // the next time anyone loads the member list (GET /api/users — every page
 // load does) the account is removed thoroughly: listing/food/activity votes,
@@ -8,6 +8,11 @@
 // scrubUserFrom* does its own part), plus the game records and chat messages
 // inside the Durable Objects, reached through their bindings below. Cards and
 // restaurants they added stay (others may have voted on them).
+//
+// A plain name on RETIRED retires the name for good: any account of that
+// name, even one made later, is removed. { name, createdBefore } removes only
+// the account that existed before that moment — once; a new account of that
+// name made afterwards is kept, so the name stays free.
 //
 // RETIRE (comma-separated names) adds to the list — only the robustness
 // suite's local server sets it, to check the removal end to end.
@@ -23,13 +28,17 @@ import { scrubUserFromPolls } from '../polls/routes.js';
 import { scrubUserFromCars } from '../cars/routes.js';
 import { scrubUserFromTodos } from '../todos/routes.js';
 
-// Nobody is retired by name right now. (2026-10-15 → 2026-10-16: a
-// test account named "PM Test" sat here; PM wanted the name back, and
-// with the entry in place any new account of that name was created by
-// login and then scrubbed again by the next member-list load — the
-// name is free again.)
-const RETIRED = [];
-const retiredNames = env => [...RETIRED, ...String(env.RETIRE || '').split(',').map(s => s.trim()).filter(Boolean)];
+// 2026-10-17: the test account "PM Test" goes (asked for in chat) — once
+// only. (2026-10-15 → 2026-10-16 a plain "PM Test" entry sat here, and every
+// new account of that name was created by login and scrubbed again by the
+// next member-list load; PM wanted the name back, so it stays free.)
+const RETIRED = [
+  { name: 'PM Test', createdBefore: Date.parse('2026-10-17T04:00:00Z') },
+];
+export const retiredList = env => [...RETIRED, ...String(env.RETIRE || '').split(',').map(s => s.trim()).filter(Boolean)]
+  .map(r => (typeof r === 'string' ? { name: r } : r));
+// An account made before the cutoff (or with no creation time) counts as made before it.
+export const isRetired = (u, list) => list.some(r => sameName(u.name, r.name) && !(r.createdBefore && (u.createdAt || 0) >= r.createdBefore));
 
 // Remove one account and everything recorded under it.
 export async function removeUser(env, target) {
@@ -69,8 +78,8 @@ export async function removeUser(env, target) {
 // The member list, after taking any retired account off it.
 async function handleList(req, env) {
   let users = await getUsers(env);
-  const names = retiredNames(env);
-  const gone = users.filter(u => names.some(n => sameName(u.name, n)));
+  const list = retiredList(env);
+  const gone = users.filter(u => isRetired(u, list));
   if (gone.length) {
     for (const u of gone) await removeUser(env, u);
     users = await getUsers(env);
