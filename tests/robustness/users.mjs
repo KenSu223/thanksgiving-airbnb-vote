@@ -105,8 +105,8 @@ const pmt = await login('PM Test');
 ck('PM Test logs in', !!pmt?.token);
 // The name sat on the hardcoded RETIRED list for a day (2026-10-15):
 // login created the account and the next list load scrubbed it again,
-// so signing up as PM Test looked broken. The name is free again —
-// the account now stays on the list like any other.
+// so signing up as PM Test looked broken. Its entry is now one-time (only
+// the account made before 2026-10-17 goes), so an account made now stays.
 ck('PM Test stays on the list', (await J('GET', '/api/users')).users.some(u => u.name === 'PM Test'));
 
 const stEnd = await J('GET', '/api/state?trip=nov26');
