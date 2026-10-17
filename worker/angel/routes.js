@@ -8,7 +8,7 @@
 import { j } from '../lib/http.js';
 import { readDoc, transact } from '../lib/store.js';
 import { cleanName, getUsers, sameName } from '../users/users.js';
-import { drawCycle } from './draw.js';
+import { drawCycle, removeFromCycle, MIN_DRAW } from './draw.js';
 import { cleanAnswers, answersError } from '../../web/src/features/angel/questions.js';
 
 const ANGEL_KEY = 'angel:v1';
@@ -64,11 +64,12 @@ const roster = (users, a) => users
 const shownPrefs = p => (p ? { answers: p.answers || null, note: p.answers ? '' : p.note || '', updatedAt: p.updatedAt || 0 } : null);
 
 function view(users, a, me) {
-  // submitted: answered the questions. inPool: has saved anything (old category
-  // wishes too), so a reshuffle never drops someone who joined before the questions.
+  // submitted: answered the questions. inDraw: in the current circle (who gives to
+  // whom stays private; only whether someone is in it). Everyone registered and not
+  // left out goes into a draw, answered or not.
   const people = users.map(u => {
     const key = u.name.toLowerCase();
-    return { name: u.name, submitted: !!a.prefs[key]?.answers, inPool: !!a.prefs[key], excluded: a.excluded.includes(key) };
+    return { name: u.name, submitted: !!a.prefs[key]?.answers, inDraw: !!(a.draw && key in a.draw.pairs), excluded: a.excluded.includes(key) };
   }).sort((x, y) => x.name.localeCompare(y.name, 'zh-CN'));
   const masterKey = me && a.draw ? a.draw.pairs[me] : null;
   const master = masterKey ? users.find(u => u.name.toLowerCase() === masterKey) : null;
@@ -115,29 +116,40 @@ async function handleExclude(req, env) {
     if (!t) return { error: '没有这个人' };
     a.excluded = a.excluded.filter(k => k !== target);
     if (body.excluded) a.excluded.push(target);
-    note(a, user.name, (body.excluded ? '把 ' + t.name + ' 排除了' : '把 ' + t.name + ' 加回来了'));
+    // Left out after a draw: out of the circle too. Whoever gave to them now gives to
+    // the person they were giving to, nobody else changes; with fewer than three left
+    // the draw goes (two could only swap). Coming back doesn't put them in the circle:
+    // that takes a reshuffle, like anyone who joins after the draw.
+    let cleared = false;
+    if (body.excluded && a.draw && target in a.draw.pairs) {
+      const pairs = removeFromCycle(a.draw.pairs, target);
+      if (pairs) a.draw.pairs = pairs; else { a.draw = null; cleared = true; }
+    }
+    note(a, user.name, (body.excluded ? '把 ' + t.name + ' 排除了' : '把 ' + t.name + ' 加回来了')
+      + (cleared ? '（抽签结果剩不到 ' + MIN_DRAW + ' 人，清掉了，要重新抽）' : ''));
     return { a };
   });
   if (out.error) return j({ ok: false, error: out.error });
   return j(view(users, out.a, key));
 }
 
-// Anyone: draw (or redraw / reshuffle). The pool is whoever is in AND
-// has saved preferences — no need to wait for stragglers: anyone who
-// hasn't filled theirs in yet sits this round out, and a redraw after
-// they submit pools them in. A redraw only replaces the pairings;
-// saved preferences are never touched here.
+// Anyone: draw (or redraw / reshuffle). Everyone registered goes into the
+// circle except whoever was left out — answered or not: someone who hasn't
+// answered yet is still somebody's to give to, and their angel sees their
+// answers as soon as they're in. People who register after a draw join at the
+// next reshuffle. A redraw only replaces the pairings; answers are never
+// touched here.
 async function handleDraw(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { users, user, key } = await caller(env, body.name, body.token);
   const out = await updateAngel(env, a => {
     if (!key) return { error: '先登录再抽签' };
-    const pool = roster(users, a).filter(p => a.prefs[p.key]);
-    if (pool.length < 2) return { error: '至少要有两个人答好题才能抽（现在 ' + pool.length + ' 人）' };
+    const pool = roster(users, a);
+    if (pool.length < MIN_DRAW) return { error: '至少要 ' + MIN_DRAW + ' 个人才能抽（两个人只能互送；现在 ' + pool.length + ' 人）' };
     const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
     const pairs = drawCycle(pool.map(p => p.key), rand);
-    if (!pairs) return { error: '至少要两个人才能抽' };
+    if (!pairs) return { error: '至少要 ' + MIN_DRAW + ' 个人才能抽' };
     note(a, user.name, a.draw ? '重新 Shuffle 了（' + pool.length + ' 人）' : '抽了签（' + pool.length + ' 人）');
     a.draw = { at: Date.now(), pairs, by: user.name };
     return { a };
@@ -149,19 +161,15 @@ async function handleDraw(req, env) {
 // Remove one person from Secret Angel entirely (a retired account,
 // users/retire.js): their saved prefs and any exclusion entry. If a draw exists, their seat is spliced out of the cycle —
 // whoever was giving to them now gives to their person — so the rest
-// of the circle stays intact; with fewer than two left, the draw goes.
+// of the circle stays intact; with fewer than three left (two could only swap), the draw goes.
 export async function scrubUserFromAngel(env, user) {
   const key = user.name.toLowerCase();
   await updateAngel(env, a => {
     delete a.prefs[key];
     a.excluded = a.excluded.filter(k => k !== key);
     if (a.draw && a.draw.pairs && key in a.draw.pairs) {
-      const pairs = a.draw.pairs;
-      const next = pairs[key];
-      const pred = Object.keys(pairs).find(k => pairs[k] === key);
-      delete pairs[key];
-      if (Object.keys(pairs).length < 2) a.draw = null;
-      else if (pred) pairs[pred] = next;
+      const pairs = removeFromCycle(a.draw.pairs, key); // same as leaving someone out
+      if (pairs) a.draw.pairs = pairs; else a.draw = null;
     }
     return a;
   });

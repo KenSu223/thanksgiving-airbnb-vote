@@ -13,8 +13,8 @@ import './angel.css';
 
 // Secret Angel：大家可能互相不熟，所以每人先从十张问题卡片里挑五张（QuestionPicker，「不能送的」必答，
 // questions.js），再一张一张回答（QuestionDeck），最后看答好的五张（AnswerCards）；天使拿着答案挑礼物；然后谁都可以抽签（没有管理员，大家一样；抽签、重抽、排除谁都会记下是谁做的），
-// 每个人只看得到自己要送给谁。不用等人齐：谁交了谁进池，没交的人这轮不参加；重抽按当前已交的人重新
-// 分配，不清任何人的答案。（以前是选礼物分类；那时交过的人照样在池子里，答了题天使就能看到。）
+// 每个人只看得到自己要送给谁。抽签把所有注册的人（排除的除外，答没答题都算）随机排成一个圈（worker/angel/draw.js），
+// 抽签之后才来的人等下一次 Shuffle；重抽不清任何人的答案。
 export default function AngelView({ active }) {
   const { name, token, users, openLogin } = useSession();
   const toast = useToast();
@@ -54,14 +54,14 @@ export default function AngelView({ active }) {
   }
   async function draw() {
     const ok = data.drawn
-      ? await confirm({ title: '重新抽签？', message: '已经抽过了。重新抽的话大家的结果都会变（答案不会清掉，只是按现在已交的人重新分配），会记下是你重抽的。确定吗？', confirmText: '重新抽' })
-      : await confirm({ title: '开始抽签？', message: '按现在已经交了答案的人分配，每个人马上就能看到自己要送给谁。会记下是你抽的。', confirmText: '抽签' });
+      ? await confirm({ title: '重新抽签？', message: '已经抽过了。重新抽会把所有人（排除的除外）重新随机排一圈，每个人的结果都会变；答案不会清掉。会记下是你重抽的。确定吗？', confirmText: '重新抽' })
+      : await confirm({ title: '开始抽签？', message: '所有注册的人（排除的除外）随机排成一个圈，每人送下一个人，大家马上就能看到自己要送给谁。还没答题的人也在里面。会记下是你抽的。', confirmText: '抽签' });
     if (!ok) return;
     if (await post('/api/angel/draw', {})) toast('🎲 抽好了！大家去拆信封吧');
   }
   // 排除 / 加回来：谁都可以，先确认一下
   async function exclude(target, excluded) {
-    if (!await confirm({ title: excluded ? '排除 ' + target + '？' : '把 ' + target + ' 加回来？', message: excluded ? 'TA 不参加这次 Secret Angel（比如来不了）。已经抽过的话，TA 的位置会从圈里拿掉，其他人不受影响。会记下是你排除的。' : 'TA 重新参加；要进抽签结果，得有人重新 Shuffle 一次。', confirmText: excluded ? '排除' : '加回来' })) return;
+    if (!await confirm({ title: excluded ? '排除 ' + target + '？' : '把 ' + target + ' 加回来？', message: excluded ? 'TA 不参加这次 Secret Angel（比如来不了）。已经抽过的话，TA 会从圈里拿掉：原来送 TA 的人改送 TA 要送的人，其他人不变（剩不到 3 个人的话，抽签结果会清掉，要重新抽）。会记下是你排除的。' : 'TA 重新参加；已经抽过的话，要有人重新 Shuffle 一次 TA 才进圈。', confirmText: excluded ? '排除' : '加回来' })) return;
     post('/api/angel/exclude', { target, excluded });
   }
 
@@ -74,10 +74,10 @@ export default function AngelView({ active }) {
   );
   if (!data) return <p className="text-slate-400 text-center py-10">加载中…</p>;
 
+  // 抽签池：所有注册的人，排除的除外（答没答题都算）；抽签之后才来的人要等下一次 Shuffle
   const people = data.people.filter(p => !p.excluded);
-  // 抽签池：交过的人（以前选礼物分类的也算）；没交过的这轮不参加
-  const waiting = people.filter(p => !p.inPool);
-  const filled = people.filter(p => p.inPool);
+  const notIn = data.drawn ? people.filter(p => !p.inDraw) : [];
+  const unanswered = people.filter(p => !p.submitted);
   const wrong = answersError(answers);
   const answeredIds = Object.keys(cleanAnswers(answers));
   const view = stage || (answeredIds.length ? 'review' : 'pick');
@@ -90,7 +90,7 @@ export default function AngelView({ active }) {
     <div className="space-y-5">
       {data.drawn && (data.master
         ? <RevealCard master={data.master} drawnAt={data.drawnAt} me={name} />
-        : <section className="glass-card rounded-2xl p-5 text-sm text-slate-600">已经抽过签了，但这次没有你（你是抽签之后才加入的）。答好题之后，谁都可以在下面点「重新 Shuffle」把你加进来。</section>)}
+        : <section className="glass-card rounded-2xl p-5 text-sm text-slate-600">已经抽过签了，但这次没有你（你是抽签之后才来的，或者被排除了又加回来）。谁都可以在下面点「重新 Shuffle」把你加进来。</section>)}
 
       <section className="glass-card rounded-2xl p-5">
         <div className="mb-4">
@@ -124,17 +124,20 @@ export default function AngelView({ active }) {
         )}
       </section>
 
-      <People people={data.people} onExclude={exclude} />
+      <People people={data.people} drawn={data.drawn} onExclude={exclude} />
 
       <section className="rounded-2xl shadow p-5 text-white bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-600">
         <h2 className="font-bold text-lg mb-1">🎲 抽签</h2>
         <p className="text-sm text-indigo-100 mb-4">
-          {filled.length < 2 ? '现在只有 ' + filled.length + ' 人交了答案，至少要 2 个人才能抽。'
-            : data.drawn ? '已经抽过了（' + (data.drawnBy ? data.drawnBy + ' 抽的，' : '') + new Date(data.drawnAt).toLocaleString('zh-CN') + '）。重新抽签按现在已交的人重新分配，谁的答案都不会清掉' + (waiting.length ? '；还没交的：' + waiting.map(p => p.name).join('、') + '，交了再重抽就能进来' : '') + '。结果连你也看不到别人的。'
-            : waiting.length ? '已交 ' + filled.length + '/' + people.length + ' 人，可以先抽！还没交的（' + waiting.map(p => p.name).join('、') + '）这轮不参加，交了再重抽就能进来；不参加的人也可以在上面点 ✕ 排除。'
-            : '大家都交了，可以抽了！每个人会被分到一个要偷偷送礼物的人，不会抽到自己，也不会两个人互送。'}
+          {people.length < 3 ? '现在只有 ' + people.length + ' 个人，至少要 3 个人才能抽（两个人只能互送）。'
+            : data.drawn ? '已经抽过了（' + (data.drawnBy ? data.drawnBy + ' 抽的，' : '') + new Date(data.drawnAt).toLocaleString('zh-CN') + '）。'
+              + (notIn.length ? '还不在圈里的：' + notIn.map(p => p.name).join('、') + '（抽签之后才来的），重新 Shuffle 就会把所有人一起排进去。' : '所有人都在圈里。')
+              + '重抽会让每个人的结果都变，答案不会清掉。结果连你也看不到别人的。'
+            : '所有注册的人（' + people.length + ' 人，排除的除外）都会进圈：随机排成一个圈，每人送下一个人——不会抽到自己，每人只收一份，也不会两个人互送。'
+              + (unanswered.length ? '还没答题的（' + unanswered.map(p => p.name).join('、') + '）也在里面，TA 的天使先看到「还没答题」，答了马上能看到。' : '')
+              + '来不了的人可以在上面点 ✕ 排除。'}
         </p>
-        <button onClick={draw} disabled={filled.length < 2}
+        <button onClick={draw} disabled={people.length < 3}
           className="bg-white text-indigo-700 font-black rounded-xl px-6 py-2 shadow-lg disabled:opacity-40">{data.drawn ? '🎲 重新 Shuffle（保留答案）' : '🎲 开始抽签'}</button>
         <p className="text-xs text-indigo-100/90 mt-2">谁都可以点，点之前会再确认一次；下面记着是谁做的。</p>
         {data.log?.length > 0 && (

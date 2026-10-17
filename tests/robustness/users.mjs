@@ -95,6 +95,10 @@ const draw = await J('POST', '/api/angel/draw', { name: 'PM', token: pm.token })
 ck('any member can draw (PM here, no admin needed)', draw.ok === true && draw.drawn === true && draw.drawnBy === 'PM', JSON.stringify(draw).slice(0, 200));
 ck('the draw is logged with who did it', (draw.log || []).some(l => l.by === 'PM' && /抽了签/.test(l.what)), JSON.stringify(draw.log));
 ck('nobody is marked admin', !('isAdmin' in draw) && draw.people.every(p => !('isAdmin' in p)), JSON.stringify(draw.people).slice(0, 160));
+// who gives to whom right after the draw (everyone registered is in it), to check the retirement splice later
+const angelBefore = {};
+for (const [n, u] of [[VICTIM, vic], ['PM', pm], ['Aster', ast]]) angelBefore[n] = (await J('GET', '/api/angel?name=' + encodeURIComponent(n) + '&token=' + u.token)).master?.name;
+ck('the retiree, PM and Aster are all in the circle', Object.values(angelBefore).every(Boolean), JSON.stringify(angelBefore));
 const transfer = await J('POST', '/api/angel/admin', { name: 'PM', token: pm.token, target: 'Aster' });
 ck('there is no admin to hand over', !transfer || transfer.ok !== true, JSON.stringify(transfer).slice(0, 120));
 
@@ -133,9 +137,11 @@ const vicErr = await until(() => vicChat.got.slice(vicCount).find(m => m.type ==
 ck("the retiree's open chat can't send any more", vicErr?.error === '先登录再聊天', JSON.stringify(vicChat.got.slice(vicCount)));
 for (const c of [vicChat, astChat, astAfter]) c.ws.close();
 const angelPm = await J('GET', `/api/angel?name=PM&token=${pm.token}`);
-ck('angel draw survives with the retiree spliced out', angelPm.drawn === true && angelPm.master?.name === 'Aster', JSON.stringify(angelPm.master));
 const angelAst = await J('GET', `/api/angel?name=Aster&token=${ast.token}`);
-ck('aster now gives to PM', angelAst.master?.name === 'PM', JSON.stringify(angelAst.master));
+const angelAfter = { PM: angelPm.master?.name, Aster: angelAst.master?.name };
+ck('angel draw survives with the retiree spliced out; nobody gives to them', angelPm.drawn === true && Object.values(angelAfter).every(n => n && !isVictim(n)), JSON.stringify(angelAfter));
+ck('whoever gave to the retiree now gives to their person; nobody else changes',
+  ['PM', 'Aster'].every(n => (isVictim(angelBefore[n]) ? angelAfter[n] === angelBefore[VICTIM] : angelAfter[n] === angelBefore[n])), JSON.stringify({ angelBefore, angelAfter }));
 const boardEnd = await J('GET', '/api/dodge/board');
 ck('no dodge record of retiree remains', boardEnd.board.every(r => !isVictim(r.name)), JSON.stringify(boardEnd.board).slice(0, 200));
 const repEnd = await J('GET', '/api/dodge/replay?name=' + encodeURIComponent(VICTIM));
@@ -144,6 +150,7 @@ ck('no dodge replay of retiree remains', repEnd.ok === false, JSON.stringify(rep
 // ---- leaving someone out of Secret Angel: any member, logged ----
 const out = await J('POST', '/api/angel/exclude', { name: 'Aster', token: ast.token, target: 'PM', excluded: true });
 ck('any member can leave someone out, logged', out.ok === true && out.people.find(p => p.name === 'PM')?.excluded === true && (out.log || []).some(l => l.by === 'Aster' && /排除/.test(l.what)), JSON.stringify(out.log));
+ck('left out after the draw: out of the circle too', out.people.find(p => p.name === 'PM')?.inDraw === false && out.drawn === true);
 const back = await J('POST', '/api/angel/exclude', { name: 'PM', token: pm.token, target: 'PM', excluded: false });
 ck('and bring them back', back.ok === true && back.people.find(p => p.name === 'PM')?.excluded === false);
 
