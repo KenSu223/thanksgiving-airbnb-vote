@@ -415,6 +415,12 @@ export function modelName(car) {
   return m.make + ' ' + m.name;
 }
 export const seatCount = rows => rows.reduce((a, b) => a + b, 0);
+// 俯视图画哪种车身（CarBody.jsx）：车型表里的按级别；「其他车型」按座位数猜
+export function kindOf(car) {
+  if (car.model !== 'custom') return (modelById(car.model) || modelById('x5')).cls;
+  const n = car.custom?.seats || 5;
+  return n <= 2 ? 'coupe' : n <= 5 ? 'sedan' : n <= 9 ? 'suv3' : 'bus';
+}
 // 「Chevrolet Suburban（8 座）」；名字里已经带着几座的（Transit 15 座）就不再重复
 export function modelTitle(car) {
   const n = modelName(car);
