@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { load, save } from '../../lib/storage.js';
-import { byId } from './categories.js';
+import { QUESTIONS } from './questions.js';
 
-// 抽签结果：一个信封，点开翻过来看你要送礼物给谁，以及 ta 的愿望
+// 抽签结果：一个信封，点开翻过来看你要送礼物给谁，以及 ta 答的题（「不能送的」排第一、标红）
 export default function RevealCard({ master, drawnAt, me }) {
   const seenKey = 'angelSeen:' + me + ':' + drawnAt;
   const [open, setOpen] = useState(() => load(seenKey) === '1');
@@ -19,8 +19,7 @@ export default function RevealCard({ master, drawnAt, me }) {
     setOpen(load(seenKey) === '1');
   }
   const prefs = master.prefs;
-  const loves = prefs ? Object.entries(prefs.picks).filter(([, v]) => v === 'love').map(([k]) => byId[k]).filter(Boolean) : [];
-  const nopes = prefs ? Object.entries(prefs.picks).filter(([, v]) => v === 'nope').map(([k]) => byId[k]).filter(Boolean) : [];
+  const answered = prefs?.answers ? QUESTIONS.filter(q => prefs.answers[q.id]) : [];
 
   function reveal() {
     if (open) return;
@@ -42,13 +41,21 @@ export default function RevealCard({ master, drawnAt, me }) {
         <div className="face back">
           <div className="text-sm text-indigo-500 font-bold tracking-widest">你要偷偷送礼物给</div>
           <div className="text-4xl font-black my-2 bg-gradient-to-r from-indigo-600 to-pink-500 bg-clip-text text-transparent">{master.name}</div>
-          {prefs ? (
-            <div className="text-left w-full mt-2 space-y-2">
-              {loves.length > 0 && <div><span className="text-xs font-bold text-rose-600">💖 ta 想要</span><div className="flex flex-wrap gap-1.5 mt-1">{loves.map(c => <span key={c.id} className="angel-pill">{c.emoji} {c.name}</span>)}</div></div>}
-              {nopes.length > 0 && <div><span className="text-xs font-bold text-slate-500">🙅 别送</span><div className="flex flex-wrap gap-1.5 mt-1">{nopes.map(c => <span key={c.id} className="angel-pill nope">{c.emoji} {c.name}</span>)}</div></div>}
-              {prefs.note && <div className="text-sm bg-amber-50 rounded-xl px-3 py-2">📝 {prefs.note}</div>}
+          {answered.length > 0 ? (
+            <dl className="angel-answers">
+              {answered.map(q => (
+                <div key={q.id} className={'angel-answer' + (q.required ? ' nogo' : '')}>
+                  <dt>{q.required ? '🙅 ' : ''}{q.text}</dt>
+                  <dd>{prefs.answers[q.id]}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <div className="text-sm text-slate-500 mt-1">
+              ta 还没答题，答了这里会自己出现
+              {prefs?.note && <div className="text-left text-slate-700 bg-amber-50 rounded-xl px-3 py-2 mt-2">📝 ta 之前写过：{prefs.note}</div>}
             </div>
-          ) : <div className="text-sm text-slate-500">ta 还没写愿望</div>}
+          )}
         </div>
       </div>
     </section>

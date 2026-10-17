@@ -111,8 +111,10 @@ try {
     const presence = existsSync(presencePath) ? await runSuite('presence.mjs') : true;
     // Party games (谁是卧底 / 阿瓦隆 / 狼人杀): whole games over real sockets.
     const party = await runSuite('party.mjs');
+    // Secret Angel's questions (five of ten, "can't be given" required).
+    const angel = await runSuite('angel.mjs');
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && pin && users && leaderboards && polls && google && cars && reactions && todos && chat && g2048 && gomoku && presence && party && storms;
+    ok = fuzz && pin && users && angel && leaderboards && polls && google && cars && reactions && todos && chat && g2048 && gomoku && presence && party && storms;
   }
 } finally {
   stopServer();
