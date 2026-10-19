@@ -22,6 +22,15 @@ import { DIRS, GOAL, move, spawn, fresh, canMove, maxTile } from '../../web/src/
 const FLUSH_MS = 2000;
 const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
 
+// Records put right by hand, each exactly once ([flag, key, biggest tile]): the
+// flag keeps what was there before, and a later record of the same person is
+// never touched. The best goes back to that tile; the best score only to what
+// can still be told apart (her saved game, if that one is hers), since only the
+// maxima are kept. A saved game with a bigger tile than that isn't theirs, so
+// it's dropped too (otherwise its next move would put the record straight back).
+// 2026-10-19: aster's 4096 (58,248 分) was a friend playing on her account; her own biggest was 128.
+const FIX_ONCE = [['fixed:aster:2026-10-19', 'aster', 128]];
+
 export class Board2048 {
   constructor(state, env) {
     this.state = state; this.env = env;
@@ -38,6 +47,18 @@ export class Board2048 {
         // what the removed autopilot left behind: its grant list, its sessions and their alarm
         await this.state.storage.delete(['grants', 'bots']);
         await this.state.storage.deleteAlarm();
+        for (const [flag, key, tile] of FIX_ONCE) {
+          if (await this.state.storage.get(flag)) continue;
+          const was = this.best.get(key) || null, game = (await this.state.storage.get('g:' + key)) || null;
+          const theirs = game && maxTile(game.grid) <= tile;
+          if (was) {
+            const rec = { ...was, tile: Math.min(was.tile, tile), score: theirs ? Math.min(was.score, game.score) : 0, at: Date.now() };
+            this.best.set(key, rec);
+            await this.state.storage.put('p:' + key, rec);
+          }
+          if (game && !theirs) await this.state.storage.delete('g:' + key);
+          await this.state.storage.put(flag, { at: Date.now(), was, game });
+        }
       });
   }
   // An autopilot alarm set before it was removed may still fire once: nothing to do.
