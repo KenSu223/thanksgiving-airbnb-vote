@@ -194,13 +194,14 @@ export default function FishView({ active }) {
               <div className="fh-intro rounded-2xl shadow-xl p-5 md:p-7 text-white">
                 <div className="fh-intro-art" aria-hidden="true">
                   <i /><b />
+                  <img className="fh-intro-cat" src="/fishing/cat.webp" alt="" />
                   <span className="fh-swim fh-swim-a"><KindIcon kind="clown" w={54} h={38} swim={!reduceMotion} /></span>
                   <span className="fh-swim fh-swim-b"><KindIcon kind="angel" w={44} h={52} swim={!reduceMotion} /></span>
                 </div>
                 <div className="fh-intro-content">
                   <div className="fh-eyebrow">LITTLE FISHING · 钓鱼</div>
                   <div className="fh-title">小小钓鱼<span>看准了再放线。</span></div>
-                  <p className="fh-description">鱼线在小船下左右摆，点一下就放下去。各种鱼在不同的深度游来游去，越大越值钱、也越重；海底还有珍珠、宝箱和垃圾。每关 60 秒，金币够了目标才能进下一关。</p>
+                  <p className="fh-description">小船上的美短拿着鱼竿，鱼钩在水里左右摆，点一下就放下去；收回来的路上碰到的也能钩住。各种鱼在不同的深度游来游去，越大越值钱、也越重；海底还有珍珠、宝箱和垃圾。每关 60 秒，金币够了目标才能进下一关。</p>
                   <div className="fh-rule-tags"><span>每关 60 秒</span><span>{KIND_KEYS.length} 种可以钓</span><span>商店买道具</span></div>
                   <ul className="mt-3 text-sm text-sky-50/90 space-y-1">
                     <li>{touch ? '👆 点水面放线' : '🖱️ 点画面，或者按 ↓ / 空格放线'}；鱼会游，要算好提前量</li>

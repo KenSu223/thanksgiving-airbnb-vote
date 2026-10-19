@@ -1,14 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, step, target, tipOf, valueOf, makeLevel, KINDS, KIND_KEYS, HZ, LEVEL_TICKS, MAX_TICKS, PIVOT, PULL, ROPE0, SWING, W, H, WATER } from './sim.js';
+import { newGame, step, target, tipOf, valueOf, makeLevel, KINDS, KIND_KEYS, HZ, LEVEL_TICKS, MAX_TICKS, PULL, ROPE0, SWING, W, H, WATER } from './sim.js';
 import { badEvents, replay } from './verify.js';
 
 // What a cast right now would hook, found by trying it on a copy of the game
-// (tests only: the fish move, so a straight line isn't enough).
-function castNow(g) {
+// (tests only: the fish move, so a straight line isn't enough). Going out, and
+// unless `outOnly`, coming back empty too.
+const busy = (h, outOnly) => h.state === 'out' || (!outOnly && h.state === 'back' && !h.item);
+function castNow(g, outOnly = false) {
   const c = { ...g, rand: () => 0, happened: [], items: g.items.map(it => ({ ...it })), hook: { ...g.hook }, boost: { ...g.boost }, caught: { ...g.caught } };
   step(c, [[c.tick, 0]]);
-  while (c.hook.state === 'out' && c.phase === 'play' && !c.over) step(c, []);
+  while (busy(c.hook, outOnly) && c.phase === 'play' && !c.over) step(c, []);
   return c.hook.item;
 }
 // A test player (tests only): casts when the cast would hook something worth
@@ -134,8 +136,8 @@ test('the hook catches what the cast was going to catch, and reels it in for its
     let it = null;
     while (!(it = castNow(g))) step(g, []);
     step(g, [[g.tick, 0]]);
-    assert.equal(g.hook.state, 'out');
-    while (g.hook.state === 'out') step(g, []);
+    assert.ok(g.hook.state === 'out' || g.hook.item); // (it may hook something right away: the hook is in the water)
+    while (busy(g.hook)) step(g, []);
     assert.equal(g.hook.item.id, it.id);
     const item = g.hook.item, kind = item.kind, before = g.money, want = kind === 'chest' ? null : valueOf(g, item), len = g.hook.len;
     let ticks = 0;
@@ -145,15 +147,49 @@ test('the hook catches what the cast was going to catch, and reels it in for its
     const speed = PULL / (1 + (item.w ?? KINDS[kind].w));
     assert.equal(ticks, Math.ceil((len - ROPE0) / speed - 1e-9), kind);
     if (kind === 'shark') assert.ok(ticks > 2 * HZ, kind + ' in ' + ticks + ' ticks');
-    // and it's in the catch, marked as the first of its kind
+    // and it's in the catch, marked as the first of its kind, landed where it was
     assert.equal(g.caught[kind], 1);
-    assert.ok(g.happened.some(h => h.type === 'land' && h.kind === kind && h.first));
+    assert.ok(g.happened.some(h => h.type === 'land' && h.kind === kind && h.first && h.y > WATER));
     tried++;
   }
   assert.ok(tried > 30);
 });
 
-test('casting again while the line is out does nothing; a miss comes back empty', () => {
+test('the hook swings under the water, all the way across', () => {
+  const g = newGame(3);
+  for (let t = 0; t < SWING.period; t++) {
+    step(g, []);
+    const [, y] = tipOf(g.hook);
+    assert.ok(y > WATER + 8, 'hook at ' + y);
+  }
+});
+
+test('coming back empty, the hook still catches what it runs into', () => {
+  let found = 0;
+  for (let seed = 1; seed < 60 && found < 5; seed++) {
+    const g = newGame(seed);
+    for (let k = 0; k < 600 && found < 5; k++) {
+      // a cast that misses on the way out but hooks something on the way back
+      if (g.hook.state === 'swing' && !castNow(g, true) && castNow(g)) {
+        const want = castNow(g);
+        step(g, [[g.tick, 0]]);
+        while (g.hook.state === 'out') step(g, []);
+        assert.equal(g.hook.item, null);                 // came back empty…
+        while (g.hook.state === 'back' && !g.hook.item) step(g, []);
+        assert.equal(g.hook.item?.id, want.id);          // …and caught it on the way
+        const before = g.money;
+        while (g.hook.state === 'back') step(g, []);
+        if (want.kind !== 'chest') assert.equal(g.money - before, valueOf(g, want));
+        found++;
+        break;
+      }
+      step(g, []);
+    }
+  }
+  assert.ok(found >= 3, 'found ' + found);
+});
+
+test('casting again while the line is out does nothing; a cast that hooks nothing comes back empty', () => {
   for (let seed = 1; seed < 200; seed++) {
     const g = newGame(seed);
     let k = 0;
@@ -165,8 +201,7 @@ test('casting again while the line is out does nothing; a miss comes back empty'
     assert.ok(g.hook.len > len);
     while (g.hook.state !== 'swing') step(g, []);
     assert.equal(g.money, 0);
-    const [x, y] = tipOf(g.hook);
-    assert.ok(Math.abs(x - PIVOT.x) < 20 && y > PIVOT.y);
+    assert.equal(g.hook.len, ROPE0);
     return;
   }
   assert.fail('never found a miss');
@@ -177,18 +212,19 @@ test('scissors cut loose what is on the line, and need one', () => {
     const g = newGame(seed);
     while (!castNow(g)) step(g, []);
     step(g, [[g.tick, 0]]);
-    while (g.hook.state === 'out') step(g, []);
-    const money = g.money;
+    while (busy(g.hook)) step(g, []);
+    const money = g.money, cutKind = g.hook.item.kind;
     step(g, [[g.tick, 1]]);
     assert.equal(g.hook.item, null);
     assert.equal(g.scissors, 0);
+    assert.ok(g.happened.some(h => h.type === 'cut' && h.kind === cutKind));
+    // what was cut loose is gone; the empty hook may still catch something on the way back
     while (g.hook.state === 'back') step(g, []);
-    assert.equal(g.money, money);
-    assert.deepEqual(g.caught, {});
+    assert.ok(g.money === money || g.happened.some(h => h.type === 'land' && h.kind !== cutKind) || Object.keys(g.caught).length === 1);
     // none left: nothing happens
     while (!castNow(g)) step(g, []);
     step(g, [[g.tick, 0]]);
-    while (g.hook.state === 'out') step(g, []);
+    while (busy(g.hook)) step(g, []);
     step(g, [[g.tick, 1]]);
     assert.ok(g.hook.item);
     return;

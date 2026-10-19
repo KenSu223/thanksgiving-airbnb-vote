@@ -10,6 +10,7 @@ import * as sfx from './sfx.js';
 // taking input, at 1×, 2× or 4×. Each level opens with a short card (第 N 关 ·
 // 目标) while the clock waits.
 // Tap / click the water, ↓ or space: cast. ✂️ or ↑: cut loose what's on the line.
+// The hook swings under the water, and on the way back it still catches things.
 const ASPECT = W / H;
 const PAD = 8, GAP = 8, BAR_H = 48; // around the field, and the button bar under it (fishing.css)
 const SPEEDS = [1, 2, 4];
@@ -86,7 +87,8 @@ export default function FishGame({ seed, paused, onPause, onResume, onDone, onLe
         else if (h.type === 'buy') sfx.play('buy');
         else if (h.type === 'pass') sfx.play('pass');
         else if (h.type === 'land') {
-          const text = h.what === 'scissors' ? '✂️ +1' : h.what === 'strong' ? '💪 大力！' : '+' + h.v.toLocaleString('en-US');
+          fx.current.push({ kind: 'fly', what: h.kind, r: KINDS[h.kind].r, x: h.x, y: h.y, at: now });
+          const text =h.what === 'scissors' ? '✂️ +1' : h.what === 'strong' ? '💪 大力！' : '+' + h.v.toLocaleString('en-US');
           const color = h.what ? '#fff' : h.v >= 300 ? '#9ef0ff' : h.v >= 40 ? '#ffe25c' : '#d6e6f2';
           pop(text, color, now, h.v >= 300);
           if (h.first) pop('新！' + KINDS[h.kind].label, '#b8ffcf', now + 250, false, 20);
