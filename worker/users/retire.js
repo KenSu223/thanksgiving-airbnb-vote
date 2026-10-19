@@ -32,8 +32,11 @@ import { scrubUserFromTodos } from '../todos/routes.js';
 // only. (2026-10-15 → 2026-10-16 a plain "PM Test" entry sat here, and every
 // new account of that name was created by login and scrubbed again by the
 // next member-list load; PM wanted the name back, so it stays free.)
+// 2026-10-19: the "🤖" account goes too (asked for in chat) — once only, so
+// the name stays free.
 const RETIRED = [
   { name: 'PM Test', createdBefore: Date.parse('2026-10-17T04:00:00Z') },
+  { name: '🤖', createdBefore: Date.parse('2026-10-19T20:05:00Z') },
 ];
 export const retiredList = env => [...RETIRED, ...String(env.RETIRE || '').split(',').map(s => s.trim()).filter(Boolean)]
   .map(r => (typeof r === 'string' ? { name: r } : r));
