@@ -4,9 +4,11 @@
 // play out the same way: the browser plays it, and the server replays the
 // inputs for the score (verify.js); a best run can be watched again.
 //
-// A little boat on the water; its line swings under the rod tip. Cast it and
-// the hook goes straight down its line until it catches something (or leaves
-// the water), then reels back, slower the heavier the catch. The fish swim
+// A little boat on the water, an American Shorthair with a rod; the hook
+// swings under the water at the end of the line. Cast it and the hook goes
+// straight down its line until it catches something (or leaves the water),
+// then reels back, slower the heavier the catch; reeling back empty it can
+// still hook something on the way. The fish swim
 // across at their own depths and speeds, so it's about timing the swing and
 // the fish together; pearls, chests and junk lie on the seabed. A run is
 // levels of 60 seconds with a coin target each; reach it and you get the
@@ -24,25 +26,27 @@
 // too, so a run's ticks are never more than the real time it took.
 export const HZ = 60;
 export const W = 360, H = 480;
-export const PIVOT = { x: 180, y: 70 };     // the rod tip, where the line comes from
+export const PIVOT = { x: 180, y: 80 };     // the rod tip, where the line comes from
 export const WATER = 112;                   // the surface
 export const SEABED = H - 34;               // where the sand starts
 export const LEVEL_TICKS = 60 * HZ;
 export const MAX_TICKS = 45 * 60 * HZ;      // a run stops after 45 minutes
-export const ROPE0 = 16;                    // line out while it swings
-export const SWING = { max: 1.22, period: 150 }; // ±70°, one full swing in 2.5 s
+// The hook swings under the water: with this much line out, even at the ends
+// of the swing (±54°, one full swing in 2.5 s) it's below the surface.
+export const ROPE0 = 74;
+export const SWING = { max: 0.95, period: 150 };
 export const CAST = 4.6, PULL = 7.6, HOOK_R = 5;
 export const STRONG = 1.6;                  // 大力水: reeling in this much faster
 // Bump whenever a change makes the same seed and inputs play out differently:
 // runs started under another version can't be checked or replayed.
-export const SIM_VERSION = 1;
+export const SIM_VERSION = 2; // 2: the hook swings under the water, and catches on the way back too
 
 // value: coins when it's in the boat; w: how much it slows the reel.
 // Swimmers keep to a depth band [top, bottom] and cross at speed [lo, hi]
 // px a tick, bobbing up and down by `bob`; the rest lie on the seabed.
 export const KINDS = {
-  minnow: { group: 'fish', label: '小黄鱼', r: 8, value: 20, w: 0.3, swim: [1.1, 1.6], band: [142, 260], bob: 2, note: '浅水里游得快' },
-  clown: { group: 'fish', label: '小丑鱼', r: 9, value: 40, w: 0.35, swim: [0.9, 1.3], band: [150, 300], bob: 2, note: '橙白条纹' },
+  minnow: { group: 'fish', label: '小黄鱼', r: 8, value: 20, w: 0.3, swim: [1.1, 1.6], band: [150, 260], bob: 2, note: '浅水里游得快' },
+  clown: { group: 'fish', label: '小丑鱼', r: 9, value: 40, w: 0.35, swim: [0.9, 1.3], band: [155, 300], bob: 2, note: '橙白条纹' },
   angel: { group: 'fish', label: '神仙鱼', r: 12, value: 80, w: 0.6, swim: [0.7, 1.0], band: [170, 330], bob: 3, note: '扁扁高高的' },
   puffer: { group: 'fish', label: '河豚', r: 13, value: 150, w: 1.2, swim: [0.4, 0.7], band: [190, 360], bob: 5, note: '慢悠悠，有点重' },
   octopus: { group: 'fish', label: '章鱼', r: 15, value: 200, w: 1.8, swim: [0.3, 0.5], band: [260, 400], bob: 8, note: '一漂一漂的' },
@@ -200,7 +204,7 @@ function landIt(g, it) {
   g.money += v;
   const first = !g.caught[it.kind];
   g.caught[it.kind] = (g.caught[it.kind] || 0) + 1;
-  g.happened.push({ type: 'land', kind: it.kind, v, what, first });
+  g.happened.push({ type: 'land', kind: it.kind, v, what, first, x: it.x, y: it.y });
 }
 
 function apply(g, e) {
@@ -221,6 +225,30 @@ function apply(g, e) {
       g.happened.push({ type: 'buy', key: o.key });
     } else if (type === 3) { startLevel(g, g.level + 1); g.happened.push({ type: 'level' }); }
   }
+}
+
+// The first thing the hook runs into moving along its line from `from` to `to`
+// (out or back), checked along the whole stretch, so nothing is skipped.
+function firstHit(g, from, to) {
+  const h = g.hook, s = dsin(h.a), c = dcos(h.a), out = to > from;
+  const lo = out ? from : to, hi = out ? to : from;
+  let hit = null, best = out ? Infinity : -Infinity;
+  for (const it of g.items) {
+    const px = it.x - PIVOT.x, py = it.y - PIVOT.y, m = it.r + HOOK_R;
+    const mid = px * s + py * c, ox = px - s * mid, oy = py - c * mid, off2 = ox * ox + oy * oy;
+    if (off2 > m * m) continue;
+    const enter = mid - Math.sqrt(m * m - off2), leave = mid + Math.sqrt(m * m - off2);
+    if (leave < lo || enter > hi) continue;
+    // where along the way it's touched first: going out the nearest, coming back the farthest
+    const at = out ? Math.max(enter, lo) : Math.min(leave, hi);
+    if (out ? at < best : at > best) { best = at; hit = it; }
+  }
+  return hit;
+}
+function hookIt(g, it) {
+  g.items = g.items.filter(o => o !== it);
+  g.hook.item = it; g.hook.state = 'back';
+  g.happened.push({ type: 'hook', kind: it.kind });
 }
 
 // One tick: this tick's inputs, then everything moves.
@@ -244,27 +272,17 @@ export function step(g, events) {
       h.phase = (h.phase + 1) % SWING.period;
       h.a = SWING.max * dsin(2 * PI * h.phase / SWING.period);
     } else if (h.state === 'out') {
-      // the hook goes straight down its line: the first thing that stretch of
-      // line runs into (checked along the whole stretch, so nothing is skipped)
-      const from = h.len, s = dsin(h.a), c = dcos(h.a);
+      const from = h.len;
       h.len += CAST;
-      let hit = null, best = Infinity;
-      for (const it of g.items) {
-        const px = it.x - PIVOT.x, py = it.y - PIVOT.y, m = it.r + HOOK_R;
-        const mid = px * s + py * c, ox = px - s * mid, oy = py - c * mid, off2 = ox * ox + oy * oy;
-        if (off2 > m * m) continue;
-        const enter = mid - Math.sqrt(m * m - off2), leave = mid + Math.sqrt(m * m - off2);
-        if (leave < from || enter > h.len) continue;
-        if (enter < best) { best = enter; hit = it; }
-      }
+      const hit = firstHit(g, from, h.len);
       const [tx, ty] = tipOf(h);
-      if (hit) {
-        g.items = g.items.filter(it => it !== hit);
-        h.item = hit; h.state = 'back';
-        g.happened.push({ type: 'hook', kind: hit.kind });
-      } else if (tx < 0 || tx > W || ty > H) { h.state = 'back'; g.happened.push({ type: 'miss' }); }
+      if (hit) hookIt(g, hit);
+      else if (tx < 0 || tx > W || ty > H) { h.state = 'back'; g.happened.push({ type: 'miss' }); }
     } else if (h.state === 'back') {
+      const from = h.len;
       h.len -= h.item ? pullSpeed(g, h.item) : PULL;
+      // coming back empty (a miss, or cut loose), the hook still catches what it runs into
+      if (!h.item) { const hit = firstHit(g, from, Math.max(h.len, ROPE0)); if (hit) hookIt(g, hit); }
       if (h.len <= ROPE0) {
         h.len = ROPE0; h.state = 'swing';
         if (h.item) { landIt(g, h.item); h.item = null; }

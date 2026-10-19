@@ -315,57 +315,80 @@ function item(ctx, g, it, t, held) {
   ctx.restore();
 }
 
-// ---- the boat, the fisher and the rod ----
-const REEL = { x: PIVOT.x + 22, y: WATER - 26 };
+// ---- the boat, the cat and the rod ----
+// The cat is いらすとや's grey tabby with a white belly and white paws
+// (web/public/fishing/SOURCES.md), standing on the boat; until it has loaded,
+// the boat is just empty for a moment.
+const CAT = typeof Image === 'undefined' ? null : Object.assign(new Image(), { src: '/fishing/cat.webp' });
+const CAT_H = 60, CAT_W = CAT_H * 272 / 300;
+export const BOAT = { x: PIVOT.x + 42, y: WATER - 4 };
 function boat(ctx, g, t) {
-  const bob = Math.sin(t * 1.6) * 1.2, bx = PIVOT.x + 34, by = WATER - 4 + bob;
-  // the fisher, sitting
-  const fx = bx + 4, fy = by - 14;
-  ctx.fillStyle = '#ffcf3d'; ctx.beginPath(); ctx.roundRect(fx - 9, fy - 16, 18, 18, 6); ctx.fill();      // raincoat
-  ctx.fillStyle = '#f2c9a0'; ctx.beginPath(); ctx.arc(fx, fy - 24, 7.5, 0, TAU); ctx.fill();               // face
-  ctx.fillStyle = '#3a7bd5'; ctx.beginPath(); ctx.ellipse(fx, fy - 29, 11, 3, 0, 0, TAU); ctx.fill();     // bucket hat
-  ctx.beginPath(); ctx.arc(fx, fy - 29, 7.5, Math.PI, 0); ctx.fill();
-  dot(ctx, fx - 3.2, fy - 24, 1, '#222'); dot(ctx, fx + 0.8, fy - 24, 1, '#222');
-  dot(ctx, fx - 4.8, fy - 21.5, 1.6, 'rgba(255,130,130,.6)');
-  ctx.strokeStyle = '#222'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(fx - 1.5, fy - 21.5, 1.6, 0.2, Math.PI - 0.2); ctx.stroke();
+  const bob = Math.sin(t * 1.6) * 1.2, bx = BOAT.x, by = BOAT.y + bob;
+  const heavy = g.hook.state === 'back' && g.hook.item && (g.hook.item.w ?? KINDS[g.hook.item.kind].w) >= 1.5;
+  // the cat, standing on the deck (leaning back a little when the catch is heavy)
+  const cx = bx - CAT_W / 2 + 5, cy = by - 7 - CAT_H;
+  if (CAT?.complete && CAT.naturalWidth) {
+    ctx.save();
+    ctx.translate(cx + CAT_W / 2, by - 7); ctx.rotate(heavy ? 0.07 + Math.sin(t * 18) * 0.02 : Math.sin(t * 1.3) * 0.015);
+    ctx.drawImage(CAT, -CAT_W / 2, -CAT_H, CAT_W, CAT_H);
+    ctx.restore();
+  }
   // the hull
   ctx.fillStyle = '#b5652d';
   ctx.beginPath(); ctx.moveTo(bx - 30, by - 8); ctx.lineTo(bx + 30, by - 8); ctx.quadraticCurveTo(bx + 26, by + 8, bx + 14, by + 9); ctx.lineTo(bx - 16, by + 9); ctx.quadraticCurveTo(bx - 28, by + 6, bx - 30, by - 8); ctx.fill();
   ctx.fillStyle = '#8a4520'; ctx.fillRect(bx - 30, by - 9, 60, 3);
   ctx.strokeStyle = 'rgba(80,35,10,.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx - 26, by - 1); ctx.lineTo(bx + 26, by - 1); ctx.stroke();
-  // the rod, from the hands to the tip, and the reel spinning with the line
+  // the rod, from the cat's front paws to the tip, and the reel spinning with the line
+  const hx = cx + CAT_W * 0.3, hy = cy + CAT_H * 0.74;
   ctx.strokeStyle = '#5a3a1a'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(fx - 4, fy - 6); ctx.quadraticCurveTo(PIVOT.x + 8, PIVOT.y + 4, PIVOT.x, PIVOT.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(hx + 4, hy + 3); ctx.quadraticCurveTo((hx + PIVOT.x) / 2, PIVOT.y + 2, PIVOT.x, PIVOT.y); ctx.stroke();
   ctx.lineCap = 'butt';
-  const spin = (g.hook.len - ROPE0) / 5;
-  ctx.fillStyle = '#9aa4ae'; ctx.beginPath(); ctx.arc(REEL.x, REEL.y, 4.2, 0, TAU); ctx.fill();
-  ctx.strokeStyle = '#4a525a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(REEL.x, REEL.y); ctx.lineTo(REEL.x + Math.cos(spin) * 4.5, REEL.y + Math.sin(spin) * 4.5); ctx.stroke();
-  ctx.fillStyle = '#f2c9a0'; ctx.beginPath(); ctx.arc(fx - 5, fy - 6, 2.8, 0, TAU); ctx.fill(); // the hand on the rod
+  const rx = hx - 3, ry = hy - 1, spin = (g.hook.len - ROPE0) / 5;
+  ctx.fillStyle = '#9aa4ae'; ctx.beginPath(); ctx.arc(rx, ry, 3.8, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#4a525a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + Math.cos(spin) * 4, ry + Math.sin(spin) * 4); ctx.stroke();
 }
 
-// ---- line and hook ----
-function hook(ctx, g) {
+// ---- line, float and hook ----
+// The float sits on the surface where the line goes in; the hook swings under
+// the water at the end of the line.
+function hook(ctx, g, t) {
   const h = g.hook, [tx, ty] = tipOf(h);
-  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(PIVOT.x, PIVOT.y); ctx.lineTo(tx, ty); ctx.stroke();
+  if (ty > WATER) {
+    const fx = surfaceX(h.a), fy = WATER + Math.sin(t * 3) * 0.8;
+    ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.ellipse(fx, fy - 1, 3.4, 4.2, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(fx, fy - 1, 3.4, 3, 0, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = '#333'; ctx.fillRect(fx - 0.5, fy - 8, 1, 3.5);
+  }
   ctx.save(); ctx.translate(tx, ty); ctx.rotate(-h.a);
-  // a float on the line, then the hook (down the line is +y here)
+  // down the line is +y here: a little weight, then the hook (open while it's empty)
+  ctx.fillStyle = '#5b6470'; ctx.beginPath(); ctx.ellipse(0, -3, 1.8, 2.6, 0, 0, TAU); ctx.fill();
   if (!h.item) {
-    ctx.strokeStyle = '#c9d1d9'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(0, 6); ctx.arc(-3.2, 6, 3.2, 0, Math.PI * 0.95); ctx.stroke();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(20,40,60,.55)'; ctx.lineWidth = 3.4;
+    ctx.beginPath(); ctx.moveTo(0, -1); ctx.lineTo(0, 7); ctx.arc(-4, 7, 4, 0, Math.PI * 0.95); ctx.stroke();
+    ctx.strokeStyle = '#e6edf3'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, -1); ctx.lineTo(0, 7); ctx.arc(-4, 7, 4, 0, Math.PI * 0.95); ctx.stroke();
     ctx.lineCap = 'butt';
   }
-  ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.ellipse(0, -9, 2.6, 3.6, 0, Math.PI, 0); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, -9, 2.6, 3.6, 0, 0, Math.PI); ctx.fill();
   ctx.restore();
 }
 
 // ---- effects: coins popping up, splashes, a cut line ----
-// fx: [{ kind: 'pop', text, color, x, y, at, big } | { kind: 'ring', x, y, at }], at in ms
+// fx: [{ kind: 'pop', text, color, x, y, at, big } | { kind: 'ring', x, y, at }
+//      | { kind: 'fly', what, r, x, y, at }  (a catch flying from the hook into the boat)], at in ms
 function effects(ctx, fx, now) {
   for (const e of fx) {
     const age = (now - e.at) / 1000;
-    if (e.kind === 'ring') {
+    if (e.kind === 'fly') {
+      if (age < 0 || age > 0.55) continue;
+      const k = age / 0.55, tx = BOAT.x - 8, ty = BOAT.y - 14;
+      const x = e.x + (tx - e.x) * k, y = e.y + (ty - e.y) * k - Math.sin(k * Math.PI) * 40;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(-Math.PI / 2 + k * 6); ctx.globalAlpha = k < 0.8 ? 1 : (1 - k) / 0.2;
+      paintKind(ctx, e.what, e.r * (1 - 0.45 * k), now / 1000, 1);
+      ctx.restore(); ctx.globalAlpha = 1;
+    } else if (e.kind === 'ring') {
       if (age > 0.6) continue;
       const k = age / 0.6;
       ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - k)})`; ctx.lineWidth = 1.5;
@@ -421,14 +444,14 @@ export function draw(ctx, g, scale, fx, now) {
   sea(ctx, g, t);
   for (const it of g.items) item(ctx, g, it, t, false);
   boat(ctx, g, t);
-  hook(ctx, g);
+  hook(ctx, g, t);
   if (g.hook.item) item(ctx, g, g.hook.item, t, true);
   effects(ctx, fx, now);
   hud(ctx, g, now);
 }
 
 // where a popup about coins shows: next to the boat; where the line meets the water
-export const POP_AT = { x: PIVOT.x - 40, y: PIVOT.y - 4 };
+export const POP_AT = { x: PIVOT.x - 38, y: PIVOT.y - 14 };
 export const surfaceX = a => PIVOT.x + (Math.sin(a) / Math.cos(a)) * (WATER - PIVOT.y);
 
 // How far each kind's drawing reaches from its centre, in units of r:

@@ -62,9 +62,11 @@ works for any group picking a place together.
   `node --test web/src/features/dodge/*.test.js`. One all-time
   leaderboard of each person's longest survival
 - 小小钓鱼 (in the Gameroom): a fishing game after 奥比岛's 小小钓鱼, played
-  like gold miner. The line swings under the rod of a little boat; tap (or
-  ↓ / space) to send the hook straight down, and it reels in whatever it hits
-  first, slower the heavier. 14 kinds to catch: fish that swim across at
+  like gold miner. An American Shorthair (いらすとや's grey tabby with a white
+  belly and white paws) fishes from a little boat; the hook swings under the
+  water, tap (or ↓ / space) to send it straight down, and it reels in
+  whatever it hits first, slower the heavier; coming back empty it can still
+  hook something on the way. 14 kinds to catch: fish that swim across at
   their own depths and speeds (小丑鱼, 河豚, 海龟, 鲨鱼, the rare 龙鱼 …),
   pearls and chests on the seabed, and junk. 60 seconds a level; reach the
   coin target to get the shop (scissors, strength drink, bait, lucky clover,
