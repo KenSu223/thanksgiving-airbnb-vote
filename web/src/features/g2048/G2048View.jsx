@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from '../../session/SessionContext.jsx';
+import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useG2048 } from './useG2048.js';
@@ -23,6 +24,7 @@ const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 export default function G2048View({ active }) {
   const { name, ensureName } = useSession();
+  const confirm = useConfirm();
   const [tiles, setTiles] = useState([]);
   const [game, setGame] = useState(null); // 服务器的这局：{ grid, score, moves, over, won, keep }
   const [best, setBest] = useState(null);
@@ -122,9 +124,11 @@ export default function G2048View({ active }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [active]);
 
-  // 滑动（手指或鼠标拖）
+  // 滑动（手指或鼠标拖）。按在盘面上的浮层（再来一局 / 继续玩 / 新游戏）上不算滑：
+  // 抓住指针以后，松手的点击会交给盘面而不是那个按钮，按钮就点不动了
   const start = useRef(null);
   const onDown = e => {
+    if (e.target.closest?.('.g48-over')) return;
     start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } // 滑出盘面再松手也算
   };
@@ -136,9 +140,10 @@ export default function G2048View({ active }) {
     go.current(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
   };
 
-  const newGame = () => {
+  // 这局还在走的话先问一声（用 app 自己的确认框：浏览器的 confirm() 可能被拦掉，什么都不弹就当成「取消」）
+  const newGame = async () => {
     const g = gameRef.current;
-    if (g && g.moves > 0 && !g.over && !window.confirm('放弃这局，重新开始？')) return;
+    if (g && g.moves > 0 && !g.over && !(g.won && !g.keep) && !await confirm({ title: '重新开始？', message: '放弃这局，从头再来。', confirmText: '重新开始', danger: true })) return;
     inflight.current = null; queue.current = [];
     send({ type: 'new' });
   };
