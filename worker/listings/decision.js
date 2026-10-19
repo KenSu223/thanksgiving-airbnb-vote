@@ -50,7 +50,7 @@ async function caller(env, name, token) {
 async function handleDecision(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   const user = await caller(env, body.name, body.token);
   if (!user) return j({ ok: false, error: '先登录' });
   if (votingOpen(trip)) return j({ ok: false, error: '投票还没截止' });
@@ -67,7 +67,7 @@ async function handleDecision(req, env) {
 async function handleBooking(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   const user = await caller(env, body.name, body.token);
   if (!user) return j({ ok: false, error: '先登录' });
   const out = await updateState(env, trip, state => {

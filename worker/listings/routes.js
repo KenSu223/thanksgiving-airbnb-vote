@@ -22,7 +22,7 @@ async function handleAdd(req, env) {
   if (isMapLink(url) || travelEntity(url)) return addHotel({ ...body, url }, env); // a hotel from a Google / Apple Maps or Google Travel link
   const roomId = roomIdFrom(url);
   if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源或地图链接（要 airbnb.com/rooms/123…，或者酒店在 Google 地图 / Google 酒店里的链接）' });
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   if (!votingOpen(trip)) return closedError();
   // Fast-path dedupe check only — do NOT hold this snapshot across the scrape.
   const preState = await getState(env, trip);
@@ -64,7 +64,7 @@ async function handleAddManual(req, env) {
   const title = String(body.title || '').trim().slice(0, 120);
   const roomId = roomIdFrom(url);
   if (!roomId || !title) return j({ ok: false, error: '链接和标题是必填的' });
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   if (!votingOpen(trip)) return closedError();
   const num = v => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);
   const listing = { id: uid(), roomId, url, title,
@@ -87,7 +87,7 @@ async function handleVote(req, env) {
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { id, token, name } = body;
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   if (!votingOpen(trip)) return closedError();
   // The voter is the account: resolve its name from the token as well, so
   // an unvote (no name sent) still finds votes left under an older token.
@@ -111,7 +111,7 @@ async function handleVote(req, env) {
 async function handleRemove(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   if (!votingOpen(trip)) return closedError();
   const out = await updateState(env, trip, state => {
     const i = state.listings.findIndex(l => l.id === body.id);
@@ -126,7 +126,7 @@ async function handleRemove(req, env) {
 async function handleEnrich(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   // Peek only to get the URL to scrape — do NOT hold this snapshot
   // across the scrape (see handleAdd: it can take up to ~35s, and
   // saving a stale snapshot would clobber concurrent changes).
@@ -162,7 +162,7 @@ async function handleEnrich(req, env) {
 // The trip's listings plus the whole group's ledger. members/expenses
 // inside trip state are pre-merge leftovers, kept in KV but not served.
 async function handleState(req, env, url) {
-  const trip = tripOf(url.searchParams.get('trip'));
+  const trip = tripOf(url.searchParams.get('trip'), env);
   const { members, expenses, decision, booking, ...state } = await getState(env, trip);
   state.listings = (state.listings || []).map(l => ({ ...l, votes: dedupeVotes(l.votes) }));
   return j({ ...state, vote: voteView({ ...state, decision, booking }, trip), ...splitView(await getSplit(env)) });

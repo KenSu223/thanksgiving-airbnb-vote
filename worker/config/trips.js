@@ -22,4 +22,11 @@ export const TRIPS = {
     ], },
 };
 export const DEFAULT_TRIP = 'nov26'; // requests without a trip (old cached pages) hit the original list
-export const tripOf = t => TRIPS[t] || TRIPS[DEFAULT_TRIP];
+// Tests only: VOTE_OPEN (trip keys, comma-separated; the robustness suite sets
+// "nov26") keeps those trips' voting open whatever the date, so the vote tests
+// don't start failing once a real deadline passes. The deployed worker never sets it.
+export const tripOf = (t, env) => {
+  const key = TRIPS[t] ? t : DEFAULT_TRIP;
+  const open = String(env?.VOTE_OPEN || '').split(',').map(s => s.trim()).includes(key);
+  return open ? { ...TRIPS[key], voteEndsAt: null } : TRIPS[key];
+};

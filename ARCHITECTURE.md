@@ -114,7 +114,7 @@ Airbnb 房源页的价格框是浏览器单独请求的（GraphQL 持久化查�
 
 ## 部署（`wrangler.toml`）
 
-声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、四个游戏的 Durable Object（`BlackjackTable`、`DdzHall`、`GuandanHall`、`MahjongHall`；migration v1、v2 各加一个，v3 加掼蛋和川麻两个）、躲技能排行榜 `DodgeBoard`（v5；v4 是 StoreDO）、2048 的 `Board2048`（v6）、谁是卧底的 `UndercoverHall`（v7）、阿瓦隆的 `AvalonHall`（v8）、狼人杀的 `WerewolfHall`（v9）、在线状态的 `PresenceDO`（v10）、聊天室的 `ChatRoom`（v11）、五子棋的 `GomokuHall`（v12）。推到 `main` 由 GitHub Action 自动 `npm ci` + `wrangler deploy`；每个 PR 都会跑 `npm run check`（lint + 构建 + 打包 worker）。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
+声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、四个游戏的 Durable Object（`BlackjackTable`、`DdzHall`、`GuandanHall`、`MahjongHall`；migration v1、v2 各加一个，v3 加掼蛋和川麻两个）、躲技能排行榜 `DodgeBoard`（v5；v4 是 StoreDO）、2048 的 `Board2048`（v6）、谁是卧底的 `UndercoverHall`（v7）、阿瓦隆的 `AvalonHall`（v8）、狼人杀的 `WerewolfHall`（v9）、在线状态的 `PresenceDO`（v10）、聊天室的 `ChatRoom`（v11）、五子棋的 `GomokuHall`（v12）。CI 在 `.github/` 里：`workflows/ci.yml` 是每个 PR 都跑的检查，两个并行的 job——`check`（`npm run check`：lint、单元测试 `npm test`（`node --test`，自动找所有 `*.test.js`）、构建页面、打包 worker）和 `robustness`（`npm run test:robustness`：本地起一个 worker，跑 `tests/robustness/` 里的每个套件；新套件放进这个目录就会被跑到，共用的帮手放 `lib/`，顺序和测试专用变量写在 `run.mjs` 开头）；`workflows/deploy.yml` 在推到 `main` 时先调用同一个 `ci.yml`，过了才 `wrangler deploy`（一次只部署一个，按顺序）；每个 job 的装 Node + `npm ci` 都是 `actions/setup`。测试服务器设 `VOTE_OPEN=nov26`，让 nov26 的投票在测试里一直开着（`worker/config/trips.js` 的 `tripOf`），投票相关的测试不会因为真的截止日期过了就挂；线上不设。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
 
 **部署踩坑清单（2026-10-10）：**
 

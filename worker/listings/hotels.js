@@ -200,7 +200,7 @@ const nightlyOf = v => { const n = Math.round(Number(v)); return n >= 1 && n <= 
 
 // POST /api/add with a maps link lands here (routes.js).
 export async function addHotel(body, env) {
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   if (!votingOpen(trip)) return closedError();
   // Slow work (link, lookups, Google) before reading the list, like Airbnb adds.
   const entity = travelEntity(body.url);
@@ -235,7 +235,7 @@ export async function addHotel(body, env) {
 async function handleRate(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   if (!votingOpen(trip)) return closedError();
   const nightly = nightlyOf(body.nightly);
   if (body.nightly !== '' && body.nightly != null && !nightly) return j({ ok: false, error: '价格要是 1 到 20000 之间的数字' });

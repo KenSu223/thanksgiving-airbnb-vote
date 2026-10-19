@@ -141,7 +141,10 @@ works for any group picking a place together.
 npm install
 npm run dev:api   # terminal 1: the worker on :8787 (KV and the Gameroom run locally)
 npm run dev       # terminal 2: the page on :5173 with hot reload, /api proxied to :8787
-npm run check     # lint + build + bundle the worker, same as CI runs on every PR
+npm run check     # lint + unit tests + build + bundle the worker (CI's check job)
+npm test          # just the unit tests (node --test: every *.test.js)
+npm run test:robustness              # boot the worker, run every suite in tests/robustness/ (CI's robustness job)
+npm run test:robustness -- chat gomoku   # only some suites
 ```
 
 `npm run dev:api` alone also works: it builds the page and serves everything on

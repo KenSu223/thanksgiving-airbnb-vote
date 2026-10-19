@@ -69,7 +69,7 @@ export async function pickArea(trip, listings, l) {
 async function handleZones(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   const peek = await getState(env, trip);
   const known = peek.listings.map(l => ({ ...l })); // assignments made below count as neighbors for the next ones
   const found = {};
@@ -92,7 +92,7 @@ async function handleZones(req, env) {
 async function handleSetArea(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const trip = tripOf(body.trip);
+  const trip = tripOf(body.trip, env);
   const out = await updateState(env, trip, state => {
     const listing = state.listings.find(l => l.id === body.id);
     if (!listing) return { error: '房源不存在' };

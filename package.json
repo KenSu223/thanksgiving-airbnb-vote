@@ -7,7 +7,8 @@
     "dev:api": "wrangler dev --port 8787 --compatibility-date 2026-04-01",
     "build": "vite build",
     "lint": "eslint .",
-    "check": "npm run lint && npm run build && wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "test": "node --test",
+    "check": "npm run lint && npm test && npm run build && wrangler deploy --dry-run --outdir .wrangler/dry-run",
     "test:robustness": "node tests/robustness/run.mjs",
     "deploy": "wrangler deploy"
   },

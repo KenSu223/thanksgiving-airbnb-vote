@@ -1,126 +1,113 @@
-// Orchestrator for the robustness suite: start the worker locally on a
-// throwaway state directory, wait until it answers, run the fuzz battery
-// and the concurrency storms against it, then tear everything down.
+// Runs the robustness suite: start the worker locally on a throwaway state
+// directory, wait until it answers, run every suite in this folder against it,
+// then tear it down.
 //
-//   npm run test:robustness
+//   npm run test:robustness                     every suite
+//   npm run test:robustness -- chat gomoku      only these
+//   TEST_BASE=http://localhost:8787 npm run test:robustness   against a worker you already run
 //
-// Exit code is 0 only if both suites pass. The worker runs fully local
-// (wrangler dev --local): local KV + local Durable Objects, no Cloudflare
-// account needed, and the throwaway persist dir means CI always exercises
-// the first-run seeding paths too.
+// A suite is any *.mjs in this folder (shared helpers live in lib/). Each one
+// runs as its own process with TEST_BASE set, prints its checks, and fails by
+// exiting non-zero; a new suite is picked up without touching this file. They
+// all share one worker, so a few run in a fixed order: FIRST in that order,
+// then the rest alphabetically, then LAST. Every suite runs even when an
+// earlier one fails; the exit code is 0 only if they all pass.
 //
-// The --compatibility-date override mirrors the repo's own `dev:api`
-// script: wrangler.toml asks for a newer date than the pinned wrangler's
-// workerd supports, so local dev (and these tests) pin a supported one.
-// Production deploys don't use this flag and are unaffected.
+// The worker runs fully local (wrangler dev --local: local KV and Durable
+// Objects, no Cloudflare account), and the throwaway state means CI always
+// exercises the first-run seeding too. --compatibility-date mirrors the
+// `dev:api` script: wrangler.toml asks for a newer date than the pinned
+// wrangler's workerd supports. Test-only vars (the deployed worker sets none):
+//   PARTY_SPEED=20   party-game clocks 20x faster, so whole games fit (worker/games/hall.js)
+//   RETIRE=Retiree   a retired test account, for users.mjs (worker/users/retire.js)
+//   VOTE_OPEN=nov26  nov26's voting stays open whatever the date, so the vote
+//                    tests don't depend on the calendar; nov25 stays closed for
+//                    the after-the-vote ones (worker/config/trips.js)
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const PORT = process.env.TEST_PORT || '8791';
-const BASE = `http://localhost:${PORT}`;
-const persist = mkdtempSync(join(tmpdir(), 'robustness-state-'));
+// fuzz: on the fresh state. users before leaderboards (its retiree's dodge run
+// has to be in the top 3 when it looks). storms: the concurrency storms, last.
+const FIRST = ['fuzz', 'pin', 'users', 'leaderboards'];
+const LAST = ['storms'];
+const VARS = { PARTY_SPEED: '20', RETIRE: 'Retiree', VOTE_OPEN: 'nov26' };
 
-// PARTY_SPEED=20 runs the party games' clocks (狼人杀 nights, speaking turns) 20x
-// faster so whole games fit in the suite (worker/games/hall.js).
-// RETIRE=Retiree puts a test account on the retired list (worker/users/retire.js),
-// so users.mjs can check an account comes off cleanly.
-const server = spawn('npx', ['wrangler', 'dev', '--port', PORT, '--local', '--compatibility-date', '2026-05-03', '--persist-to', persist, '--var', 'PARTY_SPEED:20', '--var', 'RETIRE:Retiree'], {
-  detached: true, stdio: ['ignore', 'pipe', 'pipe'],
-});
-let serverLog = '';
-server.stdout.on('data', d => { serverLog += d; });
-server.stderr.on('data', d => { serverLog += d; });
+const dir = fileURLToPath(new URL('.', import.meta.url));
+const found = readdirSync(dir).filter(f => f.endsWith('.mjs') && f !== 'run.mjs').map(f => f.slice(0, -4));
+const ordered = [...FIRST, ...found.filter(s => !FIRST.includes(s) && !LAST.includes(s)).sort(), ...LAST].filter(s => found.includes(s));
+const wanted = process.argv.slice(2);
+const unknown = wanted.filter(s => !found.includes(s));
+if (unknown.length) { console.error('no such suite: ' + unknown.join(', ') + ' (have: ' + found.join(', ') + ')'); process.exit(1); }
+const suites = wanted.length ? ordered.filter(s => wanted.includes(s)) : ordered;
 
-function stopServer() {
-  try { process.kill(-server.pid, 'SIGTERM'); } catch { /* already gone */ }
+// ---- the worker ----
+const BASE = process.env.TEST_BASE || `http://localhost:${process.env.TEST_PORT || '8791'}`;
+let server = null, persist = null, serverLog = '';
+if (!process.env.TEST_BASE) {
+  persist = mkdtempSync(join(tmpdir(), 'robustness-state-'));
+  const vars = Object.entries(VARS).flatMap(([k, v]) => ['--var', `${k}:${v}`]);
+  server = spawn('npx', ['wrangler', 'dev', '--port', new URL(BASE).port, '--local', '--compatibility-date', '2026-05-03', '--persist-to', persist, ...vars], {
+    detached: true, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  server.stdout.on('data', d => { serverLog += d; });
+  server.stderr.on('data', d => { serverLog += d; });
+  process.on('exit', () => { try { process.kill(-server.pid, 'SIGTERM'); } catch { /* already gone */ } });
 }
-process.on('exit', stopServer);
 
+// wrangler dev rebuilds once shortly after startup (its [build] step rewrites
+// dist/, which the watcher notices) and 503s during that restart, so it takes
+// two healthy answers 3 s apart to call it settled.
 async function waitReady(timeoutMs = 240000) {
-  // wrangler dev rebuilds once shortly after startup (its [build] step
-  // rewrites dist/, which the watcher notices) and 503s requests during
-  // that restart — so require two healthy answers 3s apart before
-  // declaring the server settled.
   const t0 = Date.now();
   let healthyOnce = false;
   while (Date.now() - t0 < timeoutMs) {
     try {
-      const r = await fetch(BASE + '/api/users');
-      if (r.ok) {
-        if (healthyOnce) return true;
+      if ((await fetch(BASE + '/api/users')).ok) {
+        if (healthyOnce || !server) return true;
         healthyOnce = true;
-        await new Promise(s => setTimeout(s, 3000));
+        await new Promise(r => setTimeout(r, 3000));
         continue;
       }
     } catch { /* not up yet */ }
     healthyOnce = false;
-    if (server.exitCode !== null) return false;
+    if (server && server.exitCode !== null) return false;
     await new Promise(r => setTimeout(r, 2000));
   }
   return false;
 }
 
-function runSuite(file) {
+function runSuite(name) {
   return new Promise(resolve => {
-    const child = spawn('node', [new URL(file, import.meta.url).pathname], {
-      env: { ...process.env, TEST_BASE: BASE }, stdio: 'inherit',
-    });
-    child.on('exit', code => resolve(code === 0));
+    const t0 = Date.now();
+    const child = spawn(process.execPath, [join(dir, name + '.mjs')], { env: { ...process.env, TEST_BASE: BASE }, stdio: 'inherit' });
+    child.on('exit', code => resolve({ name, ok: code === 0, secs: (Date.now() - t0) / 1000 }));
   });
 }
 
-let ok = false;
+const results = [];
 try {
   if (!await waitReady()) {
-    console.error('worker did not come up; wrangler output tail:\n' + serverLog.slice(-2000));
+    console.error('worker did not come up at ' + BASE + (server ? '; wrangler output tail:\n' + serverLog.slice(-2000) : ''));
   } else {
-    const fuzz = await runSuite('fuzz.mjs');
-    // Account protection (the PIN; email binding is gone).
-    const pin = await runSuite('pin.mjs');
-    // Same for the user-management suite (PM-only deletion).
-    const usersPath = new URL('users.mjs', import.meta.url).pathname;
-    const users = existsSync(usersPath) ? await runSuite('users.mjs') : true;
-    // Leaderboard rules (躲技能 top-3 replays, 21 点 net chips) — after users.mjs,
-    // whose victim's dodge replay has to be in the top 3 when it looks.
-    const leaderboards = await runSuite('leaderboards.mjs');
-    // And the quick-polls suite.
-    const pollsPath = new URL('polls.mjs', import.meta.url).pathname;
-    const polls = existsSync(pollsPath) ? await runSuite('polls.mjs') : true;
-    // And the dated-Google-prices suite for map-link hotels.
-    const googlePath = new URL('google.mjs', import.meta.url).pathname;
-    const google = existsSync(googlePath) ? await runSuite('google.mjs') : true;
-    // And the car seats / luggage suite.
-    const carsPath = new URL('cars.mjs', import.meta.url).pathname;
-    const cars = existsSync(carsPath) ? await runSuite('cars.mjs') : true;
-    // And the addressed game-reactions suite (WebSocket).
-    const reactionsPath = new URL('reactions.mjs', import.meta.url).pathname;
-    const reactions = existsSync(reactionsPath) ? await runSuite('reactions.mjs') : true;
-    // And the to-do list suite.
-    const todosPath = new URL('todos.mjs', import.meta.url).pathname;
-    const todos = existsSync(todosPath) ? await runSuite('todos.mjs') : true;
-    // The chat room (WebSocket): sign-in, @mentions, the 100-message cap.
-    const chat = await runSuite('chat.mjs');
-    // 2048: the server-owned board, resume, the best-tile board.
-    const g2048 = await runSuite('g2048.mjs');
-    // 五子棋: two people to five, the bot with 悔棋, a paused game picked up, the wins board.
-    const gomoku = await runSuite('gomoku.mjs');
-    // Presence: who has the app open, and when everyone else last did.
-    const presencePath = new URL('presence.mjs', import.meta.url).pathname;
-    const presence = existsSync(presencePath) ? await runSuite('presence.mjs') : true;
-    // Party games (谁是卧底 / 阿瓦隆 / 狼人杀): whole games over real sockets.
-    const party = await runSuite('party.mjs');
-    // Secret Angel's questions (five of ten, "can't be given" required).
-    const angel = await runSuite('angel.mjs');
-    const storms = await runSuite('storms.mjs');
-    ok = fuzz && pin && users && angel && leaderboards && polls && google && cars && reactions && todos && chat && g2048 && gomoku && presence && party && storms;
+    for (const s of suites) {
+      console.log(`\n=== ${s} ===`);
+      results.push(await runSuite(s));
+    }
   }
 } finally {
-  stopServer();
-  await new Promise(r => setTimeout(r, 1000));
-  try { process.kill(-server.pid, 'SIGKILL'); } catch { /* already gone */ }
-  rmSync(persist, { recursive: true, force: true });
+  if (server) {
+    try { process.kill(-server.pid, 'SIGTERM'); } catch { /* already gone */ }
+    await new Promise(r => setTimeout(r, 1000));
+    try { process.kill(-server.pid, 'SIGKILL'); } catch { /* already gone */ }
+    rmSync(persist, { recursive: true, force: true });
+  }
 }
-console.log(ok ? 'ROBUSTNESS SUITE: PASSED' : 'ROBUSTNESS SUITE: FAILED');
+
+const failed = results.filter(r => !r.ok).map(r => r.name);
+const ok = results.length === suites.length && !failed.length;
+console.log('\n' + results.map(r => `${r.ok ? 'pass' : 'FAIL'}  ${r.name.padEnd(14)} ${r.secs.toFixed(1)}s`).join('\n'));
+console.log(ok ? `ROBUSTNESS SUITE: PASSED (${results.length} suites)` : `ROBUSTNESS SUITE: FAILED${failed.length ? ' (' + failed.join(', ') + ')' : ''}`);
 process.exit(ok ? 0 : 1);
