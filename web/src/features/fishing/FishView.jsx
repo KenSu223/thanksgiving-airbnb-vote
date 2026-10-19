@@ -206,7 +206,8 @@ export default function FishView({ active }) {
                   <ul className="mt-3 text-sm text-sky-50/90 space-y-1">
                     <li>{touch ? '👆 点水面放线' : '🖱️ 点画面，或者按 ↓ / 空格放线'}；鱼会游，要算好提前量</li>
                     <li>✂️ 钓到靴子、礁石这种不想要的，{touch ? '点 ✂️' : '点 ✂️ 或按 ↑'} 剪断线，钩子马上空着回来</li>
-                    <li>🐉 龙鱼在最深处，第 3 关起才有，游得飞快，值 800</li>
+                    <li>🐙 章鱼值 300 可是又沉又慢；🐉 龙鱼在最深处，第 3 关起才有，游得飞快，值 800</li>
+                    <li>⚠️ 河豚扎手，钓上来扣钱；海龟慢得要命还得放生；鲨鱼又大又慢不值钱、还挡路——绕开它们，或者用 ✂️ 剪掉</li>
                     <li>🏪 过关进商店；买东西花的金币会从成绩里扣掉</li>
                   </ul>
                   {mine && <p className="mt-3 text-amber-200 font-bold">你的最好：{coins(mine.money)}（{reached(mine)}）</p>}
@@ -228,7 +229,7 @@ export default function FishView({ active }) {
                           <div key={k} className={'fh-dex-card' + (got.has(k) ? ' got' : '')}>
                             <KindIcon kind={k} w={64} h={44} className="fh-dex-icon" label={KINDS[k].label} />
                             <b>{KINDS[k].label}</b>
-                            <span className="fh-dex-value">{k === 'chest' ? '🪙 ？' : coins(KINDS[k].value)}</span>
+                            <span className={'fh-dex-value' + (KINDS[k].value < 0 ? ' bad' : '')}>{k === 'chest' ? '🪙 ？' : KINDS[k].value < 0 ? '扣 ' + -KINDS[k].value : coins(KINDS[k].value)}</span>
                             <small>{got.has(k) ? KINDS[k].note : '还没钓到'}</small>
                           </div>
                         ))}

@@ -55,7 +55,9 @@ test('a level starts with the line swinging and things in the water, nothing on 
     for (const it of g.items) assert.ok(it.x - it.r >= 0 && it.x + it.r <= W && it.y - it.r >= WATER && it.y + it.r <= H, JSON.stringify(it));
     for (const a of g.items) for (const b of g.items) if (a !== b) assert.ok((a.x - b.x) ** 2 + (a.y - b.y) ** 2 > (a.r + b.r) ** 2);
     const worth = g.items.reduce((s, it) => s + valueOf(g, it), 0);
-    assert.ok(worth >= target(1) * 1.5, 'level 1 is worth ' + worth);
+    assert.ok(worth >= target(1) * 1.4, 'level 1 is worth ' + worth);
+    // level 1 has no traps yet
+    assert.ok(!g.items.some(it => it.kind === 'puffer' || it.kind === 'turtle'), 'traps on level 1');
     // the fish swim, the seabed doesn't
     for (const it of g.items) assert.equal(!!it.vx, !!KINDS[it.kind].swim, it.kind);
   }
@@ -77,7 +79,7 @@ test('香饵 brings two more big fish', () => {
     const plain = makeLevel(seed, 2).items, baited = makeLevel(seed, 2, { bait: true }).items;
     assert.deepEqual(baited.slice(0, plain.length).map(it => it.kind), plain.map(it => it.kind));
     const extra = baited.slice(plain.length);
-    assert.ok(extra.length >= 1 && extra.every(it => ['turtle', 'shark', 'octopus', 'puffer'].includes(it.kind)), JSON.stringify(extra.map(it => it.kind)));
+    assert.ok(extra.length >= 1 && extra.every(it => it.kind === 'octopus'), JSON.stringify(extra.map(it => it.kind))); // (龙鱼 too from level 3)
   }
 });
 
@@ -254,12 +256,44 @@ test('the shop: buying spends coins, the next level starts with the boost, the t
   assert.fail('no shop reached');
 });
 
+test('traps: a puffer costs coins (never below none), a turtle pays nothing and is slow; more of them every level', () => {
+  assert.ok(KINDS.puffer.value < 0 && KINDS.turtle.value === 0 && KINDS.turtle.w > KINDS.shark.w && KINDS.shark.value < KINDS.octopus.value);
+  const count = (items, k) => items.filter(it => it.kind === k).length;
+  for (let seed = 1; seed < 20; seed++) {
+    const traps = L => { const items = makeLevel(seed, L).items; return count(items, 'puffer') + count(items, 'turtle'); };
+    assert.ok(traps(2) >= 1 && traps(6) > traps(2), seed + ': ' + traps(2) + ' -> ' + traps(6));
+  }
+  // land a puffer with some coins, then with none
+  for (let seed = 1; seed < 200; seed++) {
+    const g = newGame(seed);
+    step(g, [[0, 3]]); g.money = 700; step(g, [[g.tick, 3]]); step(g, [[g.tick, 3]]); // to level 2 (it has a puffer)
+    let k = 0, it = null;
+    while (k++ < 3000 && !((it = castNow(g)) && it.kind === 'puffer')) step(g, []);
+    if (!it || it.kind !== 'puffer') continue;
+    step(g, [[g.tick, 0]]);
+    while (g.hook.state !== 'swing') step(g, []);
+    assert.equal(g.money, 700 - 60);
+    assert.ok(g.happened.some(h => h.type === 'land' && h.kind === 'puffer' && h.v === -60));
+    return;
+  }
+  assert.fail('never hooked a puffer');
+});
+
+test('a puffer never takes the coins below none', () => {
+  const g = newGame(1);
+  const puffer = { id: 999, kind: 'puffer', x: 0, y: 200, r: 13 };
+  g.hook = { ...g.hook, state: 'back', item: puffer, len: 0 };
+  step(g, []);
+  assert.equal(g.money, 0);
+  assert.ok(g.happened.some(h => h.type === 'land' && h.kind === 'puffer' && h.v === 0));
+});
+
 test('回收袋: junk is worth three times as much', () => {
   const g = newGame(1), boot = { kind: 'boot' }, fish = { kind: 'shark' };
   assert.equal(valueOf(g, boot), 3);
   g.boost = { recycle: true };
   assert.equal(valueOf(g, boot), 9);
-  assert.equal(valueOf(g, fish), 500);
+  assert.equal(valueOf(g, fish), 100);
 });
 
 test('finishing a level early needs the target; ending the run keeps the coins', () => {

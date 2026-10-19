@@ -67,8 +67,10 @@ works for any group picking a place together.
   water, tap (or ↓ / space) to send it straight down, and it reels in
   whatever it hits first, slower the heavier; coming back empty it can still
   hook something on the way. 14 kinds to catch: fish that swim across at
-  their own depths and speeds (小丑鱼, 河豚, 海龟, 鲨鱼, the rare 龙鱼 …),
-  pearls and chests on the seabed, and junk. 60 seconds a level; reach the
+  their own depths and speeds (小丑鱼, 章鱼, the rare 龙鱼 …), pearls and
+  chests on the seabed, junk, and traps like gold miner's rocks: 河豚 costs
+  coins, 海龟 is very slow and pays nothing, 鲨鱼 is big, slow and cheap.
+  Level 1 has no traps; every level after has more. 60 seconds a level; reach the
   coin target to get the shop (scissors, strength drink, bait, lucky clover,
   recycling bag) and the next level, or the run is over. ✂️ / ↑ cuts loose
   what's on the line. The score is the coins left at the end; one all-time
