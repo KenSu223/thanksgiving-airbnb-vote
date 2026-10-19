@@ -39,7 +39,7 @@ export const CAST = 4.6, PULL = 7.6, HOOK_R = 5;
 export const STRONG = 1.6;                  // 大力水: reeling in this much faster
 // Bump whenever a change makes the same seed and inputs play out differently:
 // runs started under another version can't be checked or replayed.
-export const SIM_VERSION = 2; // 2: the hook swings under the water, and catches on the way back too
+export const SIM_VERSION = 3; // 2: the hook swings under the water, and catches on the way back too
 
 // value: coins when it's in the boat; w: how much it slows the reel.
 // Swimmers keep to a depth band [top, bottom] and cross at speed [lo, hi]
@@ -47,13 +47,13 @@ export const SIM_VERSION = 2; // 2: the hook swings under the water, and catches
 export const KINDS = {
   minnow: { group: 'fish', label: '小黄鱼', r: 8, value: 20, w: 0.3, swim: [1.1, 1.6], band: [150, 260], bob: 2, note: '浅水里游得快' },
   clown: { group: 'fish', label: '小丑鱼', r: 9, value: 40, w: 0.35, swim: [0.9, 1.3], band: [155, 300], bob: 2, note: '橙白条纹' },
-  angel: { group: 'fish', label: '神仙鱼', r: 12, value: 80, w: 0.6, swim: [0.7, 1.0], band: [170, 330], bob: 3, note: '扁扁高高的' },
-  puffer: { group: 'fish', label: '河豚', r: 13, value: 150, w: 1.2, swim: [0.4, 0.7], band: [190, 360], bob: 5, note: '慢悠悠，有点重' },
-  octopus: { group: 'fish', label: '章鱼', r: 15, value: 200, w: 1.8, swim: [0.3, 0.5], band: [260, 400], bob: 8, note: '一漂一漂的' },
-  turtle: { group: 'fish', label: '海龟', r: 20, value: 300, w: 3.2, swim: [0.3, 0.5], band: [220, 380], bob: 3, note: '很重，拉得慢' },
-  shark: { group: 'fish', label: '鲨鱼', r: 24, value: 500, w: 4.6, swim: [0.8, 1.1], band: [300, 410], bob: 2, note: '又大又重，值钱' },
-  dragon: { group: 'fish', label: '龙鱼', r: 14, value: 800, w: 0.9, swim: [1.5, 1.9], band: [360, 420], bob: 2, note: '最深处，很少见，游得飞快' },
-  jelly: { group: 'fish', label: '水母', r: 11, value: 10, w: 0.15, swim: [0.15, 0.3], band: [150, 380], bob: 12, note: '轻飘飘，不值钱' },
+  angel: { group: 'fish', label: '神仙鱼', r: 12, value: 70, w: 0.6, swim: [0.7, 1.0], band: [170, 330], bob: 3, note: '扁扁高高的' },
+  puffer: { group: 'fish', label: '河豚', r: 13, value: -60, w: 1.0, swim: [0.5, 0.8], band: [170, 360], bob: 5, note: '扎手！钓上来扣 60' },
+  octopus: { group: 'fish', label: '章鱼', r: 15, value: 300, w: 3.0, swim: [0.3, 0.5], band: [280, 410], bob: 8, note: '很值钱，可是又沉又慢' },
+  turtle: { group: 'fish', label: '海龟', r: 20, value: 0, w: 6.5, swim: [0.25, 0.4], band: [200, 380], bob: 3, note: '慢得要命，钓上来还得放生，一分不给' },
+  shark: { group: 'fish', label: '鲨鱼', r: 24, value: 100, w: 5.0, swim: [0.8, 1.1], band: [290, 410], bob: 2, note: '又大又慢，不值什么钱，挡路' },
+  dragon: { group: 'fish', label: '龙鱼', r: 14, value: 800, w: 0.9, swim: [1.6, 2.0], band: [370, 425], bob: 2, note: '最深处，很少见，游得飞快' },
+  jelly: { group: 'fish', label: '水母', r: 11, value: 5, w: 0.15, swim: [0.15, 0.3], band: [150, 380], bob: 12, note: '轻飘飘，几乎不值钱' },
   pearl: { group: 'bed', label: '珍珠贝', r: 9, value: 600, w: 0.4, note: '躺在海底，小又轻' },
   chest: { group: 'bed', label: '宝箱', r: 13, value: 0, w: 1.5, note: '打开看看：金币、剪刀或者大力水' },
   boot: { group: 'junk', label: '旧靴子', r: 11, value: 3, w: 2.2, note: '谁丢的…' },
@@ -130,21 +130,25 @@ export function makeLevel(seed, level, boost = {}) {
     }
   };
   const L = level;
-  put('rock', Math.min(1 + ((L + 1) >> 1), 5));
-  if (L >= 2) put('pearl', Math.min(L >> 1, 4));
-  put('chest', 1 + (rand() < 0.5 ? 1 : 0) + (L >= 4 ? 1 : 0));
-  put('boot', 1 + (L >= 3 ? 1 : 0));
-  put('can', Math.min(1 + (L >> 2), 3));
-  put('shark', Math.min(1 + (L >> 2), 3));
-  put('turtle', Math.min(1 + (L >> 2), 3));
-  if (L >= 2) put('octopus', Math.min(1 + (L >> 2), 3));
-  put('puffer', Math.min(1 + (L >> 1), 3));
-  put('angel', Math.min(2 + (L >> 1), 4));
-  put('clown', 3);
-  put('minnow', Math.max(5 - (L >> 1), 3));
-  if (L >= 3) put('dragon', L >= 6 ? 2 : 1);
-  if (L >= 2) put('jelly', Math.min(1 + (L >> 1), 4));
-  if (boost.bait) for (let i = 0; i < 2; i++) put(['turtle', 'shark', 'octopus', L >= 3 ? 'dragon' : 'puffer'][Math.floor(rand() * 4)], 1);
+  // Like gold miner: what's worth having is about 1.7× what the level needs,
+  // the big money (pearls, 龙鱼, 章鱼) is deep and slow or fast and rare, and
+  // from level 2 on the traps (puffers cost coins, turtles waste time and pay
+  // nothing) and the blockers (sharks, rocks) get in the way more every level.
+  put('rock', Math.min(1 + (L >> 1), 4));
+  put('pearl', L < 2 ? 0 : L < 6 ? 1 : L < 10 ? 2 : 3);
+  put('chest', L === 1 || L >= 4 ? 2 : 1);
+  put('boot', L < 3 ? 1 : 2);
+  put('can', L < 5 ? 1 : 2);
+  put('shark', Math.min(1 + (L >> 1), 4));
+  put('turtle', Math.min(L >> 1, 4));
+  put('octopus', L <= 3 ? 1 : L <= 7 ? 2 : L <= 9 ? 3 : 4);
+  put('puffer', Math.min(L - 1, 5));
+  put('angel', L === 1 ? 4 : Math.max(3 - (L >> 1), 1));
+  put('clown', Math.max(4 - (L >> 1), 1));
+  put('minnow', Math.max(6 - L, 2));
+  put('dragon', L < 3 ? 0 : L < 8 ? 1 : 2);
+  put('jelly', Math.min(L >> 1, 4));
+  if (boost.bait) for (let i = 0; i < 2; i++) put(L >= 3 && rand() < 0.4 ? 'dragon' : 'octopus', 1);
   return { items, rand };
 }
 
@@ -201,6 +205,8 @@ function landIt(g, it) {
     else if (r < 0.18 && !g.boost.strong) { g.boost = { ...g.boost, strong: true }; v = 0; what = 'strong'; }
     else v = g.boost.clover ? 150 + Math.floor(g.rand() * 650) : 20 + Math.floor(g.rand() * (280 + 30 * g.level));
   }
+  // a puffer costs coins, never below none
+  if (g.money + v < 0) v = -g.money;
   g.money += v;
   const first = !g.caught[it.kind];
   g.caught[it.kind] = (g.caught[it.kind] || 0) + 1;

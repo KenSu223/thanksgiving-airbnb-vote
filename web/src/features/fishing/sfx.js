@@ -47,6 +47,7 @@ const SOUNDS = {
   coin: t => { tone(t, { f0: 1318, dur: 0.18, vol: 0.22 }); tone(t + 0.07, { f0: 1760, dur: 0.3, vol: 0.22 }); },
   big: t => { tone(t, { f0: 1046, dur: 0.16, vol: 0.22 }); tone(t + 0.07, { f0: 1318, dur: 0.18, vol: 0.22 }); tone(t + 0.14, { f0: 2093, dur: 0.4, vol: 0.24 }); },
   junk: t => tone(t, { f0: 140, f1: 70, dur: 0.22, type: 'square', vol: 0.12 }),
+  ouch: t => { tone(t, { f0: 520, f1: 180, dur: 0.25, type: 'sawtooth', vol: 0.14 }); tone(t + 0.08, { f0: 300, f1: 120, dur: 0.25, type: 'square', vol: 0.1 }); },
   cut: t => { noise(t, { dur: 0.05, vol: 0.3, f0: 6000, f1: 3000, type: 'highpass' }); noise(t + 0.07, { dur: 0.05, vol: 0.3, f0: 6000, f1: 3000, type: 'highpass' }); },
   tick: t => tone(t, { f0: 1000, dur: 0.05, type: 'square', vol: 0.08 }),
   pass: t => [523, 659, 784, 1046].forEach((f, i) => tone(t + i * 0.09, { f0: f, dur: 0.25, type: 'triangle', vol: 0.25 })),

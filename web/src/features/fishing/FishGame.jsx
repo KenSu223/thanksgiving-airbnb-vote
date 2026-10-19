@@ -88,11 +88,13 @@ export default function FishGame({ seed, paused, onPause, onResume, onDone, onLe
         else if (h.type === 'pass') sfx.play('pass');
         else if (h.type === 'land') {
           fx.current.push({ kind: 'fly', what: h.kind, r: KINDS[h.kind].r, x: h.x, y: h.y, at: now });
-          const text =h.what === 'scissors' ? '✂️ +1' : h.what === 'strong' ? '💪 大力！' : '+' + h.v.toLocaleString('en-US');
-          const color = h.what ? '#fff' : h.v >= 300 ? '#9ef0ff' : h.v >= 40 ? '#ffe25c' : '#d6e6f2';
+          // a puffer pricks (coins off), a turtle is let go (nothing), the rest pay
+          const text = h.what === 'scissors' ? '✂️ +1' : h.what === 'strong' ? '💪 大力！' : h.v < 0 ? h.v.toLocaleString('en-US') + ' 扎手！'
+            : h.kind === 'turtle' ? '🐢 放生了' : '+' + h.v.toLocaleString('en-US');
+          const color = h.what ? '#fff' : h.v < 0 ? '#ff8a7a' : h.v >= 300 ? '#9ef0ff' : h.v >= 40 ? '#ffe25c' : '#d6e6f2';
           pop(text, color, now, h.v >= 300);
           if (h.first) pop('新！' + KINDS[h.kind].label, '#b8ffcf', now + 250, false, 20);
-          sfx.play(h.v >= 300 ? 'big' : h.v >= 40 || h.what ? 'coin' : 'junk');
+          sfx.play(h.v < 0 ? 'ouch' : h.v >= 300 ? 'big' : h.v >= 40 || h.what ? 'coin' : 'junk');
         }
       }
       if (sim.over && sim.end === 'fail') sfx.play('fail');
