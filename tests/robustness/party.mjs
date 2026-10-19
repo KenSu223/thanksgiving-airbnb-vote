@@ -3,7 +3,7 @@
 // none), a phone dropping and coming back, the host tapping outs and undoing,
 // ending it, the board; then 阿瓦隆 and 狼人杀 end to end.
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/party.mjs
-import { ck, done, client, table, all, login } from './partykit.mjs';
+import { ck, done, client, table, all, login } from './lib/partykit.mjs';
 
 const tag = Date.now().toString(36).slice(-5);
 const names = ['甲', '乙', '丙', '丁', '戊'].map(n => n + tag);

@@ -1,0 +1,23 @@
+name: CI
+
+# The checks every PR runs, and every deploy too (deploy.yml calls this):
+#   check:       lint, unit tests (node --test), build the page, bundle the worker
+#   robustness:  boot the worker locally and run every suite in tests/robustness/
+on:
+  pull_request:
+  workflow_call:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: npm run check
+
+  robustness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: npm run test:robustness
