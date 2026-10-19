@@ -1,0 +1,100 @@
+/* 小小钓鱼 */
+.fh-intro { position:relative; isolation:isolate; overflow:hidden; border:1px solid #7fd3ff55;
+  background:radial-gradient(120% 80% at 85% 0%, #9be3ff44, transparent 55%), linear-gradient(180deg,#0f5d8f 0%,#0b4774 50%,#07304f 100%); }
+/* light coming down through the water */
+.fh-intro::before { content:''; position:absolute; z-index:-2; inset:0; opacity:.5;
+  background:repeating-linear-gradient(110deg, transparent 0 46px, #ffffff10 46px 70px, transparent 70px 130px); }
+/* a line swinging from the top right, and two fish swimming past */
+/* only on the right, clear of the text */
+.fh-intro-art { position:absolute; z-index:-1; top:0; bottom:0; right:0; width:40%; pointer-events:none; overflow:hidden; }
+.fh-intro-art i { position:absolute; right:50%; top:0; width:1.5px; height:min(13rem, 42%); background:#e8f6ff; opacity:.8; transform-origin:top center; animation:fh-swing 2.5s ease-in-out infinite; }
+.fh-intro-art i::after { content:''; position:absolute; left:50%; bottom:-.6rem; width:.7rem; height:.9rem; transform:translateX(-50%); border:2px solid #dfe7ee; border-top:none; border-radius:0 0 .5rem .5rem; }
+.fh-intro-art b { position:absolute; right:50%; top:-.5rem; width:1rem; height:1rem; margin-right:-.5rem; border-radius:50%; background:linear-gradient(#e74c3c 50%, #fff 50%); }
+@keyframes fh-swing { 0%,100% { transform:rotate(18deg); } 50% { transform:rotate(-18deg); } }
+.fh-swim { position:absolute; opacity:.85; }
+.fh-swim-a { bottom:16%; animation:fh-across 16s linear infinite; }
+.fh-swim-b { bottom:42%; animation:fh-across 23s linear infinite -9s; }
+@keyframes fh-across { from { left:-4rem; } to { left:100%; } }
+@media (prefers-reduced-motion: reduce) { .fh-intro-art i, .fh-swim { animation:none; } .fh-swim-a { left:20%; } .fh-swim-b { left:60%; } }
+.fh-intro-content { position:relative; max-width:32rem; }
+.fh-eyebrow { color:#9fe3ff; letter-spacing:.2em; font-size:.65rem; font-weight:700; margin-bottom:1rem; }
+.fh-title { font-size:clamp(2rem,4vw,3rem); font-weight:900; letter-spacing:.08em; color:#eaf8ff; text-shadow:0 3px 12px #031c30; }
+.fh-title span { display:block; font-size:clamp(1rem,2vw,1.25rem); letter-spacing:.12em; margin:.4rem 0 .9rem; font-weight:500; color:#cdeeff; }
+.fh-description { max-width:26rem; color:#d2ecfa; line-height:1.75; font-size:.9rem; }
+.fh-rule-tags { display:flex; flex-wrap:wrap; gap:.4rem; margin:1rem 0 .4rem; }
+.fh-rule-tags span { border:1px solid #9fe3ff55; background:#03203566; color:#d8f3ff; padding:.25rem .6rem; border-radius:3px; font-size:.68rem; }
+.fh-btn { border-radius:.8rem; padding:.6rem 1.3rem; font-weight:800; box-shadow:0 3px 8px rgba(0,0,0,.25); }
+.fh-btn:disabled { opacity:.45; }
+.fh-btn-sun, .fh-start { background:linear-gradient(135deg,#ffe58a,#f5b82e); color:#3b2208; border:1px solid #fff0b8; }
+.fh-start { min-width:11rem; }.fh-start span { margin-left:1.6rem; }
+.fh-btn-dim { background:rgba(255,255,255,.15); color:#fff; }
+.fh-btn-sky { background:#7dd3fc; color:#0c2a3a; }
+.fh-btn:focus-visible, .fh-tool:focus-visible, .fh-cut:focus-visible, .fh-next:focus-visible, .fh-good:focus-visible { outline:3px solid #ffe58a; outline-offset:3px; }
+
+/* 图鉴: everything you can catch; the ones you've caught in colour */
+.fh-dex-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(6.4rem, 1fr)); gap:.45rem; }
+.fh-dex-card { display:flex; flex-direction:column; align-items:center; text-align:center; gap:.1rem; padding:.45rem .3rem .5rem; border-radius:.75rem; background:#0b3d6312; border:1px solid #0b3d6322; }
+.fh-dex-card b { font-size:.78rem; color:#0b3d63; }
+.fh-dex-card small { font-size:.62rem; color:#64748b; line-height:1.3; }
+.fh-dex-value { font-size:.66rem; color:#a16207; font-weight:700; }
+.fh-dex-card:not(.got) .fh-dex-icon { filter:brightness(0) opacity(.28); }
+.fh-dex-card:not(.got) b { color:#94a3b8; }
+.fh-dex-card.got { background:linear-gradient(#e0f4ff,#f4fbff); border-color:#7cc7ef; }
+
+/* the game: the field (3:4) as big as fits, the buttons under it */
+.fh-box { border-radius:1rem; overflow:hidden; background:#06263f; box-shadow:0 20px 40px -15px rgba(0,0,0,.5); }
+.fh-box .fh-stage { height:min(calc(100vh - 2rem), 760px); min-height:420px; }
+/* padding, gap and the bar's height match PAD / GAP / BAR_H in FishGame.jsx */
+.fh-stage { position:relative; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8px; gap:8px; touch-action:none; }
+.fh-field { flex:none; position:relative; border-radius:.6rem; overflow:hidden; box-shadow:0 0 0 2px #1d6fa3, 0 10px 30px #0008; }
+.fh-canvas { display:block; cursor:pointer; touch-action:none; }
+.fh-tools { position:absolute; top:.35rem; left:50%; transform:translateX(-50%); display:flex; gap:.35rem; z-index:3; }
+.fh-tool { width:2.1rem; height:2.1rem; border-radius:9999px; background:rgba(8,40,66,.45); color:#fff; font-size:.9rem; font-weight:700; }
+.fh-tool:hover { background:rgba(8,40,66,.65); }
+.fh-replay-tag { position:absolute; left:50%; top:2.9rem; transform:translateX(-50%); z-index:3; font-size:.7rem; color:#eaf8ff; background:rgba(8,40,66,.55); border-radius:9999px; padding:.15rem .6rem; white-space:nowrap; pointer-events:none; }
+.fh-bar { display:flex; align-items:center; justify-content:space-between; gap:.5rem; max-width:100%; flex:none; height:48px; }
+.fh-cut { display:flex; align-items:center; gap:.2rem; height:2.9rem; padding:0 .8rem; border-radius:9999px; font-size:1.25rem; color:#fff; background:linear-gradient(#1f6a99,#0d3f63); border:1px solid #5fb4e6; box-shadow:0 3px 8px #0006; flex:none; }
+.fh-cut b { font-size:.95rem; }.fh-cut small { font-size:.65rem; color:#bfe5fb; margin-left:.2rem; }
+.fh-cut:disabled { opacity:.45; }
+.fh-cut.ready { background:linear-gradient(#2ea0dc,#1667a0); border-color:#bfe9ff; animation:fh-pulse .7s ease-in-out infinite; }
+@keyframes fh-pulse { 50% { transform:scale(1.07); box-shadow:0 0 0 5px #8fd8ff44, 0 3px 8px #0006; } }
+@media (prefers-reduced-motion: reduce) { .fh-cut.ready { animation:none; } }
+.fh-hint { flex:1; text-align:center; font-size:.72rem; color:#b9dcf0; line-height:1.3; }
+.fh-next { height:2.9rem; padding:0 .9rem; border-radius:9999px; font-weight:800; font-size:.85rem; color:#3b2208; background:linear-gradient(135deg,#ffe58a,#f5b82e); box-shadow:0 3px 8px #0006; flex:none; white-space:nowrap; }
+.fh-next:disabled { opacity:.6; }
+.fh-next-space { width:2.9rem; flex:none; }
+/* 第 N 关 · 目标 */
+.fh-card { position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); z-index:4; text-align:center; color:#fff; pointer-events:none;
+  background:linear-gradient(#0f4f7cee,#082f4dee); border:2px solid #7fd3ff; border-radius:1rem; padding:1rem 1.6rem; box-shadow:0 12px 30px #000a; animation:fh-card-in .25s ease-out; white-space:nowrap; }
+.fh-card small { display:block; font-size:.85rem; color:#9fe3ff; letter-spacing:.2em; font-weight:700; }
+.fh-card strong { display:block; font-size:1.6rem; font-weight:900; color:#ffe25c; margin:.2rem 0; }
+.fh-card span { display:block; font-size:.75rem; color:#d2ecfa; }
+@keyframes fh-card-in { from { opacity:0; transform:translate(-50%,-40%) scale(.92); } }
+@media (prefers-reduced-motion: reduce) { .fh-card { animation:none; } }
+.fh-over { position:absolute; inset:0; z-index:6; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#fff; background:linear-gradient(#06263fa8,#06263fee); backdrop-filter:blur(3px); padding:1rem; }
+/* what this run caught */
+.fh-catch { display:flex; flex-wrap:wrap; justify-content:center; gap:.3rem .6rem; margin-top:.6rem; max-width:20rem; }
+.fh-catch span { display:flex; align-items:center; gap:.1rem; font-size:.75rem; }
+.fh-new { margin-top:.5rem; font-size:.8rem; color:#b8ffcf; font-weight:700; }
+/* the shop between levels */
+.fh-shop { position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; gap:.6rem; padding:.9rem; overflow-y:auto; color:#fff;
+  background:linear-gradient(#0f4f7cf2,#082f4df7); }
+.fh-shop-head { text-align:center; padding-top:2rem; }
+.fh-goods { display:flex; flex-direction:column; gap:.45rem; }
+.fh-good { display:flex; align-items:center; gap:.6rem; text-align:left; padding:.5rem .6rem; border-radius:.7rem; background:#ffffff14; border:1px solid #7fd3ff55; color:#fff; }
+.fh-good:not(:disabled):hover { background:#ffffff22; border-color:#7fd3ff; }
+.fh-good:disabled { opacity:.5; }
+.fh-good-icon { font-size:1.5rem; width:2rem; text-align:center; flex:none; }
+.fh-good-text { flex:1; min-width:0; }.fh-good-text b { display:block; font-size:.85rem; }.fh-good-text small { display:block; font-size:.68rem; color:#cfe8f6; line-height:1.35; }
+.fh-price { flex:none; font-weight:800; color:#ffe25c; font-variant-numeric:tabular-nums; font-size:.85rem; }
+.fh-shop-note { text-align:center; font-size:.7rem; color:#b9dcf0; }
+/* phones: the run takes the whole screen (upright) */
+.fh-full { position:fixed; inset:0; z-index:80; background:#06263f; overscroll-behavior:none; touch-action:none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+html.fh-lock, html.fh-lock body { overflow:hidden; overscroll-behavior:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.fh-full, .fh-stage, .fh-over, .fh-box { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+/* leaderboard: ▶ watch a best run again */
+.fh-watch { width:1.6rem; height:1.6rem; border-radius:9999px; background:#eef2ff; color:#4f46e5; font-size:.7rem; line-height:1.6rem; text-align:center; flex:none; }
+.fh-watch:hover { background:#4f46e5; color:#fff; }.fh-watch:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
+.fh-watch-none { background:transparent; color:#cbd5e1; }
+@media (max-width:640px) { .fh-intro-art { width:34%; } .fh-intro-art i, .fh-intro-art b { right:30%; } .fh-swim { opacity:.3; } }

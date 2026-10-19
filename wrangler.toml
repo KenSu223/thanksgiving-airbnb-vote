@@ -128,3 +128,12 @@ class_name = "GomokuHall"
 [[migrations]]
 tag = "v12"
 new_sqlite_classes = ["GomokuHall"]
+
+# 小小钓鱼 leaderboard: one Durable Object, everyone's best run (checked by replaying it) and 图鉴.
+[[durable_objects.bindings]]
+name = "FISH"
+class_name = "FishBoard"
+
+[[migrations]]
+tag = "v13"
+new_sqlite_classes = ["FishBoard"]
