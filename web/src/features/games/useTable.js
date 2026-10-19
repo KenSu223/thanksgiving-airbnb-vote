@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from '../../session/SessionContext.jsx';
+import { signedOut } from '../../lib/api.js';
 import { load, save } from '../../lib/storage.js';
 import { setSeated } from '../../lib/seated.js';
 
@@ -9,7 +10,7 @@ import { setSeated } from '../../lib/seated.js';
 // path：WebSocket 地址（/api/ddz）；roomKey：记住看哪张桌的 localStorage key；
 // noHint：点「提示」却没有能出的牌时显示的话。
 export function useTable(active, { path, roomKey, noHint }) {
-  const { name, token, ensureName, openLogin } = useSession();
+  const { name, token, ensureName, openLogin, epoch } = useSession();
   const [st, setSt] = useState(null); // 服务器发来的 { room, seatedAt, you, table, lobby, board } + 收到的时间 at
   const [live, setLive] = useState(false);
   const [msg, setMsg] = useState('');
@@ -48,7 +49,7 @@ export function useTable(active, { path, roomKey, noHint }) {
         wantSeat.current = false; satConfirmed.current = false;
         disconnectIfIdle();
       }
-      if (m.error === '先登录再坐下') openLogin(me => actions.current.sit(me));
+      if (m.error === '先登录再坐下') { if (credRef.current.name) { signedOut(); flash('正在重新登录，好了再点一次坐下'); } else openLogin(me => actions.current.sit(me)); }
       else if (m.error || m.notice) flash(m.error || m.notice);
     };
     s.onclose = () => {
@@ -90,7 +91,7 @@ export function useTable(active, { path, roomKey, noHint }) {
   }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 登录/换人之后补上身份（围观发表情用；坐下了就不用，sit 本身就证明了）
-  useEffect(() => { if (name && token) send({ type: 'identify', name, token }); }, [name, token, send]);
+  useEffect(() => { if (name && token) send({ type: 'identify', name, token }); }, [name, token, epoch, send]); // (epoch: signed in again as the same person)
 
   // 这个游戏的页面开着、你坐在桌上：聊天、投票的悬浮球先收起来（lib/seated.js）
   const seatedHere = !!(active && st?.seatedAt);

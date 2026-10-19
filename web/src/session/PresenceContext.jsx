@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useSession } from './SessionContext.jsx';
+import { signedOut } from '../lib/api.js';
 
 // 在线状态：整个 App 就这一条连线（WebSocket /api/presence）。规矩和
 // 各个游戏的连线一样——页面看得见才连，藏起来 / 锁屏就断开，所以
@@ -16,7 +17,7 @@ export const usePresence = () => useContext(Ctx);
 const PING_MS = 25000;
 
 export function PresenceProvider({ children }) {
-  const { name, token } = useSession();
+  const { name, token, epoch } = useSession();
   const [users, setUsers] = useState([]);
   const ws = useRef(null), retry = useRef(0), ping = useRef(null);
   const cred = useRef({ name, token });
@@ -53,6 +54,7 @@ export function PresenceProvider({ children }) {
       let m;
       try { m = JSON.parse(e.data); } catch (err) { return; }
       if (m.type === 'roster' && Array.isArray(m.users)) setUsers(m.users);
+      else if (/先登录/.test(m.error || '') && cred.current.name) signedOut(); // the name we gave wasn't taken: check the session
     };
     s.onclose = () => {
       if (ws.current === s) ws.current = null;
@@ -67,8 +69,8 @@ export function PresenceProvider({ children }) {
     document.addEventListener('visibilitychange', onVis);
     return () => { document.removeEventListener('visibilitychange', onVis); ws.current?.close(); };
   }, []);
-  // 登录 / 换了人：在同一条连线上重新报名字
-  useEffect(() => { hello(); }, [name, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 登录 / 换了人 / 重新登录成同一个人（epoch）：在同一条连线上重新报名字
+  useEffect(() => { hello(); }, [name, token, epoch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return <Ctx.Provider value={{ users, setActivity }}>{children}</Ctx.Provider>;
 }

@@ -97,5 +97,25 @@ ck('after remove, the token travels with the list again', pListed2?.token === pi
 const pFree = await J('POST', '/api/login', { name: P, token: 'whatever' });
 ck('after remove, login needs no PIN', pFree.ok && !pFree.needPin && !!pFree.user?.token, JSON.stringify(pFree));
 
+// The session check (POST /api/auth/check): does this device's sign-in still work?
+// It answers without ever creating or changing an account.
+const C = 'Chk' + tag;
+const cLogin = await J('POST', '/api/login', { name: C, token: 'chk-tok-1' });
+const cOk = await J('POST', '/api/auth/check', { name: C, token: cLogin.user.token });
+ck('check: the right token is valid', cOk.ok && cOk.exists && cOk.valid && !cOk.pinBound && cOk.name === C, JSON.stringify(cOk));
+const cBad = await J('POST', '/api/auth/check', { name: C.toLowerCase(), token: 'stale' });
+ck('check: a stale token is not (and the name matches whatever its case)', cBad.ok && cBad.exists && !cBad.valid && cBad.name === C, JSON.stringify(cBad));
+const cPinSet = await J('POST', '/api/auth/pin/set', { name: C, token: cLogin.user.token, pin: '2468' });
+const cOld = await J('POST', '/api/auth/check', { name: C, token: cLogin.user.token });
+ck('check: after the PIN is set elsewhere the old token is stale, and it says PIN', cOld.ok && !cOld.valid && cOld.pinBound, JSON.stringify(cOld));
+const cNew = await J('POST', '/api/auth/check', { name: C, token: cPinSet.user.token });
+ck('check: the new token is valid', cNew.valid === true && cNew.pinBound === true, JSON.stringify(cNew));
+const ghost = 'Nobody' + tag;
+const cNone = await J('POST', '/api/auth/check', { name: ghost, token: 'x' });
+ck('check: a name that isn\'t there', cNone.ok && cNone.exists === false && cNone.valid === false, JSON.stringify(cNone));
+ck('check never creates an account', !(await J('GET', '/api/users')).users.some(u => u.name === ghost));
+const cNoTok = await J('POST', '/api/auth/check', { name: C });
+ck('check: no token is never valid', cNoTok.ok && !cNoTok.valid, JSON.stringify(cNoTok));
+
 console.log(`PIN: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

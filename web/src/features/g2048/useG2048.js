@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from '../../session/SessionContext.jsx';
+import { signedOut } from '../../lib/api.js';
 
 // 2048 的连线（WebSocket /api/2048）：在这页、页面看得见时才连；连上就报上名字，
 // 服务器回这个人正在玩的那局（没有就开一局）。onState 收到服务器发来的每条消息。
 export function useG2048(active, onState) {
-  const { name, token } = useSession();
+  const { name, token, epoch } = useSession();
   const [live, setLive] = useState(false);
   const ws = useRef(null), retry = useRef(0);
   const activeRef = useRef(active), cred = useRef({ name, token }), handler = useRef(onState);
@@ -30,6 +31,7 @@ export function useG2048(active, onState) {
       let m;
       try { m = JSON.parse(e.data); } catch (err) { return; }
       if (m.type === 'state') handler.current(m);
+      if (/先登录/.test(m.error || '') && cred.current.name) signedOut(); // the name we gave wasn't taken: check the session
     };
     s.onclose = () => {
       if (ws.current === s) ws.current = null;
@@ -45,8 +47,8 @@ export function useG2048(active, onState) {
     return () => document.removeEventListener('visibilitychange', onVis);
   }, [active]);
   useEffect(() => () => ws.current?.close(), []);
-  // 登录 / 换了人：重新报名字，拿这个人的那局
-  useEffect(() => { hello(); }, [name, token, hello]);
+  // 登录 / 换了人 / 重新登录成同一个人（epoch）：重新报名字，拿这个人的那局
+  useEffect(() => { hello(); }, [name, token, epoch, hello]);
 
   return { live, send };
 }

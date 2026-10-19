@@ -12,8 +12,11 @@ import './presence.css';
 // 「我来过了」是一份能点的名单：一行一个人（头像 + 名字 + 在线状态），
 // 点谁就登谁。在线状态来自 PresenceContext：在在线的只有一个绿点，
 // 不在线的是小灰字（3 分钟前 / 还没来过）。
+// 账号界面里自己那一行能点：点一下就重新登录成自己（这台设备记着的 token 还管用
+// 就直接好了，所有连线重新报名字；设了 PIN、在别处改过的，转去输 PIN）。不用再
+// 切到别人再切回来。登录过期了（stale）会直接写出来。
 export default function LoginModal() {
-  const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, verifyPin, setAccountPin, removeAccountPin } = useSession();
+  const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, verifyPin, setAccountPin, removeAccountPin, stale } = useSession();
   const { users: presenceUsers } = usePresence();
   const presOf = n => presenceUsers.find(u => u.name === n);
   const [now, setNow] = useState(() => Date.now());
@@ -124,7 +127,7 @@ export default function LoginModal() {
               <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-[26px] shadow-[0_8px_20px_-6px_rgba(99,60,235,.6),inset_0_1px_0_rgba(255,255,255,.4)]">🔑</span>
               <div>
                 <h3 className="text-xl font-extrabold leading-tight">输入 PIN</h3>
-                <p className="mt-0.5 text-sm leading-snug text-slate-500"><b>{challenge.name}</b> · 这个设备还没验过</p>
+                <p className="mt-0.5 text-sm leading-snug text-slate-500"><b>{challenge.name}</b> · {challenge.stale ? '登录过期了（PIN 在别的设备上改过），输一下就好' : '这个设备还没验过'}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -145,18 +148,19 @@ export default function LoginModal() {
               <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-[26px] shadow-[0_8px_20px_-6px_rgba(99,60,235,.6),inset_0_1px_0_rgba(255,255,255,.4)]">👋</span>
               <div>
                 <h3 className="text-xl font-extrabold leading-tight">{name}</h3>
-                <p className="mt-0.5 text-sm leading-snug text-slate-500">已登录</p>
+                <p className="mt-0.5 text-sm leading-snug text-slate-500">{stale ? '登录过期了，点下面你的名字重新登录' : '已登录'}</p>
               </div>
             </div>
             <ul className="login-users mb-2">
               <li>
-                <div className="login-user sel">
+                <button type="button" className="login-user sel" onClick={() => go(name)} title="点一下重新登录" aria-label={'重新登录 ' + name}>
                   <span className="avatar login-user-av" aria-hidden="true">{Array.from(name)[0].toUpperCase()}</span>
                   <span className="login-user-name">{name}{me.pinBound ? ' 🔒' : ''}</span>
+                  <span className="login-relogin">🔄 重新登录</span>
                   {myPres && (myPres.online
                     ? <span className="presence-dot on" role="img" aria-label="在线" />
                     : <span className="presence-when">{agoText(myPres.lastSeen, now)}</span>)}
-                </div>
+                </button>
               </li>
             </ul>
             {protectCard}

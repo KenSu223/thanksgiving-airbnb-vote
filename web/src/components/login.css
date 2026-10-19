@@ -17,3 +17,6 @@
 .login-user-av { width: 2.15rem; height: 2.15rem; font-size: 0.9rem; flex: none; }
 .login-user-name { font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .login-user .presence-dot { margin-left: auto; }
+/* 账号界面里自己那一行：点一下重新登录 */
+.login-relogin { margin-left: auto; font-size: 0.72rem; font-weight: 700; color: #6366f1; white-space: nowrap; }
+.login-user:hover .login-relogin { color: #4338ca; }

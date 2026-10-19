@@ -105,7 +105,24 @@ async function handlePinRemove(req, env) {
   return j({ ok: true, users: publicUsers(out.users) });
 }
 
+// POST /api/auth/check { name, token }
+// Is this device still signed in as `name`? The page asks on load, when it's
+// shown again and whenever something answers 先登录…: a token can stop
+// working elsewhere (a PIN set or changed on another device rotates it; an
+// account can be removed), and the page would otherwise keep showing the
+// name while everything is refused. Never creates or changes anything.
+//   -> { exists, valid, pinBound, name }
+async function handleCheck(req, env) {
+  let body = {};
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
+  const users = await getUsers(env);
+  const user = users.find(u => sameName(u.name, cleanName(body.name)));
+  if (!user) return j({ ok: true, exists: false, valid: false, pinBound: false });
+  return j({ ok: true, exists: true, name: user.name, valid: !!body.token && String(body.token) === user.token, pinBound: !!user.pinHash });
+}
+
 export const routes = {
+  'POST /api/auth/check': handleCheck,
   'POST /api/auth/pin/set': handlePinSet,
   'POST /api/auth/pin/verify': handlePinVerify,
   'POST /api/auth/pin/remove': handlePinRemove,
