@@ -41,6 +41,13 @@ export function SessionProvider({ children }) {
   const [loginTick, setLoginTick] = useState(0);
   const [bindIntent, setBindIntent] = useState(false);
   const pending = useRef(null); // 登录后要接着做的事（比如投票），参数是 { name, token }
+  // epoch：每次登录（包括重新登录成同一个人、悄悄换回有效的 token）+1。游戏、聊天、
+  // 在线名单的连线都跟着它重新报一次名字——同一个人同一个 token 时 name / token
+  // 都没变，以前就什么都不发生，只好切到别人再切回来。
+  const [epoch, setEpoch] = useState(0);
+  // stale：这台设备的登录在服务器那边已经不认了（设了 PIN 的账号在别处改了 PIN）
+  const [stale, setStale] = useState(false);
+  const cur = useRef({ name, token }); cur.current = { name, token };
 
   const loadUsers = useCallback(async () => {
     try { const r = await api('/api/users'); if (r.ok) setUsers(r.users); } catch (e) {}
@@ -64,17 +71,67 @@ export function SessionProvider({ children }) {
     else openLogin(fn);
   }, [name, token, openLogin]);
 
-  // 登录 / 设 PIN 成功后：换上这个账号的身份，关弹窗，接着做刚才想做的事
-  const adopt = useCallback(r => {
-    setLoginTick(t => t + 1);
+  // 登录 / 设 PIN 成功后：换上这个账号的身份，关弹窗，接着做刚才想做的事。
+  // quiet：自己检查出 token 过期、悄悄换回有效的那个（不算一次新登录，不关弹窗）。
+  const adopt = useCallback((r, { quiet = false } = {}) => {
+    if (!quiet) setLoginTick(t => t + 1);
+    setEpoch(e => e + 1);
+    setStale(false);
     setName(r.user.name); setToken(r.user.token); if (r.users) setUsers(r.users);
     save('vn', r.user.name); save('vt', r.user.token);
     rememberUserToken(r.user.name, r.user.token);
+    if (quiet) return;
     setChallenge(null);
     setLoginOpen(false);
     const f = pending.current; pending.current = null;
     if (f) f({ name: r.user.name, token: r.user.token });
   }, []);
+
+  // 这台设备的登录还管不管用（打开页面、切回来、哪里回了「先登录…」时问一下服务器）：
+  // - 管用：什么都不用做（被拒的那条连线让它重新报一次名字）
+  // - 账号已经没了（退役）：这里也退出登录
+  // - 没设 PIN 的账号：token 本来就是公开的，悄悄换回现在有效的那个
+  // - 设了 PIN 的账号：直接弹出输 PIN（说明登录过期了），不用先切别人再切回来
+  const lastCheck = useRef(0);
+  const checkSession = useCallback(async ({ reidentify = false } = {}) => {
+    const { name: n, token: t } = cur.current;
+    if (!n) return;
+    lastCheck.current = Date.now();
+    let r;
+    try { r = await api('/api/auth/check', 'POST', { name: n, token: t }); } catch (e) { return; } // 没网：先不管
+    if (!r || !r.ok || cur.current.name !== n) return;
+    if (!r.exists) { setName(''); save('vn', ''); setStale(false); return; }
+    if (r.valid) { setStale(false); if (reidentify) setEpoch(e => e + 1); return; }
+    if (!r.pinBound) {
+      let l = null;
+      try { l = await api('/api/login', 'POST', { name: n, token: t }); } catch (e) { return; }
+      if (l?.ok && l.user && cur.current.name === n) adopt(l, { quiet: true });
+      return;
+    }
+    setStale(true);
+    setChallenge({ kind: 'pin', name: r.name || n, stale: true });
+    setLoginOpen(true);
+  }, [adopt]);
+  useEffect(() => {
+    checkSession();
+    // 被拒了（api.js / 各条连线发 session:check）：马上查，但几秒内只查一次
+    const onFail = () => { if (Date.now() - lastCheck.current > 4000) checkSession({ reidentify: true }); };
+    // 切回这个页面：隔了半分钟以上就再查一次（可能在别的设备上改了 PIN）
+    const onShow = () => { if (document.visibilityState === 'visible' && Date.now() - lastCheck.current > 30000) checkSession(); };
+    // 另一个标签页换了人：这里跟着换
+    const onStorage = e => {
+      if (e.key !== 'vn' && e.key !== 'vt') return;
+      setName(load('vn', '')); setToken(load('vt') || cur.current.token); setEpoch(x => x + 1);
+    };
+    window.addEventListener('session:check', onFail);
+    document.addEventListener('visibilitychange', onShow);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('session:check', onFail);
+      document.removeEventListener('visibilitychange', onShow);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [checkSession]);
 
   // 返回错误文字，成功返回 null。设了 PIN 的账号在这台设备上没有 token 时，
   // 服务器回 needPin：不算失败，转入输 PIN（弹窗自己切到 PIN 视图）。
@@ -131,6 +188,6 @@ export function SessionProvider({ children }) {
     return null;
   }, [name, token]);
 
-  const value = { name, token, users, setUsers, loadUsers, loginOpen, openLogin, closeLogin, ensureName, login, challenge, setChallenge, verifyPin, setAccountPin, removeAccountPin, loginTick, bindIntent, openBind };
+  const value = { name, token, users, setUsers, loadUsers, loginOpen, openLogin, closeLogin, ensureName, login, challenge, setChallenge, verifyPin, setAccountPin, removeAccountPin, loginTick, bindIntent, openBind, epoch, stale };
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

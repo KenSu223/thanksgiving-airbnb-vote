@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from '../../session/SessionContext.jsx';
+import { signedOut } from '../../lib/api.js';
 import { setSeated } from '../../lib/seated.js';
 
 // 21 点：牌局都在服务器（Durable Object）里，这里只负责连线。
 // 不在 21 点页面、也没坐下就不连：没人连着时 Durable Object 能休息，省免费额度。
 export function useBlackjack(active) {
-  const { name, token, ensureName, openLogin } = useSession();
+  const { name, token, ensureName, openLogin, epoch } = useSession();
   const [st, setSt] = useState(null); // 服务器发来的 { table, you, board } + 收到的时间 at
   const [live, setLive] = useState(false);
   const [msg, setMsg] = useState('');
@@ -41,7 +42,7 @@ export function useBlackjack(active) {
         wantSeat.current = false; satConfirmed.current = false;
         disconnectIfIdle(); // 不在这页的话就断开，别让 Durable Object 一直开着占免费额度
       }
-      if (m.error === '先登录再坐下') openLogin(me => actions.current.sit(me));
+      if (m.error === '先登录再坐下') { if (credRef.current.name) { signedOut(); flash('正在重新登录，好了再点一次坐下'); } else openLogin(me => actions.current.sit(me)); }
       else if (m.error || m.notice) flash(m.error || m.notice);
     };
     s.onclose = () => {
@@ -81,7 +82,7 @@ export function useBlackjack(active) {
   }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 登录/换人之后补上身份（围观发表情用；坐下了就不用，sit 本身就证明了）
-  useEffect(() => { if (name && token) send({ type: 'identify', name, token }); }, [name, token, send]);
+  useEffect(() => { if (name && token) send({ type: 'identify', name, token }); }, [name, token, epoch, send]); // (epoch: signed in again as the same person)
 
   const me = st?.you ? st.table.seats.find(s => s.key === st.you) : null;
   // 21 点的页面开着、你坐在桌上：聊天、投票的悬浮球先收起来（lib/seated.js）

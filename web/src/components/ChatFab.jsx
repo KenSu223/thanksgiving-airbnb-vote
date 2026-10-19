@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from '../session/SessionContext.jsx';
+import { signedOut } from '../lib/api.js';
 import { useToast } from './Toast.jsx';
 import { load, save } from '../lib/storage.js';
 import { useSeated } from '../lib/seated.js';
@@ -18,7 +19,7 @@ const time = at => {
 };
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-function useChat(name, token, onMsg) {
+function useChat(name, token, epoch, onMsg) {
   const [msgs, setMsgs] = useState([]);
   const [live, setLive] = useState(false);
   const ws = useRef(null), retry = useRef(0), cb = useRef(onMsg);
@@ -34,7 +35,7 @@ function useChat(name, token, onMsg) {
       let m; try { m = JSON.parse(e.data); } catch (err) { return; }
       if (m.type === 'history') { setMsgs(m.msgs); setLive(true); }
       else if (m.type === 'msg') { setMsgs(list => [...list, m.msg].slice(-100)); cb.current?.(m.msg); }
-      else if (m.type === 'error') cb.current?.(null, m.error);
+      else if (m.type === 'error') { cb.current?.(null, m.error); if (/先登录/.test(m.error || '')) signedOut(); }
     };
     s.onclose = () => {
       if (ws.current === s) ws.current = null;
@@ -49,7 +50,7 @@ function useChat(name, token, onMsg) {
     const onVis = () => (document.visibilityState === 'visible' ? connect.current() : ws.current?.close());
     document.addEventListener('visibilitychange', onVis);
     return () => { document.removeEventListener('visibilitychange', onVis); ws.current?.close(); ws.current = null; };
-  }, [name, token]);
+  }, [name, token, epoch]); // (epoch: signed in again as the same person — reconnect and say hello again)
   const send = useCallback(text => {
     if (!ws.current || ws.current.readyState !== 1) return false;
     ws.current.send(JSON.stringify({ type: 'send', text }));
@@ -74,7 +75,7 @@ function Text({ msg, names, me }) {
 }
 
 export default function ChatFab() {
-  const { name, token, users } = useSession();
+  const { name, token, users, epoch } = useSession();
   const seated = useSeated(); // 坐在游戏桌上：球先收起来
   const toast = useToast();
   const me = name ? name.toLowerCase() : '';
@@ -87,7 +88,7 @@ export default function ChatFab() {
     if (error) { toast(error); return; }
     if (msg && !openRef.current && msg.byKey !== me && (msg.mentions || []).includes(me)) toast('💬 ' + msg.by + ' 在聊天室 @了' + (msg.all ? '所有人' : '你'));
   }, [me, toast]);
-  const { msgs, live, send } = useChat(name, token, onMsg);
+  const { msgs, live, send } = useChat(name, token, epoch, onMsg);
   const names = useMemo(() => new Map(users.map(u => [u.name.toLowerCase(), u.name])), [users]);
 
   // 打开着就算都读了
