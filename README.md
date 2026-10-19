@@ -61,6 +61,19 @@ works for any group picking a place together.
   screen plays its sounds. Unit tests:
   `node --test web/src/features/dodge/*.test.js`. One all-time
   leaderboard of each person's longest survival
+- 小小钓鱼 (in the Gameroom): a fishing game after 奥比岛's 小小钓鱼, played
+  like gold miner. The line swings under the rod of a little boat; tap (or
+  ↓ / space) to send the hook straight down, and it reels in whatever it hits
+  first, slower the heavier. 14 kinds to catch: fish that swim across at
+  their own depths and speeds (小丑鱼, 河豚, 海龟, 鲨鱼, the rare 龙鱼 …),
+  pearls and chests on the seabed, and junk. 60 seconds a level; reach the
+  coin target to get the shop (scissors, strength drink, bait, lucky clover,
+  recycling bag) and the next level, or the run is over. ✂️ / ↑ cuts loose
+  what's on the line. The score is the coins left at the end; one all-time
+  board (top 3), checked the same way as 躲技能 below, with the top 3's runs
+  to watch again. Every kind you've ever caught goes in your 图鉴. Own art and
+  sounds, drawn and synthesized in the browser. Unit tests:
+  `node --test web/src/features/fishing/sim.test.js`
 - Flights: everyone enters their arrival and departure flights; a route map
   (arrivals and departures separately), an airport pickup list people can
   claim, and suggested times to be at the airport for departures
@@ -73,7 +86,7 @@ works for any group picking a place together.
 ## How it works
 
 - **Frontend** (`web/`): React + Vite + Tailwind, one folder per feature
-  (`web/src/features/hunt`, `food`, `split`, `games`, `blackjack`, `ddz`, `guandan`, `mahjong`, `dodge`). People log in by picking
+  (`web/src/features/hunt`, `food`, `split`, `games`, `blackjack`, `ddz`, `guandan`, `mahjong`, `dodge`, `fishing`). People log in by picking
   their name from the group's user list; votes are tied to that user's token.
 - **Add to home screen** (`web/public/manifest.webmanifest`, the icons, the
   Apple tags in `web/index.html`): opened from a home-screen icon, the site
@@ -129,6 +142,13 @@ works for any group picking a place together.
   run of any length counts; if sending fails, the page keeps the run on the
   device and sends it again later. Records from before tickets stay as they
   were, without a replay.
+- **小小钓鱼** (`/api/fish/start`, `/api/fish/score`, `/api/fish/board`,
+  `/api/fish/replay`): the same tickets and replay check as 躲技能, in the
+  `FishBoard` Durable Object, with the game in
+  `web/src/features/fishing/sim.js` (`verify.js` replays a run). Ranked by the
+  coins at the end, then levels cleared. Each counted run's catch is added to
+  that person's 图鉴, which only they get back. No 🤖 mark: the only input is
+  when to press, so the top 3's replays are what to look at.
 - **Listing enrichment**: pasted Airbnb URLs are scraped server-side. Because
   Airbnb bot-blocks datacenter IPs, the scraper tries three levels: direct
   fetch → `airbnb.co.uk` (same listing, no bot wall) → the `r.jina.ai` reader
@@ -185,7 +205,7 @@ Notes:
 | `web/src/components/` | Shared UI: splash, nav, header, login, toast |
 | `web/src/lib/`, `web/src/session/` | Shared helpers, trip/page config, the logged-in user |
 | `worker/index.js` | Worker entry: merges the route tables, serves `dist/` |
-| `worker/<feature>/` | `listings/`, `food/`, `users/`, `split/`, `blackjack/`, `games/` (shared game hall), `ddz/`, `guandan/`, `mahjong/`, `dodge/`: storage, logic and routes |
+| `worker/<feature>/` | `listings/`, `food/`, `users/`, `split/`, `blackjack/`, `games/` (shared game hall), `ddz/`, `guandan/`, `mahjong/`, `dodge/`, `fishing/`: storage, logic and routes |
 | `worker/config/` | Trips and seed listings |
 | `wrangler.toml` | Deploy config (build step, KV, assets, Durable Objects) |
 | `CONTRIBUTING.md` | Where new code goes, and how to keep PRs from colliding |

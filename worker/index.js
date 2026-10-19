@@ -28,6 +28,7 @@ export { UndercoverHall, AvalonHall, WerewolfHall } from './party/halls.js';
 export { PresenceDO } from './presence/presence.js';
 export { ChatRoom } from './chat/room.js';
 export { GomokuHall } from './gomoku/hall.js';
+export { FishBoard } from './fishing/board.js';
 
 const ROUTES = { ...listingRoutes, ...userRoutes, ...authRoutes, ...retireRoutes, ...splitRoutes, ...foodRoutes, ...angelRoutes, ...weatherRoutes, ...activityRoutes, ...flightRoutes, ...pollRoutes, ...carRoutes, ...todoRoutes };
 
@@ -42,6 +43,8 @@ export default {
     if (url.pathname === '/api/mahjong') return env.MJ_HALL.get(env.MJ_HALL.idFromName('hall')).fetch(request);
     // 鲁班七号躲技能: one leaderboard object checks and keeps everyone's best run.
     if (url.pathname.startsWith('/api/dodge/')) return env.DODGE.get(env.DODGE.idFromName('board')).fetch(request);
+    // 小小钓鱼: the same, one leaderboard object checks and keeps everyone's best run and 图鉴.
+    if (url.pathname.startsWith('/api/fish/')) return env.FISH.get(env.FISH.idFromName('board')).fetch(request);
     // 2048: one WebSocket endpoint; the object keeps everyone's board.
     if (url.pathname === '/api/2048') return env.G2048.get(env.G2048.idFromName('board')).fetch(request);
     // 谁是卧底 / 阿瓦隆 / 狼人杀: one WebSocket endpoint per game, its hall holds two tables.

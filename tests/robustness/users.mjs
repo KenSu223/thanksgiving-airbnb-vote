@@ -4,7 +4,7 @@
 // list the next time anyone loads it, with everything recorded under it:
 // votes, flights, split entries, Secret Angel prefs and draw seat, car seat
 // and luggage, to-do assignments and comments, chat messages (and @mentions
-// of them), and the game records (the dodge board).
+// of them), and the game records (the dodge and fishing boards).
 // Also: Secret Angel has no admin any more — any member draws and leaves
 // people out, and it's logged who did.
 //
@@ -64,6 +64,10 @@ const scrubDoor = await J('POST', '/api/dodge/scrub-user', { target: VICTIM });
 ck('the dodge board has no public scrub door', !scrubDoor || scrubDoor.ok !== true, JSON.stringify(scrubDoor));
 const vicBoard = await J('GET', `/api/dodge/board?name=${VICTIM}&token=${vic.token}`);
 ck('retiree still on the dodge board', [...vicBoard.board, vicBoard.boardMe].some(r => r && isVictim(r.name)), JSON.stringify(vicBoard));
+// 小小钓鱼: a run ended straight away (0 coins) is still a record
+const ftk = await J('POST', '/api/fish/start', { name: VICTIM, token: vic.token });
+const fsc = await J('POST', '/api/fish/score', { name: VICTIM, token: vic.token, ticket: ftk.ticket, events: [[0, 4]] });
+ck('retiree fishing run recorded', fsc.ok === true && fsc.rank >= 1, JSON.stringify(fsc).slice(0, 160));
 
 // the chat room: the retiree says something, and Aster @s them
 const chat = who => new Promise((resolve, reject) => {
@@ -146,6 +150,8 @@ const boardEnd = await J('GET', '/api/dodge/board');
 ck('no dodge record of retiree remains', boardEnd.board.every(r => !isVictim(r.name)), JSON.stringify(boardEnd.board).slice(0, 200));
 const repEnd = await J('GET', '/api/dodge/replay?name=' + encodeURIComponent(VICTIM));
 ck('no dodge replay of retiree remains', repEnd.ok === false, JSON.stringify(repEnd).slice(0, 200));
+const fishEnd = await J('GET', '/api/fish/replay?name=' + encodeURIComponent(VICTIM));
+ck('no fishing record of retiree remains (not ranked at all)', fishEnd.ok === false && /没有回放/.test(fishEnd.error), JSON.stringify(fishEnd).slice(0, 200));
 
 // ---- leaving someone out of Secret Angel: any member, logged ----
 const out = await J('POST', '/api/angel/exclude', { name: 'Aster', token: ast.token, target: 'PM', excluded: true });
