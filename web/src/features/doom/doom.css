@@ -1,0 +1,55 @@
+/* 末日小队 */
+.dm-intro { position:relative; isolation:isolate; overflow:hidden; border:1px solid #ff8a5c44;
+  background:radial-gradient(110% 80% at 85% 10%, #ff6a3a33, transparent 55%), linear-gradient(180deg,#2b2337 0%,#26212d 55%,#1c1a20 100%); }
+.dm-intro::before { content:''; position:absolute; z-index:-1; inset:0; opacity:.35;
+  background:repeating-linear-gradient(0deg, transparent 0 38px, #f0dc781a 38px 42px), linear-gradient(90deg, transparent 47%, #f0dc7822 47% 53%, transparent 53%); }
+.dm-intro-content { position:relative; max-width:34rem; }
+.dm-eyebrow { color:#ffb08a; letter-spacing:.2em; font-size:.65rem; font-weight:700; margin-bottom:1rem; }
+.dm-title { font-size:clamp(2rem,4vw,3rem); font-weight:900; letter-spacing:.08em; color:#fff1e6; text-shadow:0 3px 12px #000; }
+.dm-title span { display:block; font-size:clamp(1rem,2vw,1.25rem); letter-spacing:.12em; margin:.4rem 0 .9rem; font-weight:500; color:#ffd2bd; }
+.dm-description { max-width:28rem; color:#d8cfd6; line-height:1.75; font-size:.9rem; }
+.dm-rule-tags { display:flex; flex-wrap:wrap; gap:.4rem; margin:1rem 0 .4rem; }
+.dm-rule-tags span { border:1px solid #ff8a5c55; background:#00000055; color:#ffd2bd; padding:.25rem .6rem; border-radius:3px; font-size:.68rem; }
+.dm-btn { border-radius:.8rem; padding:.6rem 1.3rem; font-weight:800; box-shadow:0 3px 8px rgba(0,0,0,.3); }
+.dm-btn:disabled { opacity:.45; }
+.dm-btn-hot, .dm-start { background:linear-gradient(135deg,#ffb36b,#ff6a3a); color:#2a1206; border:1px solid #ffd2b0; }
+.dm-start { min-width:10rem; }.dm-start span { margin-left:1.6rem; }
+.dm-btn-dim { background:rgba(255,255,255,.15); color:#fff; }
+.dm-btn-sky { background:#7dd3fc; color:#0c2a3a; }
+.dm-btn:focus-visible, .dm-tool:focus-visible, .dm-card:focus-visible { outline:3px solid #ffd2b0; outline-offset:3px; }
+
+/* the game: the field (3:5) as big as fits */
+.dm-box { border-radius:1rem; overflow:hidden; background:#151318; box-shadow:0 20px 40px -15px rgba(0,0,0,.5); }
+.dm-box .dm-stage { height:min(calc(100vh - 2rem), 820px); min-height:460px; }
+.dm-stage { position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; padding:6px; touch-action:none; }
+.dm-field { flex:none; position:relative; border-radius:.6rem; overflow:hidden; box-shadow:0 0 0 2px #4a3a44, 0 10px 30px #000a; }
+.dm-canvas { display:block; touch-action:none; cursor:ew-resize; }
+.dm-tools { position:absolute; top:.35rem; left:50%; transform:translateX(-50%); display:flex; gap:.35rem; z-index:3; }
+.dm-tool { width:2.1rem; height:2.1rem; border-radius:9999px; background:rgba(0,0,0,.45); color:#fff; font-size:.9rem; font-weight:700; }
+.dm-tool:hover { background:rgba(0,0,0,.65); }
+.dm-replay-tag { position:absolute; left:50%; top:2.9rem; transform:translateX(-50%); z-index:3; font-size:.7rem; color:#fff; background:rgba(0,0,0,.55); border-radius:9999px; padding:.15rem .6rem; white-space:nowrap; pointer-events:none; }
+.dm-over { position:absolute; inset:0; z-index:6; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#fff; background:linear-gradient(#151318aa,#151318ee); backdrop-filter:blur(3px); padding:1rem; }
+/* three upgrades to pick from between waves */
+.dm-pick { position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; justify-content:center; gap:.8rem; padding:1rem; color:#fff;
+  background:linear-gradient(#151318cc,#151318f2); animation:dm-in .2s ease-out; }
+@keyframes dm-in { from { opacity:0; } }
+@media (prefers-reduced-motion: reduce) { .dm-pick { animation:none; } }
+.dm-pick-head { text-align:center; }
+.dm-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; }
+.dm-card { position:relative; display:flex; flex-direction:column; align-items:center; gap:.25rem; padding:.9rem .4rem .8rem; border-radius:.9rem; text-align:center; color:#fff;
+  background:linear-gradient(#3a2f3e,#2a2230); border:1px solid #ff8a5c66; box-shadow:0 6px 16px #0008; transition:transform .1s, border-color .15s; }
+.dm-card:not(:disabled):hover { border-color:#ffb36b; transform:translateY(-2px); }
+.dm-card:not(:disabled):active { transform:scale(.97); }
+.dm-card-icon { font-size:2rem; }
+.dm-card b { font-size:.85rem; }
+.dm-card small { font-size:.68rem; color:#d8cfd6; line-height:1.35; }
+.dm-card kbd { position:absolute; top:.35rem; right:.45rem; font-size:.62rem; color:#ffb08a; font-family:inherit; }
+/* phones: the run takes the whole screen (upright) */
+.dm-full { position:fixed; inset:0; z-index:80; background:#151318; overscroll-behavior:none; touch-action:none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+html.dm-lock, html.dm-lock body { overflow:hidden; overscroll-behavior:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.dm-full, .dm-stage, .dm-over, .dm-box { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+/* leaderboard: ▶ watch a best run again */
+.dm-watch { width:1.6rem; height:1.6rem; border-radius:9999px; background:#eef2ff; color:#4f46e5; font-size:.7rem; line-height:1.6rem; text-align:center; flex:none; }
+.dm-watch:hover { background:#4f46e5; color:#fff; }.dm-watch:focus-visible { outline:2px solid #6366f1; outline-offset:2px; }
+.dm-watch-none { background:transparent; color:#cbd5e1; }
