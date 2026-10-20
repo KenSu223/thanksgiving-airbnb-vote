@@ -137,3 +137,12 @@ class_name = "FishBoard"
 [[migrations]]
 tag = "v13"
 new_sqlite_classes = ["FishBoard"]
+
+# 末日小队 leaderboard: one Durable Object, everyone's best run (checked by replaying it).
+[[durable_objects.bindings]]
+name = "DOOM"
+class_name = "DoomBoard"
+
+[[migrations]]
+tag = "v14"
+new_sqlite_classes = ["DoomBoard"]

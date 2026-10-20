@@ -10,6 +10,7 @@ import DodgeView from '../dodge/DodgeView.jsx';
 import G2048View from '../g2048/G2048View.jsx';
 import GomokuView from '../gomoku/GomokuView.jsx';
 import FishView from '../fishing/FishView.jsx';
+import DoomView from '../doom/DoomView.jsx';
 import AvalonView from '../party/AvalonView.jsx';
 import WerewolfView from '../party/WerewolfView.jsx';
 import UndercoverView from '../party/UndercoverView.jsx';
@@ -24,6 +25,7 @@ const GAMES = [
   { key: 'dodge', label: '🎯 鲁班躲技能', View: DodgeView },
   { key: '2048', label: '🔢 2048', View: G2048View },
   { key: 'fish', label: '🎣 小小钓鱼', View: FishView },
+  { key: 'doom', label: '🧟 末日小队', View: DoomView },
   { key: 'gomoku', label: '⚫ 五子棋', View: GomokuView },
   { key: 'uc', label: '🕵️ 谁是卧底', View: UndercoverView },
   { key: 'av', label: '🏰 阿瓦隆', View: AvalonView },
