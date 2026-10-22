@@ -37,6 +37,11 @@ function noise(t, { dur, vol = 0.3, f0 = 1200, f1 = 200, type = 'lowpass' }) {
 }
 const SOUNDS = {
   shot: [70, t => noise(t, { dur: 0.05, vol: 0.12, f0: 3000, f1: 900, type: 'bandpass' })],
+  shotgun: [120, t => noise(t, { dur: 0.12, vol: 0.22, f0: 2200, f1: 300 })],
+  rocket: [150, t => noise(t, { dur: 0.25, vol: 0.16, f0: 900, f1: 2400, type: 'bandpass' })],
+  laser: [80, t => tone(t, { f0: 1800, f1: 900, dur: 0.06, type: 'square', vol: 0.05 })],
+  sniper: [0, t => { noise(t, { dur: 0.18, vol: 0.3, f0: 4000, f1: 400 }); tone(t, { f0: 160, f1: 60, dur: 0.15, vol: 0.2 }); }],
+  blast: [90, t => { noise(t, { dur: 0.3, vol: 0.28, f0: 800, f1: 80 }); tone(t, { f0: 110, f1: 50, dur: 0.22, vol: 0.2 }); }],
   kill: [60, t => noise(t, { dur: 0.12, vol: 0.18, f0: 700, f1: 120 })],
   good: [0, t => { tone(t, { f0: 784, dur: 0.12, vol: 0.2 }); tone(t + 0.07, { f0: 1175, dur: 0.22, vol: 0.2 }); }],
   bad: [0, t => tone(t, { f0: 300, f1: 140, dur: 0.3, type: 'sawtooth', vol: 0.12 })],
