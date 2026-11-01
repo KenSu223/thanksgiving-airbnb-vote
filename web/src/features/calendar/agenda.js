@@ -31,7 +31,8 @@ export function stayEvents(listingsByTrip, voteByTrip = {}) {
       continue;
     }
     const votes = top.votes.length;
-    const warn = isBooked(top, T) ? ' · ⚠️ Airbnb 显示这几天已经订不了' : '';
+    // 定下的那间被订走了，多半是我们自己订的，不用提醒
+    const warn = isBooked(top, T) && !chosen ? ' · ⚠️ Airbnb 显示这几天已经订不了' : '';
     const link = 'https://www.airbnb.com/rooms/' + top.roomId + '?adults=' + T.people + '&check_in=' + T.checkIn + '&check_out=' + T.checkOut;
     const base = { tone: warn ? 'warn' : 'stay', link };
     const status = chosen ? (vote.booking?.status === 'booked' ? '✅ 已订好' : '🏆 大家定了这间（' + votes + ' 票）') : '目前票数最高（' + votes + ' 票）· 还在投票';
