@@ -16,7 +16,7 @@ export const TRIPS = {
       { name: 'Denver 周边', lat: 39.7392, lng: -104.9903, km: 50 },
     ], },
   nov26: { kvKey: 'state:v1', seed: SEED, checkIn: '2026-11-26', checkOut: '2026-11-29', people: 14,
-    voteEndsAt: null, // reopened 10/30 with no deadline (was 10/18 00:00 PDT)
+    voteEndsAt: '2026-10-31T07:00:00Z', // 10/31 00:00 PDT (first closed 10/18, reopened 10/30, booked 10/31)
     zones: [
       { name: '大沙丘区域', lat: 37.7326, lng: -105.5122, km: 60 },
       { name: '落基山 · Estes Park', lat: 40.3772, lng: -105.5217, km: 30 },
