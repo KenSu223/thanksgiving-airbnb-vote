@@ -57,9 +57,13 @@ function HotelPrice({ l, T, closed, onSetRate }) {
   return <><div className="text-sm text-slate-500">🏨 还没有价格（Google 上没查到）</div>{edit}</>;
 }
 
-export default function PriceBlock({ l, T, closed, onSetRate }) {
+export default function PriceBlock({ l, T, closed, chosen, onSetRate }) {
   if (l.kind === 'hotel') return <HotelPrice l={l} T={T} closed={closed} onSetRate={onSetRate} />;
   const v = liveOf(l, T);
+  // 我们选定的那间被订走了，多半就是我们自己订的
+  if (v && !v.available && chosen && v.reason === 'DATE') return (
+    <div className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1">🏠 这几天我们订下了</div>
+  );
   if (v && !v.available) return (
     <>
       <div className="inline-flex items-center gap-1 text-sm font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1">❌ {UNAVAILABLE[v.reason] || '这几天订不了'}</div>

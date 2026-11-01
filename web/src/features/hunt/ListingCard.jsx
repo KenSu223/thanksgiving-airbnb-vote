@@ -20,7 +20,7 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
   const pics = l.images && l.images.length ? l.images : l.image ? [l.image] : [];
   return (
     <article ref={cardRef} data-id={l.id}
-      className={'glass-card rounded-2xl overflow-hidden flex flex-col ' + (hotel ? 'is-hotel' : 'is-airbnb') + (chosen ? ' ring-4 ring-amber-400' : '') + (isBooked(l, T) ? ' opacity-60 grayscale-[40%] hover:opacity-100 hover:grayscale-0 transition' : '') + (glow ? ' just-voted' : '')}>
+      className={'glass-card rounded-2xl overflow-hidden flex flex-col ' + (hotel ? 'is-hotel' : 'is-airbnb') + (chosen ? ' ring-4 ring-amber-400' : '') + (isBooked(l, T) && !chosen ? ' opacity-60 grayscale-[40%] hover:opacity-100 hover:grayscale-0 transition' : '') + (glow ? ' just-voted' : '')}>
       <div className="relative car-wrap">
         <Carousel pics={pics} />
         <span className={'kind-tag ' + (hotel ? 'hotel' : 'airbnb')}>{hotel ? '🏨 酒店' : '🏠 Airbnb'}</span>
@@ -33,7 +33,7 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
         {hotel && l.address && <p className="text-sm text-slate-600 mb-1">📍 {l.address}</p>}
         <p className="text-sm text-slate-500 mb-2">{hotel ? '酒店' : statsLine(l)}{l.addedBy ? ' · 由 ' + l.addedBy + ' 添加' : ''}</p>
         {l.sleeps && l.sleeps < T.people ? <p className="text-sm text-amber-600 mb-2">⚠️ 最多住 {l.sleeps} 人，不够 {T.people} 人</p> : null}
-        <div className="mb-1"><PriceBlock l={l} T={T} closed={closed} onSetRate={onSetRate} /></div>
+        <div className="mb-1"><PriceBlock l={l} T={T} closed={closed} chosen={chosen} onSetRate={onSetRate} /></div>
         <div className="mb-2">{l.rating ? <span className="text-sm">⭐ {l.rating}{l.reviews ? '（' + l.reviews + '条评价）' : ''}</span> : null}</div>
         {l.note && <p className="text-sm text-slate-600 mb-2">💡 {l.note}</p>}
         {votes.length

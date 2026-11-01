@@ -4,7 +4,8 @@
 // voting has closed anyone can change the pick (the page asks first, and the
 // pick shows who changed it); someone claims and records the booking, and
 // only they can mark it booked or let it go. A listing someone has claimed or
-// booked stays the pick even after Airbnb shows it as taken (we took it).
+// booked stays the pick even after Airbnb shows it as taken (we took it),
+// and so does the trip's `booked` listing from the config.
 import { j } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
 import { cleanName, getUsers, sameName } from '../users/users.js';
@@ -36,7 +37,8 @@ export function voteView(state, trip) {
   const ranked = open ? [] : ranking(state, trip).filter(l => (l.votes || []).length && !unavailable(l, trip));
   const override = state.decision && state.listings.some(l => l.id === state.decision.listingId) ? state.decision : null;
   const held = state.booking && state.listings.some(l => l.id === state.booking.listingId) ? state.booking.listingId : null;
-  const chosenId = open ? null : override ? override.listingId : held || ranked[0]?.id || null;
+  const pinned = trip.booked && state.listings.some(l => l.id === trip.booked) ? trip.booked : null;
+  const chosenId = open ? null : override ? override.listingId : held || pinned || ranked[0]?.id || null;
   const booking = state.booking && state.booking.listingId === chosenId ? state.booking : null;
   return { voteEndsAt: trip.voteEndsAt || null, open, chosenId, override: override ? { by: override.by, at: override.at } : null,
     ranking: ranked.slice(0, 5).map(l => l.id), booking };

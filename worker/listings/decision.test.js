@@ -38,3 +38,10 @@ test('changing the pick by hand still wins over a booking', () => {
 test('while voting is open there is no pick', () => {
   assert.equal(voteView({ listings: [listing('a', 9)] }, { ...trip, voteEndsAt: null }).chosenId, null);
 });
+
+test("the trip's booked listing is the pick even when Airbnb shows it as taken", () => {
+  const state = { listings: [listing('a', 9, false), listing('b', 4)] };
+  assert.equal(voteView(state, trip).chosenId, 'b', 'without it the next available one would win');
+  assert.equal(voteView(state, { ...trip, booked: 'a' }).chosenId, 'a');
+  assert.equal(voteView(state, { ...trip, booked: 'gone' }).chosenId, 'b', 'a listing that was removed is ignored');
+});
