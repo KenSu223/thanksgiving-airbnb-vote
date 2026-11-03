@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { newGame, step, HZ, W, H, ROAD, PERKS, ZOMBIES } from './sim.js';
+import { newGame, step, HZ, W, H, ROAD, PERK, ZOMBIES, WEAPONS, STAGES, BOSS_SECONDS, firepower, bossHp, levelOf, stageOf } from './sim.js';
 import { draw, gateText } from './draw.js';
 import * as sfx from './sfx.js';
 
@@ -9,21 +9,27 @@ import * as sfx from './sfx.js';
 // again. With `replay` (a recorded input list) it plays those back instead of
 // taking input, at 1×, 2× or 4×.
 // Steering: drag on the road (phone), move the mouse over it (computer), or ← / →.
-// Between waves, the three upgrades are cards to tap (or 1 / 2 / 3).
+// Between waves, the three upgrades are cards to tap (or 1 / 2 / 3): small ones
+// after a 小关, big ones (weapons) after a 大关; the pick before a 大关 shows
+// the 尸王's DPS check next to the squad's firepower.
 const ASPECT = W / H;
 const PAD = 6;
 const SPEEDS = [1, 2, 4];
-const PERK = Object.fromEntries(PERKS.map(p => [p.key, p]));
+const fmt = n => Math.round(n).toLocaleString('en-US');
 function viewOf(g) {
-  const v = { phase: g.phase, wave: g.wave, offers: g.offers, count: g.squad.count, score: g.score };
+  const v = { phase: g.phase, wave: g.wave, offers: g.offers, size: g.offerSize, count: g.squad.count, score: g.score,
+    weapon: g.stats.weapon, power: g.phase === 'pick' ? firepower(g) : 0 };
   v.key = [v.phase, v.wave, (v.offers || []).join(',')].join('|');
   return v;
 }
+// the shot sound for each weapon
+const SHOT = { rifle: 'shot', shotgun: 'shotgun', rocket: 'rocket', laser: 'laser', sniper: 'sniper' };
 
 export default function DoomGame({ seed, paused, onPause, onResume, onDone, onLeave, replay, replayName, touch, children }) {
   const wrap = useRef(null), canvas = useRef(null);
   const g = useRef(null), pending = useRef([]), log = useRef([]), cursor = useRef(0), fx = useRef([]);
   const want = useRef(null), sentX = useRef(null), keys = useRef({ left: false, right: false }), flashUntil = useRef(0);
+  const dealtLog = useRef([]); // [ms, damage dealt so far]: the squad's DPS over the last second
   const speedRef = useRef(1), doneRef = useRef(false), overAt = useRef(null);
   const callbacks = useRef({ onDone, onPause });
   callbacks.current = { onDone, onPause };
@@ -65,13 +71,18 @@ export default function DoomGame({ seed, paused, onPause, onResume, onDone, onLe
     const pop = (text, color, x, y, now) => fx.current.push({ kind: 'pop', text, color, x, y, at: now });
     const happened = (sim, now) => {
       for (const h of sim.happened) {
-        if (h.type === 'shot') { flashUntil.current = now + 60; sfx.play('shot'); }
+        if (h.type === 'shot') { flashUntil.current = now + 60; sfx.play(SHOT[h.weapon] || 'shot'); }
+        else if (h.type === 'boom') { fx.current.push({ kind: 'boom', x: h.x, y: h.y, small: true, at: now }); sfx.play('blast'); }
         else if (h.type === 'hit') fx.current.push({ kind: 'spark', x: h.x, y: h.y, crit: h.crit, at: now });
         else if (h.type === 'kill') { fx.current.push({ kind: 'splat', x: h.x, y: h.y, s: ZOMBIES[h.kind].r / 10, at: now }); sfx.play('kill'); }
         else if (h.type === 'bite') { fx.current.push({ kind: 'bite', x: h.x, y: h.y, at: now }); sfx.play('bite'); }
         else if (h.type === 'mortar') { fx.current.push({ kind: 'boom', x: h.x, y: h.y, at: now }); sfx.play('boom'); }
         else if (h.type === 'boss') sfx.play('boss');
-        else if (h.type === 'perk') { sfx.play('perk'); pop('第 ' + sim.wave + ' 波', '#ffe28a', W / 2, H * 0.42, now + 150); }
+        else if (h.type === 'perk') {
+          sfx.play('perk');
+          const st = stageOf(sim.wave);
+          pop(st === STAGES ? '⚠️ 大关：尸王' : '第 ' + levelOf(sim.wave) + ' 关 · 小关 ' + st, st === STAGES ? '#ff9a8a' : '#ffe28a', W / 2, H * 0.42, now + 150);
+        }
         else if (h.type === 'wave') sfx.play('wave');
         else if (h.type === 'gate') {
           const good = h.kind !== 'add' || h.v > 0;
@@ -115,7 +126,11 @@ export default function DoomGame({ seed, paused, onPause, onResume, onDone, onLe
       } else acc = 0;
       last = now;
       fx.current = fx.current.filter(e => now - e.at < 1200);
-      draw(ctx, sim, scale, fx.current, now, now < flashUntil.current);
+      const dl = dealtLog.current;
+      dl.push([now, sim.dealt]);
+      while (dl.length > 2 && now - dl[1][0] > 1000) dl.shift();
+      const dps = dl.length > 1 && now > dl[0][0] ? ((sim.dealt - dl[0][1]) * 1000) / (now - dl[0][0]) / (replay ? speedRef.current : 1) : 0;
+      draw(ctx, sim, scale, fx.current, now, now < flashUntil.current, { dps });
       const v = viewOf(sim);
       if (v.key !== viewKey.current) { viewKey.current = v.key; setView(v); }
       if (sim.over && overAt.current === null) overAt.current = now;
@@ -169,12 +184,24 @@ export default function DoomGame({ seed, paused, onPause, onResume, onDone, onLe
         {view.phase === 'pick' && view.offers && (
           <div className="dm-pick">
             <div className="dm-pick-head">
-              <div className="text-xl font-extrabold">第 {view.wave} 波 守住了！</div>
-              <div className="text-sm text-slate-300">选一个强化（这一局一直有效）{!touch && !replay ? ' · 按 1 / 2 / 3' : ''}</div>
+              {view.size === 'big'
+                ? <><div className="text-xl font-extrabold">🏆 第 {levelOf(view.wave)} 关 尸王倒了！</div>
+                    <div className="text-sm text-amber-200">大关奖励：挑一件大装备（现在用的是 {WEAPONS[view.weapon].emoji} {WEAPONS[view.weapon].label}）{!touch && !replay ? ' · 按 1 / 2 / 3' : ''}</div></>
+                : <><div className="text-xl font-extrabold">小关 {stageOf(view.wave)}/{STAGES - 1} 守住了！</div>
+                    <div className="text-sm text-slate-300">小奖励：选一个强化（这一局一直有效）{!touch && !replay ? ' · 按 1 / 2 / 3' : ''}</div></>}
+              {view.size === 'small' && stageOf(view.wave) === STAGES - 1 && (() => {
+                const L = levelOf(view.wave), need = bossHp(L) / BOSS_SECONDS;
+                return (
+                  <div className={'dm-check' + (view.power >= need ? ' ok' : '')}>
+                    ⚠️ 下一关是大关：尸王 {fmt(bossHp(L))} 血，{BOSS_SECONDS} 秒内打掉 → 每秒要 {fmt(need)}
+                    <br />你现在的火力约每秒 {fmt(view.power)}{view.power >= need ? '，够了' : '，还不够：挑伤害、射速、援军'}
+                  </div>
+                );
+              })()}
             </div>
             <div className="dm-cards">
               {view.offers.map((k, i) => (
-                <button key={k} className="dm-card" onClick={() => pick(i)} disabled={!!replay}>
+                <button key={k} className={'dm-card' + (PERK[k].size === 'big' ? ' big' : '')} onClick={() => pick(i)} disabled={!!replay}>
                   <span className="dm-card-icon" aria-hidden="true">{PERK[k].emoji}</span>
                   <b>{PERK[k].label}</b>
                   <small>{PERK[k].tip}</small>

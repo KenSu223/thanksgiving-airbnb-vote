@@ -82,10 +82,15 @@ works for any group picking a place together.
   games like 向末日开炮. The squad runs and fires on its own; you steer it
   left and right through gates (+N, ×2, faster fire; red gates take soldiers
   away, but shooting them counts them up until they turn good) and into
-  waves of zombies (a boss every 5th wave). After each wave, pick one of three
-  upgrades for the rest of the run (fire rate, damage, reinforcements,
-  piercing, spread, crits, mortar, shield). The score is the zombies killed;
-  checked the same way as 躲技能, top 3 replays to watch. Unit tests:
+  zombies. Each level is 4 small stages and a boss stage. A small stage is a
+  wave of zombies; hold it and pick one of three small upgrades (fire rate,
+  damage, reinforcements, crits, shield). The boss stage is a DPS check: the
+  boss reaches the squad in exactly 20 seconds and wipes it, so you need its
+  HP ÷ 20 damage per second (shown on screen, along with your own). Beat it
+  and pick a big upgrade: a new weapon (shotgun, rocket launcher, laser,
+  sniper rifle) or weapon damage, mortar, spread, piercing. The score is the
+  zombies killed; checked the same way as 躲技能, top 3 replays to watch.
+  Unit tests:
   `node --test web/src/features/doom/sim.test.js`
 - Flights: everyone enters their arrival and departure flights; a route map
   (arrivals and departures separately), an airport pickup list people can
@@ -165,7 +170,8 @@ works for any group picking a place together.
 - **末日小队** (`/api/doom/start`, `/api/doom/score`, `/api/doom/board`,
   `/api/doom/replay`): the same tickets and replay check, in the `DoomBoard`
   Durable Object, with the game in `web/src/features/doom/sim.js`. Ranked by
-  the kill score, then the wave reached.
+  the kill score, then the wave reached. Replays recorded on an older
+  `SIM_VERSION` are refused; their scores stay on the board.
 - **Listing enrichment**: pasted Airbnb URLs are scraped server-side. Because
   Airbnb bot-blocks datacenter IPs, the scraper tries three levels: direct
   fetch → `airbnb.co.uk` (same listing, no bot wall) → the `r.jina.ai` reader

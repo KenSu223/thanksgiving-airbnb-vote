@@ -1,4 +1,4 @@
-import { W, H, ROAD, SQUAD_Y, spanOf } from './sim.js';
+import { W, H, ROAD, SQUAD_Y, STAGES, BOSS_SECONDS, spanOf, levelOf, stageOf } from './sim.js';
 
 // Drawing one frame of 末日小队: a wrecked city road scrolling past, the
 // squad at the bottom, the zombies, the gates, the bullets and the effects.
@@ -147,10 +147,26 @@ function gates(ctx, g) {
   }
 }
 
+// each weapon's shots look their own: pellets, rockets, a laser line, a sniper streak
 function bullets(ctx, g) {
   for (const b of g.bullets) {
-    ctx.strokeStyle = b.crit ? '#ff9f43' : '#ffe58a'; ctx.lineWidth = b.crit ? 3 : 2;
-    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx, b.y + 9); ctx.stroke();
+    if (b.kind === 'rocket') {
+      dot(ctx, b.x - b.vx * 2, b.y + 12, 3.5, 'rgba(200,200,200,.35)');
+      ctx.fillStyle = '#c94f3a'; ctx.beginPath(); ctx.roundRect(b.x - 2.5, b.y - 5, 5, 11, 2); ctx.fill();
+      ctx.fillStyle = '#ffd36b'; ell(ctx, b.x, b.y + 8, 2, 3.5); ctx.fill();
+    } else if (b.kind === 'laser') {
+      ctx.strokeStyle = 'rgba(120,240,255,.85)'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(b.x, b.y - 4); ctx.lineTo(b.x, b.y + 18); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1; ctx.stroke();
+    } else if (b.kind === 'sniper') {
+      ctx.strokeStyle = b.crit ? '#ff9f43' : '#ffffff'; ctx.lineWidth = b.crit ? 3.5 : 2.5;
+      ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx, b.y + 22); ctx.stroke();
+    } else if (b.kind === 'shotgun') {
+      dot(ctx, b.x, b.y, b.crit ? 2.6 : 2, b.crit ? '#ff9f43' : '#ffc46b');
+    } else {
+      ctx.strokeStyle = b.crit ? '#ff9f43' : '#ffe58a'; ctx.lineWidth = b.crit ? 3 : 2;
+      ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx, b.y + 9); ctx.stroke();
+    }
   }
 }
 
@@ -168,7 +184,7 @@ function effects(ctx, fx, now) {
       for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU + e.x; dot(ctx, e.x + Math.cos(a) * 14 * k * e.s, e.y + Math.sin(a) * 10 * k * e.s, 3 * (1 - k) * e.s + 0.5, ctx.fillStyle); }
     } else if (e.kind === 'boom') {
       if (age > 0.5) continue;
-      const k = age / 0.5, r = 12 + 34 * k;
+      const k = age / 0.5, r = (12 + 34 * k) * (e.small ? 0.7 : 1);
       const gr = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
       gr.addColorStop(0, `rgba(255,250,210,${1 - k})`); gr.addColorStop(0.4, `rgba(255,160,40,${0.85 * (1 - k)})`); gr.addColorStop(1, 'rgba(200,60,10,0)');
       ctx.fillStyle = gr; ell(ctx, e.x, e.y, r, r); ctx.fill();
@@ -195,15 +211,35 @@ function hud(ctx, g, now) {
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.strokeText(s, x, y);
     ctx.fillStyle = color; ctx.fillText(s, x, y);
   };
-  text('第 ' + g.wave + ' 波', 10, 24, 16, '#fff');
+  const s = stageOf(g.wave);
+  text('第 ' + levelOf(g.wave) + ' 关', 10, 24, 16, '#fff');
+  text(s === STAGES ? '大关 · 尸王' : '小关 ' + s + '/' + (STAGES - 1), 10, 42, 11.5, s === STAGES ? '#ff9a8a' : '#cfd3dc');
   text('💀 ' + g.score.toLocaleString('en-US'), W - 10, 24, 16, '#ffe28a', 'right');
-  if (g.zombies.some(z => z.kind === 'boss')) {
-    const pulse = 0.7 + 0.3 * Math.sin(now / 120);
-    text('⚠️ 尸王来了', W / 2, 52, 15, `rgba(255,110,90,${pulse})`, 'center');
-  }
 }
 
-export function draw(ctx, g, scale, fx, now, flash) {
+// The 尸王's bar: hp, the seconds it has left to reach the line, the DPS it
+// takes (hp over the time) and the squad's DPS right now (ui.dps, measured by the page).
+function bossBar(ctx, g, now, ui) {
+  const z = g.zombies.find(o => o.kind === 'boss');
+  if (!z) return;
+  const x = 14, y = 52, w = W - 28;
+  const left = Math.max(0, (SQUAD_Y - 8 - (z.y + z.r)) / z.speed / 60);
+  ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.beginPath(); ctx.roundRect(x - 4, y - 4, w + 8, 40, 8); ctx.fill();
+  ctx.fillStyle = '#3a1414'; ctx.fillRect(x, y, w, 10);
+  ctx.fillStyle = '#ff5a4a'; ctx.fillRect(x, y, w * Math.max(0, z.hp / z.max), 10);
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, 10);
+  ctx.font = '900 11px system-ui, sans-serif'; ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left'; ctx.fillStyle = '#fff';
+  ctx.fillText('尸王 ' + Math.ceil(Math.max(0, z.hp)).toLocaleString('en-US') + ' 血', x, y + 25);
+  const need = Math.ceil(z.max / BOSS_SECONDS), have = Math.round(ui?.dps || 0);
+  ctx.textAlign = 'center'; ctx.fillStyle = have >= need ? '#9be59b' : '#ffb0a0';
+  ctx.fillText('火力 ' + have.toLocaleString('en-US') + '/秒 · 要 ' + need.toLocaleString('en-US') + '/秒', x + w / 2, y + 25);
+  const pulse = left < 5 ? 0.6 + 0.4 * Math.sin(now / 90) : 1;
+  ctx.textAlign = 'right'; ctx.fillStyle = `rgba(255,220,120,${pulse})`;
+  ctx.fillText('⏱ ' + left.toFixed(1) + ' 秒', x + w, y + 25);
+}
+
+export function draw(ctx, g, scale, fx, now, flash, ui) {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   road(ctx, g);
   gates(ctx, g);
@@ -212,5 +248,6 @@ export function draw(ctx, g, scale, fx, now, flash) {
   squad(ctx, g, flash);
   effects(ctx, fx, now);
   hud(ctx, g, now);
+  bossBar(ctx, g, now, ui);
 }
 export { gateText };

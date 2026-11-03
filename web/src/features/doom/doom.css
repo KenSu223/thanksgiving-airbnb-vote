@@ -27,7 +27,7 @@
 .dm-tools { position:absolute; top:.35rem; left:50%; transform:translateX(-50%); display:flex; gap:.35rem; z-index:3; }
 .dm-tool { width:2.1rem; height:2.1rem; border-radius:9999px; background:rgba(0,0,0,.45); color:#fff; font-size:.9rem; font-weight:700; }
 .dm-tool:hover { background:rgba(0,0,0,.65); }
-.dm-replay-tag { position:absolute; left:50%; top:2.9rem; transform:translateX(-50%); z-index:3; font-size:.7rem; color:#fff; background:rgba(0,0,0,.55); border-radius:9999px; padding:.15rem .6rem; white-space:nowrap; pointer-events:none; }
+.dm-replay-tag { position:absolute; left:50%; bottom:.45rem; transform:translateX(-50%); z-index:3; font-size:.7rem; color:#fff; background:rgba(0,0,0,.55); border-radius:9999px; padding:.15rem .6rem; white-space:nowrap; pointer-events:none; }
 .dm-over { position:absolute; inset:0; z-index:6; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#fff; background:linear-gradient(#151318aa,#151318ee); backdrop-filter:blur(3px); padding:1rem; }
 /* three upgrades to pick from between waves */
 .dm-pick { position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; justify-content:center; gap:.8rem; padding:1rem; color:#fff;
@@ -43,6 +43,11 @@
 .dm-card-icon { font-size:2rem; }
 .dm-card b { font-size:.85rem; }
 .dm-card small { font-size:.68rem; color:#d8cfd6; line-height:1.35; }
+.dm-card.big { background:linear-gradient(#4a3a1e,#2e2414); border-color:#ffcf6b; box-shadow:0 0 0 1px #ffcf6b33, 0 6px 16px #0008; }
+.dm-card.big:not(:disabled):hover { border-color:#ffe39a; }
+/* before a 大关: the 尸王's DPS check next to the squad's firepower */
+.dm-check { margin:.6rem auto 0; max-width:22rem; font-size:.75rem; line-height:1.5; color:#ffd0c8; background:#3a141455; border:1px solid #ff8a7a66; border-radius:.6rem; padding:.45rem .7rem; }
+.dm-check.ok { color:#c8f5c8; background:#143a1e55; border-color:#7ee07066; }
 .dm-card kbd { position:absolute; top:.35rem; right:.45rem; font-size:.62rem; color:#ffb08a; font-family:inherit; }
 /* phones: the run takes the whole screen (upright) */
 .dm-full { position:fixed; inset:0; z-index:80; background:#151318; overscroll-behavior:none; touch-action:none;
