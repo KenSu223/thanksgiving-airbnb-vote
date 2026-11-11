@@ -6,6 +6,8 @@ import { reduceMotion } from '../../lib/motion.js';
 import { useG2048 } from './useG2048.js';
 import { GOAL, SIZE, move } from './logic.js';
 import { BoardRows, place, TOP_NOTE } from '../games/TopBoard.jsx';
+import { unlock as unlockSfx, play } from '../games/tableSfx.js';
+import SoundToggles from '../games/SoundToggles.jsx';
 import './g2048.css';
 
 // 2048：盘面在服务器上（新砖是服务器出的），离开、刷新、换设备都接着玩。
@@ -87,6 +89,8 @@ export default function G2048View({ active }) {
     if (f) { inflight.current = null; if (m.stale || m.still) queue.current = []; }
     setGame(g); gameRef.current = g;
     if (f && !f.wonBefore && g.won && !reduceMotion) confetti({ particleCount: 160, spread: 100, origin: { y: 0.4 }, colors: CONFETTI_COLORS }); // 这一步拼出了 2048
+    if (f && !f.wonBefore && g.won) play('win', 0.15);
+    else if (f && g.over) play('lose', 0.25); // 这一步之后没地方走了
     if (queue.current.length && !inflight.current) setTimeout(() => go.current(queue.current.shift()), 0);
   }, [build, put, slide]);
 
@@ -104,6 +108,8 @@ export default function G2048View({ active }) {
     if (!send({ type: 'move', dir, n: g.moves })) return;
     inflight.current = { n: g.moves, dir, wonBefore: g.won };
     put(list);
+    unlockSfx(); // a swipe or a key press is what lets the browser make sound
+    play(r.gained >= 256 ? 'bigmerge' : r.gained > 0 ? 'merge' : 'slide');
     setGame({ ...g, score: g.score + r.gained }); // 分先加上，服务器回来会再对一遍
     // 网断了没回音：别一直卡着
     setTimeout(() => { if (inflight.current?.n === g.moves) { inflight.current = null; queue.current = []; } }, 5000);
@@ -158,7 +164,8 @@ export default function G2048View({ active }) {
           <h2 className="g48-title">2048</h2>
           <div className="g48-stat"><span>分数</span><b className="tabular-nums">{(game?.score ?? 0).toLocaleString()}</b></div>
           <div className="g48-stat"><span>最好</span><b className="tabular-nums">{best ? best.tile.toLocaleString() : '—'}</b></div>
-          <button onClick={name ? newGame : () => ensureName(() => {})} className="g48-btn ml-auto">{name ? '新游戏' : '登录开始'}</button>
+          <span className="g48-sound ml-auto"><SoundToggles soundOnly /></span>
+          <button onClick={name ? newGame : () => ensureName(() => {})} className="g48-btn">{name ? '新游戏' : '登录开始'}</button>
         </div>
         <div className="g48-board" onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={() => { start.current = null; }}
           role="application" aria-label="2048 盘面：用方向键或者滑动来移动">

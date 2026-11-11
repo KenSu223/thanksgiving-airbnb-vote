@@ -7,6 +7,9 @@ import Seat from './Seat.jsx';
 import { ReactionBar, reactionsFor } from '../games/Reactions.jsx';
 import Controls from './Controls.jsx';
 import Leaderboard from './Leaderboard.jsx';
+import { unlock as unlockSfx, play } from '../games/tableSfx.js';
+import SoundToggles from '../games/SoundToggles.jsx';
+import '../games/table.css';
 import './blackjack.css';
 
 // 倒计时用服务器给的时间算，本地每 250ms 刷一下
@@ -31,13 +34,29 @@ export default function BlackjackView({ active }) {
   const timer = useCountdown(st);
   const t = st?.table;
   const shown = useRef(new Set()); // 已经画过的牌：只有新牌播发牌动画
+  const seenTable = useRef(false);
   const celebrated = useRef(-1);
 
   // 这次渲染里新出现的牌按顺序错开 90ms
   const fresh = [];
   const cardDelay = id => { if (shown.current.has(id)) return null; let i = fresh.indexOf(id); if (i < 0) { fresh.push(id); i = fresh.length - 1; } return i * 90; };
   useEffect(() => { shown.current.clear(); }, [t?.round]); // 先清上一局，再记这一局画过的牌
-  useEffect(() => { fresh.forEach(id => shown.current.add(id)); });
+  useEffect(() => {
+    // 每张新牌落下「啪」一声，和发牌动画一样错开（刚打开页面时桌上已有的牌不响）
+    if (active && seenTable.current) fresh.forEach((_, i) => play('card', i * 0.09));
+    if (t) seenTable.current = true;
+    fresh.forEach(id => shown.current.add(id));
+  });
+  // 下了注：筹码响一下；这一手出结果：赢 / 输 / 爆牌 / 21 点各有一声
+  const myBet = me?.bet || 0, phase = t?.phase;
+  useEffect(() => { if (active && myBet > 0 && phase === 'betting') play('chip'); }, [myBet]); // eslint-disable-line react-hooks/exhaustive-deps -- only a new bet
+  const sounded = useRef(-1);
+  useEffect(() => {
+    if (!t || t.phase !== 'result' || !me?.result || sounded.current === t.round) return;
+    sounded.current = t.round;
+    if (!active) return;
+    play(me.result === 'blackjack' ? 'lord' : me.result === 'win' ? 'win' : me.result === 'bust' ? 'bust' : me.result === 'lose' ? 'lose' : 'draw', 0.5);
+  }, [t, me, active]);
 
   // 自己赢了撒点彩带
   useEffect(() => {
@@ -49,10 +68,11 @@ export default function BlackjackView({ active }) {
   const status = !t ? '连接中…' : !live ? '断线了，重连中…' : t.seats.length + '/' + t.rules.seats + ' 人在桌上' + (me ? '' : ' · 你在旁观');
   return (
     <div className="grid lg:grid-cols-3 gap-5">
-      <section className="lg:col-span-2 bj-felt rounded-2xl shadow-xl p-4 md:p-6 text-white">
+      <section className="lg:col-span-2 bj-felt rounded-2xl shadow-xl p-4 md:p-6 text-white" onPointerDownCapture={unlockSfx}>
         <div className="flex items-center justify-between gap-3 mb-4 text-sm">
           <span className="font-medium text-emerald-100">{status}</span>
           <span className="font-bold tabular-nums text-amber-200">{timer}</span>
+          <SoundToggles soundOnly />
         </div>
         {t && (
           <>

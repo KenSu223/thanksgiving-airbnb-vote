@@ -18,11 +18,14 @@ function voice() {
 }
 if (canSpeak()) window.speechSynthesis.onvoiceschanged = () => { zh = null; voice(); };
 
-export function speak(text) {
+// rate: how fast; cut: drop whatever is still being said or waiting (the card tables call out every
+// play, and a call that comes late is worse than one cut short)
+export function speak(text, { rate = 1, cut = false } = {}) {
   if (!canSpeak() || !text) return;
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'zh-CN'; u.rate = 1; u.pitch = 1;
+  u.lang = 'zh-CN'; u.rate = rate; u.pitch = 1;
   const v = voice(); if (v) u.voice = v;
+  if (cut && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
 }
 export function hush() { if (canSpeak()) window.speechSynthesis.cancel(); }

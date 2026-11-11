@@ -10,8 +10,9 @@ import { deck, isBombish, legalPlay, shuffle, sortHand, takeFrom } from './cards
 import { choosePlay, wantsCall, wantsGrab } from './bot.js';
 import { beatOptions, leadOptions } from './hints.js';
 import { snapshotOf, restoreInto, parkOut, unparkInto } from '../games/saving.js';
+import { note } from '../games/fx.js';
 
-export const DDZ = { base: 10, startPoints: 1000, bidMs: 15000, turnMs: 30000, botMs: 900, idleMs: 10 * 60 * 1000 };
+export const DDZ = { base: 10, startPoints: 1000, bidMs: 15000, turnMs: 30000, botMs: 1100, idleMs: 10 * 60 * 1000 };
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑'];
 const next = i => (i + 1) % 3;
 
@@ -24,6 +25,7 @@ export class DdzGame {
     this.first = 0; // who bids first; rotates every hand
     this.round = 0;
     this.turn = -1; this.deadline = 0; this.timer = null;
+    this.fx = []; this.fxN = 0; // what just happened, for the page's sounds (games/fx.js)
     this.reset();
   }
   reset() {
@@ -81,6 +83,7 @@ export class DdzGame {
     this.phase = 'bidding';
     const order = [this.first, next(this.first), next(next(this.first))];
     this.bid = { stage: 'call', order, pos: 0, caller: -1, last: -1, queue: [] };
+    note(this, { k: 'deal' });
     this.setTurn(this.first);
   }
 
@@ -110,6 +113,7 @@ export class DdzGame {
   doBid(i, yes) {
     const b = this.bid;
     this.said[i] = b.stage === 'call' ? (yes ? '叫地主' : '不叫') : (yes ? '抢地主' : '不抢');
+    note(this, { k: 'bid', seat: i, say: this.said[i] });
     if (b.stage === 'call') {
       if (!yes) {
         b.pos++;
@@ -137,6 +141,7 @@ export class DdzGame {
     this.phase = 'playing';
     this.trick = null;
     this.said = [null, null, null];
+    note(this, { k: 'lord', seat: i });
     this.setTurn(i);
   }
 
@@ -165,6 +170,7 @@ export class DdzGame {
     if (isBombish(play)) this.bombs++;
     this.trick = { play, cards: sortHand(cards), by: i };
     this.said[i] = { cards: this.trick.cards };
+    note(this, { k: 'play', seat: i, type: play.type, main: play.main, count: cards.length, left: left.length });
     if (!left.length) { this.endHand(i); return null; }
     this.advance(i);
     return null;
@@ -172,6 +178,7 @@ export class DdzGame {
   doPass(i) {
     if (!this.toBeat(i)) return '该你出牌了，不能不出';
     this.said[i] = '不出';
+    note(this, { k: 'pass', seat: i });
     this.advance(i);
     return null;
   }
@@ -241,6 +248,7 @@ export class DdzGame {
     this.result = { winner, landlordWin, deltas, spring, factor, multiplier: this.multiplier, bombs: this.bombs, names: this.seats.map(s => s.name) };
     this.phase = 'result';
     this.turn = -1;
+    note(this, { k: 'end', landlord: this.landlord, landlordWin, spring });
     for (const s of this.seats) if (!s.bot && !s.leaving && s.connected) this.h.save(s); // 豆子 saved after every hand
     this.release();
   }
@@ -325,7 +333,7 @@ export class DdzGame {
       bottom: this.landlord >= 0 || over ? this.bottom : this.bottom.map(() => null),
       bidStage: this.bid && this.phase === 'bidding' ? this.bid.stage : null,
       trickBy: this.trick ? this.trick.by : -1,
-      said: this.said,
+      said: this.said, fx: this.fx,
       seats: this.seats.map((s, k) => s && {
         name: s.name, bot: s.bot, me: k === me, connected: s.connected, auto: !!s.auto, leaving: !!s.leaving,
         points: s.bot ? null : s.points, count: s.cards.length, cards: k === me || over ? s.cards : null,

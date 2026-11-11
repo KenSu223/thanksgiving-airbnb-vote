@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useTable, useCountdown, secondsLeft } from '../games/useTable.js';
-import { alertsOn, setAlertsOn, unlock, useTurnAlert } from '../games/turnAlert.js';
+import { unlock, useTurnAlert } from '../games/turnAlert.js';
+import { unlock as unlockSfx, play, say, useTableFx, playSound, ddzLine } from '../games/tableSfx.js';
+import SoundToggles from '../games/SoundToggles.jsx';
+import { useCallouts, Callouts } from '../games/Callouts.jsx';
 import TableFrame, { useFullTable, RoomPicker, PointsBoard, SavedNote } from '../games/TableFrame.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import PlayingCard from '../games/PlayingCard.jsx';
@@ -47,8 +50,26 @@ export default function DdzView({ active }) {
   const secs = secondsLeft(st);
   const hurry = thinking && secs != null && secs <= 5;
   useTurnAlert(thinking && live ? t.deadline : 0, secs);
-  const [alerts, setAlerts] = useState(alertsOn);
-  const toggleAlerts = () => { setAlertsOn(!alerts); setAlerts(!alerts); };
+  // 声音和喊牌：发牌、出牌「啪」一声并念出来（对三、顺子、炸弹…），炸弹 / 王炸 / 飞机 / 春天在桌子中间跳出大字；
+  // 谁只剩一两张了，响警报
+  const [calls, shout] = useCallouts();
+  useTableFx(t?.fx, room, active, (e, after) => {
+    if (e.k === 'deal') play('deal', after);
+    else if (e.k === 'bid') { play(e.say === '叫地主' || e.say === '抢地主' ? 'bid' : 'no', after); say(e.say, after); }
+    else if (e.k === 'lord') play('lord', after);
+    else if (e.k === 'pass') { play('pass', after); say('不要', after); }
+    else if (e.k === 'play') {
+      play(playSound(e), after); say(ddzLine(e), after);
+      if (e.type === 'rocket') shout('🚀 王炸！', { cls: 'boom' });
+      else if (e.type === 'bomb') shout('💣 炸弹！', { cls: 'boom' });
+      else if (e.type.startsWith('plane')) shout('✈️ 飞机');
+      if (e.left === 1 || e.left === 2) { play('warn', after + 0.8); say(e.left === 1 ? '就剩一张了' : '就剩两张了', after + 1); }
+    } else if (e.k === 'end') {
+      const d = me >= 0 ? t.result?.deltas[me] || 0 : 0;
+      play(d > 0 ? 'win' : d < 0 ? 'lose' : 'out', after + 0.7);
+      if (e.spring) shout(e.landlordWin ? '🌸 春天' : '🌸 反春');
+    }
+  });
   // 三家都不叫：服务器重新洗牌发牌了，说一声（只在刚发生时）
   const [redealt, setRedealt] = useState(false);
   const seenRedeal = useRef(null);
@@ -125,19 +146,19 @@ export default function DdzView({ active }) {
       <div className="grid lg:grid-cols-3 gap-5">
         <TableFrame full={full} onExit={exit} className="lg:col-span-2">
           {/* 点牌桌任何地方都让浏览器允许提醒出声（浏览器要求先点过页面） */}
-          <div style={{ display: 'contents' }} onPointerDownCapture={unlock}>
+          <div style={{ display: 'contents' }} onPointerDownCapture={() => { unlock(); unlockSfx(); }}>
           <div className="gt-bar flex items-center justify-between gap-3 mb-3 text-sm">
             <span className="font-medium text-emerald-100">{status}</span>
             {meLine}
             {t && t.landlord >= 0 && <span className="font-bold text-amber-200">倍数 ×{odds}{t.bombs ? '（炸弹 ' + t.bombs + '）' : ''}</span>}
-            <button onClick={toggleAlerts} aria-pressed={alerts} title={alerts ? '轮到你时响一声（点一下关掉）' : '轮到你时不响（点一下打开）'}
-              className="text-xs rounded-full bg-white/15 px-2 py-1">{alerts ? '🔔 提醒' : '🔕 提醒'}</button>
-            {canEnter && <button onClick={enter} className="text-xs rounded-full bg-white/15 px-2 py-1">⛶ 全屏</button>}
+            <SoundToggles />
+            {canEnter && <button onClick={enter} className="gt-pill">⛶<span> 全屏</span></button>}
           </div>
           {redealt && <div className="dz-redeal" role="status">🔀 三家都不叫，重新洗牌发牌</div>}
           {t && (
             <>
               <div className="gt-mid">
+                <Callouts list={calls} />
                 <div className="dz-top">
                   <div className="dz-side"><SeatBox s={t.seats[left]} idx={left} t={t} timer={timer} compact reacts={reactionsFor(st?.reactions, t.seats[left]?.name?.toLowerCase())} /><Said said={t.said[left]} /></div>
                   <div className="dz-center">

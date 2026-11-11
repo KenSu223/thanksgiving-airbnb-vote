@@ -40,7 +40,12 @@ works for any group picking a place together.
   no 番 cap), each with three tables and bots in empty seats, joined from
   everyone's own phone. Each game has its own leaderboard (chips / 豆子), play
   points only. On a phone held upright the cards / tiles are bigger and the
-  hand wraps into rows; held sideways while seated, the table fills the screen
+  hand wraps into rows; held sideways while seated, the table fills the screen.
+  The card tables have sound (cards and tiles landing, bombs, 碰 / 杠 / 胡,
+  synthesized in the browser) and call out the plays in Chinese with the
+  browser's own voice; 🔊 and 🗣 in the table's top bar turn them off. 川麻 is
+  laid out as a table: everyone's discards in front of them, the tile just
+  thrown popping up large
 - 鲁班七号躲技能 (in the Gameroom): a single-player dodge game. Enemy skills
   (钟馗's hook, 安琪拉's fireballs, 王昭君's ice, 小乔's fan, 后羿's arrow,
   姜子牙's beam) warn on the ground, then fire, more and faster as time goes
@@ -138,7 +143,9 @@ works for any group picking a place together.
   while bidding counts as 不叫 / 不抢; three 不叫 reshuffle and deal again,
   and the table says so. 提示 lists every play that beats the table
   (`worker/ddz/hints.js`), one per press — not what the bot would do, which
-  can be a deliberate pass.
+  can be a deliberate pass. Sounds: each table's state carries a short numbered
+  list of what just happened (`worker/games/fx.js`, public information only);
+  the page plays each new event once (`web/src/features/games/tableSfx.js`).
 - **鲁班七号躲技能** (`/api/dodge/start`, `/api/dodge/score`,
   `/api/dodge/board`, `/api/dodge/replay`): the game runs in the browser
   (`web/src/features/dodge/sim.js`), which is deterministic: the same seed
