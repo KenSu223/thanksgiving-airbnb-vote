@@ -3,6 +3,8 @@ import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useTable, useCountdown, secondsLeft } from '../games/useTable.js';
 import { alertsOn, setAlertsOn, unlock, useTurnAlert } from '../games/turnAlert.js';
+import { unlock as unlockSfx, play } from '../games/tableSfx.js';
+import SoundToggles from '../games/SoundToggles.jsx';
 import { BoardRows, place, TOP_NOTE } from '../games/TopBoard.jsx';
 import { ReactionBar, ReactBubbles, reactionsFor } from '../games/Reactions.jsx';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
@@ -87,6 +89,17 @@ export default function GomokuView({ active }) {
   // 赢了撒点彩带
   const won = t?.phase === 'over' && me >= 0 && t.result?.winner === me;
   const round = t?.round;
+  // 落子「嗒」一声（谁下的都响；刚打开页面、悔棋、新的一局不响）；这局完了：赢、输各一声
+  const count = moves.length, heard = useRef(null);
+  useEffect(() => {
+    if (heard.current != null && count === heard.current + 1 && active) play('stone');
+    heard.current = count;
+  }, [count, active]);
+  const over = t?.phase === 'over', sounded = useRef(null);
+  useEffect(() => {
+    if (sounded.current != null && over && !sounded.current && active) play(me < 0 ? 'out' : won ? 'win' : t.result?.winner >= 0 ? 'lose' : 'draw', 0.3);
+    sounded.current = !!over;
+  }, [over]); // eslint-disable-line react-hooks/exhaustive-deps -- only the moment the game ends
   useEffect(() => {
     if (won && !reduceMotion) confetti({ particleCount: 120, spread: 90, origin: { y: 0.6 }, colors: CONFETTI_COLORS });
   }, [won, round]);
@@ -191,12 +204,15 @@ export default function GomokuView({ active }) {
     <div>
       <Rooms st={st} room={shown} watch={watch} />
       <div className="grid lg:grid-cols-3 gap-5">
-        <section className="gm-felt lg:col-span-2 rounded-2xl shadow-xl p-2 sm:p-4" onPointerDownCapture={unlock}>
+        <section className="gm-felt lg:col-span-2 rounded-2xl shadow-xl p-2 sm:p-4" onPointerDownCapture={() => { unlock(); unlockSfx(); }}>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2 text-sm px-1">
             <span className="font-medium text-amber-50">{status}</span>
             {w?.n > 0 && <span className="text-amber-100/90 truncate max-w-full" title={w.names.join('、')}>👀 {w.n} 人观战{w.names.length ? '：' + w.names.join('、') : ''}</span>}
-            {t && !vsBot && me >= 0 && <button onClick={toggleAlerts} aria-pressed={alerts} title={alerts ? '轮到你时响一声（点一下关掉）' : '轮到你时不响（点一下打开）'}
-              className="ml-auto text-xs rounded-full bg-white/15 px-2 py-1">{alerts ? '🔔 提醒' : '🔕 提醒'}</button>}
+            <span className="ml-auto inline-flex gap-1">
+              {t && !vsBot && me >= 0 && <button onClick={toggleAlerts} aria-pressed={alerts} title={alerts ? '轮到你时响一声（点一下关掉）' : '轮到你时不响（点一下打开）'}
+                className={'gt-pill' + (alerts ? '' : ' off')}>{alerts ? '🔔' : '🔕'}<span> 提醒</span></button>}
+              <SoundToggles soundOnly />
+            </span>
           </div>
           {t && (
             <div className="grid grid-cols-2 gap-2 mb-2">

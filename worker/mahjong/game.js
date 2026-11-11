@@ -20,8 +20,9 @@ import { wall, shuffle, sortTiles, counts, take, suitOf, SUITS, idx } from './ti
 import { isWin, fan, waits, holdsSuit } from './hand.js';
 import { chooseSwap, chooseLack, chooseDiscard, wantPong, wantKong, wantAddKong } from './bot.js';
 import { snapshotOf, restoreInto, parkOut, unparkInto } from '../games/saving.js';
+import { note } from '../games/fx.js';
 
-export const MJ = { base: 5, hua: 16, startPoints: 1000, swapMs: 25000, lackMs: 15000, turnMs: 60000, claimMs: 10000, botMs: 800, idleMs: 10 * 60 * 1000 };
+export const MJ = { base: 5, hua: 16, startPoints: 1000, swapMs: 25000, lackMs: 15000, turnMs: 60000, claimMs: 10000, botMs: 1100, idleMs: 10 * 60 * 1000 };
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑', '🤖 大橘'];
 const next = i => (i + 1) % 4;
 
@@ -34,6 +35,7 @@ export class MahjongGame {
     this.dealer = 0;
     this.round = 0;
     this.turn = -1; this.deadline = 0; this.timer = null;
+    this.fx = []; this.fxN = 0; // what just happened, for the page's sounds (games/fx.js)
     this.reset();
   }
   reset() {
@@ -97,6 +99,7 @@ export class MahjongGame {
     d.drawn = this.wall.shift(); d.hand = sortTiles(d.hand.concat(d.drawn));
     this.turn = this.dealer;
     this.phase = 'swap';
+    note(this, { k: 'deal' });
     this.setTimer(MJ.swapMs, () => this.autoStep());
     this.seats.forEach((s, i) => { if (this.machine(s)) this.pickSwap(i, chooseSwap(s.hand)); });
   }
@@ -129,6 +132,7 @@ export class MahjongGame {
     const d = this.seats[this.dealer];
     if (!d.hand.includes(d.drawn)) d.drawn = null;
     this.phase = 'lack';
+    note(this, { k: 'swap', dir: this.swapDir });
     this.setTimer(MJ.lackMs, () => this.autoStep());
     this.seats.forEach((s, i) => { if (this.machine(s)) this.pickLack(i, chooseLack(s.hand)); });
   }
@@ -282,6 +286,7 @@ export class MahjongGame {
     s.justKonged = false;
     this.discarded = true;
     this.said[i] = null;
+    note(this, { k: 'discard', seat: i, tile: kind });
     const who = {};
     for (let q = 0; q < 4; q++) {
       if (q === i || !this.live(q)) continue;
@@ -358,6 +363,7 @@ export class MahjongGame {
     t.melds.push({ kind, type: 'pong', from });
     t.afterPong = true;
     this.said[q] = '碰';
+    note(this, { k: 'pong', seat: q, tile: kind });
     this.setTurn(q);
   }
   exposedKong(q, from, kind) {
@@ -367,6 +373,7 @@ export class MahjongGame {
     t.melds.push({ kind, type: 'kong', from });
     this.pay(from, q, 2 * MJ.base); // 直杠
     this.said[q] = '杠';
+    note(this, { k: 'kong', seat: q, tile: kind, how: '杠' });
     this.replacement(q);
   }
   doKong(i, kind) {
@@ -377,6 +384,7 @@ export class MahjongGame {
       s.melds.push({ kind, type: 'kong', concealed: true });
       for (let q = 0; q < 4; q++) if (q !== i && this.live(q)) this.pay(q, i, 2 * MJ.base);
       this.said[i] = '暗杠';
+      note(this, { k: 'kong', seat: i, how: '暗杠' }); // which tile stays face down
       return this.replacement(i);
     }
     // 补杠: anyone waiting on this tile may 抢杠 first
@@ -396,6 +404,7 @@ export class MahjongGame {
     meld.type = 'kong'; meld.added = true;
     for (let q = 0; q < 4; q++) if (q !== i && this.live(q)) this.pay(q, i, MJ.base);
     this.said[i] = '补杠';
+    note(this, { k: 'kong', seat: i, tile: kind, how: '补杠' });
     this.replacement(i);
   }
   pay(from, to, n) { this.ledger[from] -= n; this.ledger[to] += n; }
@@ -444,6 +453,7 @@ export class MahjongGame {
     s.drawn = null;
     this.wins.push(q);
     this.said[q] = self ? '自摸' : '胡';
+    note(this, { k: 'hu', seat: q, self: !!self, tile, fan: f.fan });
   }
 
   // ---- end of a hand ----
@@ -467,6 +477,7 @@ export class MahjongGame {
     if (this.nextDealer !== null) this.dealer = this.nextDealer;
     this.phase = 'result';
     this.turn = -1; this.stage = null;
+    note(this, { k: 'end', wins: this.wins.length });
     for (const s of this.seats) if (!s.bot && !s.leaving && s.connected) this.h.save(s); // 豆子 saved after every hand
     this.release();
   }
@@ -574,7 +585,7 @@ export class MahjongGame {
       dealer: this.dealer, wallLeft: this.wall.length, base: MJ.base, swapDir: this.phase === 'swap' ? 0 : this.swapDir,
       last: this.last && { seat: this.last.seat, kind: this.last.kind },
       claimOn: this.claims && { from: this.claims.from, kind: this.claims.kind, rob: this.claims.rob },
-      said: this.said,
+      said: this.said, fx: this.fx,
       seats: this.seats.map((s, k) => s && {
         name: s.name, bot: s.bot, me: k === me, connected: s.connected, auto: !!s.auto, leaving: !!s.leaving,
         points: s.bot ? null : s.points, count: s.hand.length,

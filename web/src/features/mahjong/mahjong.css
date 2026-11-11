@@ -44,20 +44,10 @@ button.mj-tile { cursor:pointer; touch-action:manipulation; transition:transform
 /* melds and discards */
 .mj-melds { display:flex; flex-wrap:wrap; gap:.3rem; }
 .mj-meld { display:flex; gap:1px; }
-.mj-river { display:flex; flex-wrap:wrap; gap:2px; min-height:1.7rem; }
 
 /* captions: 碰杠 / 打出 rows, so melds and discards don't run together */
-.mj-row { display:flex; align-items:flex-start; gap:.3rem; min-width:0; }
 .mj-cap { flex:none; font-size:.6rem; line-height:1.7rem; color:#a7f3d0; opacity:.85; white-space:nowrap; }
 
-/* a table: 对家 across the top, 上家 on the left, 下家 on the right, the last discard in the middle */
-.mj-table { display:grid; grid-template-columns:1fr 1.15fr 1fr; grid-template-areas:"l t r" "l c r"; gap:.6rem; align-items:start; }
-.mj-table > .mj-l { grid-area:l; } .mj-table > .mj-t { grid-area:t; } .mj-table > .mj-r { grid-area:r; } .mj-table > .mj-center { grid-area:c; }
-@media (max-width:640px) { .mj-table { grid-template-columns:1fr 1fr; grid-template-areas:"t t" "l r" "c c"; } }
-/* the result needs the whole width, under the three seats */
-.mj-table > .mj-center.wide { grid-area:auto; grid-column:1 / -1; }
-.mj-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-top:.5rem; }
-.mj-opp { display:flex; flex-direction:column; gap:.3rem; min-width:0; }
 .mj-head { display:flex; flex-wrap:wrap; align-items:center; gap:.3rem; }
 .mj-rel { font-size:.65rem; font-weight:800; padding:0 6px; border-radius:9999px; background:rgba(255,255,255,.18); color:#ecfdf5; }
 /* 结算: one row per player — name, what happened (tags), 豆 — winners first; your row lit */
@@ -88,31 +78,13 @@ button.mj-tile { cursor:pointer; touch-action:manipulation; transition:transform
 @keyframes mj-dust { 0% { opacity:.9; transform:translate(0, 0) scale(.4); } 100% { opacity:0; transform:translate(var(--dx), var(--dy)) scale(1.8); } }
 /* small tiles (the discard rows, the top bar) get a smaller puff */
 .mj-tile.xs .mj-dust, .mj-tile.sm .mj-dust { transform:scale(.55); }
-/* full screen: your own melds and discards right above your hand, one row (the middle of the table scrolls) */
-.mj-mine-strip { display:flex; flex-wrap:nowrap; align-items:center; gap:.6rem; overflow-x:auto; margin-top:.25rem; }
-.mj-mine-strip .mj-melds, .mj-mine-strip .mj-river { flex-wrap:nowrap; }
-.mj-mine-strip .mj-river { min-height:0; }
-.mj-mine-strip .mj-row { flex:none; align-items:center; }
 .mj-lack { font-size:.7rem; font-weight:900; padding:0 6px; border-radius:9999px; background:#fde68a; color:#78350f; }
 .mj-won { font-size:.7rem; font-weight:800; padding:1px 7px; border-radius:9999px; background:#f59e0b; color:#1e1b4b; }
-.mj-center { display:flex; flex-direction:column; align-items:center; gap:.4rem; margin-top:.6rem; text-align:center; }
-.mj-note { font-size:.8rem; color:#fef3c7; background:rgba(0,0,0,.22); border-radius:.8rem; padding:.3rem .7rem; }
 
-/* full screen, phone on its side: the three others in one row with small tiles, the last
-   discard up in the top bar, a one-row hand */
-.gt-full .mj-grid { grid-template-columns:1fr 1fr 1fr; margin-top:0; gap:.5rem; }
-.gt-full .mj-opp { gap:.2rem; }
-.gt-full .mj-opp .mj-extra { display:none; }
-.gt-full .mj-opp .gt-seat { padding:.2rem .45rem; }
 .gt-full .mj-melds .mj-tile.sm { width:1.2rem; height:1.6rem; }
 .gt-full .mj-melds .mj-tile.sm .mj-cn { font-size:.55rem; } .gt-full .mj-melds .mj-tile.sm .mj-wan { font-size:.48rem; }
-.gt-full .mj-river .mj-tile.xs { width:1.05rem; height:1.42rem; }
-.gt-full .mj-river .mj-tile.xs .mj-cn { font-size:.5rem; } .gt-full .mj-river .mj-tile.xs .mj-wan { font-size:.42rem; }
-.gt-full .mj-center { margin-top:.25rem; gap:.2rem; }
 .gt-full .mj-hand { flex-wrap:nowrap; padding-top:.8rem; gap:.12rem; }
 .gt-full .mj-hand .mj-tile:not(.sm) { width:2.35rem; height:3.15rem; }
-.gt-full .mj-river { min-height:0; }
-.gt-full .mj-tile.lg { width:2.4rem; height:3.2rem; }
 .gt-full .mj-controls { margin-top:.35rem; }
 .gt-full .mj-msg { margin-top:.15rem; min-height:1rem; font-size:.75rem; }
 @media (prefers-reduced-motion: reduce) { button.mj-tile { transition:none; } .mj-tile.slam { animation:none; } .mj-dust { display:none; } }
@@ -140,3 +112,104 @@ button.mj-tile { cursor:pointer; touch-action:manipulation; transition:transform
   50% { transform:scale(1.06); box-shadow:0 0 0 9px rgba(244,63,94,0), 0 4px 10px rgba(0,0,0,.3); } }
 .gt-full .gt-btn.mj-claim { font-size:1.1rem; padding:.45rem 1.1rem; }
 @media (prefers-reduced-motion: reduce) { .gt-btn.mj-claim { animation:none; } }
+
+/* ---- the table ----
+   对家 across the top, 上家 on the left, 下家 on the right, you at the bottom. Each one's discards (牌河) lie in front of
+   them in the order they were thrown, big enough to read; in the middle, how many tiles are left and whose turn it is.
+   --rw / --rh: the size of a tile on the table (rivers and the others' melds). */
+.mj-board { --rw:1.9rem; --rh:2.55rem; display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, 1fr);
+  grid-template-areas:"l t r" "l m r" "l b r"; gap:.5rem .7rem; align-items:start; padding:.55rem; border-radius:1rem;
+  background:rgba(0,0,0,.14); box-shadow:inset 0 0 0 2px rgba(255,255,255,.06); }
+.mj-l { grid-area:l; } .mj-t { grid-area:t; } .mj-r { grid-area:r; } .mj-b { grid-area:b; } .mj-mid { grid-area:m; }
+.mj-side { position:relative; display:flex; flex-direction:column; gap:.35rem; min-width:0; }
+.mj-who { display:flex; flex-direction:column; gap:.3rem; min-width:0; }
+.mj-river { display:grid; grid-template-columns:repeat(auto-fill, var(--rw)); gap:2px; align-content:start; min-height:calc(var(--rh) + 8px); padding:4px;
+  border-radius:.5rem; background:rgba(0,0,0,.16); box-shadow:inset 0 1px 3px rgba(0,0,0,.25); }
+.mj-t .mj-river, .mj-b .mj-river { justify-content:center; }
+.mj-l .mj-river { justify-content:end; }
+.mj-tile.rv { width:var(--rw); height:var(--rh); padding:.07rem; border-radius:.28rem; box-shadow:0 1px 0 #d6cfb8, 0 2px 3px rgba(0,0,0,.3); }
+.mj-tile.rv .mj-cn { font-size:calc(var(--rw) * .46); } .mj-tile.rv .mj-wan { font-size:calc(var(--rw) * .4); margin-top:0; }
+/* the tile just thrown: a gold ring and a little arrow bouncing over it */
+.mj-tile.rv.last { z-index:1; box-shadow:0 0 0 2px #facc15, 0 0 10px 2px rgba(250,204,21,.75); }
+.mj-tile.rv.last::before { content:''; position:absolute; left:50%; top:-9px; margin-left:-5px; border:5px solid transparent; border-top-color:#facc15; border-bottom:0;
+  animation:mj-point .6s ease-in-out infinite alternate; }
+@keyframes mj-point { to { transform:translateY(-4px); } }
+/* pick a tile in your hand: the same tile lights up blue wherever it lies on the table, so you can see how many are gone */
+.mj-tile.same { background:linear-gradient(#e0f2fe, #bae6fd); box-shadow:0 0 0 2px #0ea5e9, 0 2px 3px rgba(0,0,0,.3); }
+/* …and for a moment it jumps up big in front of whoever threw it */
+.mj-tile.xl { width:3.9rem; height:5.2rem; border-radius:.55rem; }
+.mj-tile.xl .mj-cn { font-size:1.8rem; } .mj-tile.xl .mj-wan { font-size:1.6rem; }
+.mj-tile.mj-pop { position:absolute; left:50%; top:50%; z-index:5; margin:-2.6rem 0 0 -1.95rem; pointer-events:none;
+  box-shadow:0 0 0 3px #facc15, 0 10px 30px rgba(0,0,0,.55); animation:mj-pop 1.3s ease-out both; }
+@keyframes mj-pop { 0% { transform:scale(.3); opacity:0; } 12% { transform:scale(1.12); opacity:1; } 20% { transform:scale(1); } 72% { transform:scale(1); opacity:1; } 100% { transform:scale(.5); opacity:0; } }
+/* 碰 / 杠 / 胡: the call bursts out in front of whoever made it */
+.mj-call { position:absolute; left:50%; top:45%; z-index:6; transform:translate(-50%, -50%); pointer-events:none; white-space:nowrap; font-size:2.8rem; font-weight:900; line-height:1;
+  color:#fde047; -webkit-text-stroke:2px #7c2d12; paint-order:stroke fill; text-shadow:0 0 18px rgba(250,204,21,.9), 0 4px 0 #7c2d12; animation:mj-call 1.45s ease-out both; }
+.mj-call.hu { font-size:3.4rem; color:#fff1f2; -webkit-text-stroke-color:#9f1239; text-shadow:0 0 22px rgba(244,63,94,.95), 0 4px 0 #9f1239; }
+@keyframes mj-call { 0% { transform:translate(-50%, -50%) scale(2.4); opacity:0; } 14% { transform:translate(-50%, -50%) scale(.9); opacity:1; } 22% { transform:translate(-50%, -50%) scale(1); }
+  78% { opacity:1; } 100% { transform:translate(-50%, -80%) scale(1); opacity:0; } }
+/* a seat's name plate, compact: who on the first line, counts and what they're doing on the second */
+.gt-seat.mj-seat { min-width:0; padding:.35rem .55rem; }
+.mj-stats { display:flex; flex-wrap:wrap; align-items:center; gap:.1rem .6rem; margin-top:.2rem; font-size:.75rem; color:rgba(236,253,245,.9); }
+.mj-doing { color:#fde68a; font-weight:700; }
+/* a hand laid open (someone who has 胡'd; everyone once the hand is over), smaller than the table's tiles, with its caption */
+.mj-shown { display:flex; flex-wrap:wrap; align-items:center; gap:1px; }
+.mj-shown .mj-cap { margin-right:.2rem; }
+/* the middle of the table */
+.mj-mid { display:flex; align-items:center; justify-content:center; gap:.8rem; min-height:4.8rem; }
+.mj-plate { position:relative; flex:none; width:4.6rem; height:4.6rem; border-radius:.9rem; background:rgba(0,0,0,.35); box-shadow:inset 0 0 0 2px rgba(255,255,255,.12);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; }
+.mj-plate b { font-size:1.4rem; font-weight:900; color:#fde68a; font-variant-numeric:tabular-nums; }
+.mj-plate small { font-size:.6rem; color:#a7f3d0; margin-top:.15rem; }
+.mj-plate small.big { font-size:.72rem; font-weight:800; margin:0; }
+.mj-dir { position:absolute; width:0; height:0; border:.42rem solid transparent; opacity:.28; }
+.mj-dir.t { top:.22rem; left:50%; margin-left:-.42rem; border-top:0; border-bottom-color:#fff; }
+.mj-dir.b { bottom:.22rem; left:50%; margin-left:-.42rem; border-bottom:0; border-top-color:#fff; }
+.mj-dir.l { left:.22rem; top:50%; margin-top:-.42rem; border-left:0; border-right-color:#fff; }
+.mj-dir.r { right:.22rem; top:50%; margin-top:-.42rem; border-right:0; border-left-color:#fff; }
+.mj-dir.on { opacity:1; filter:drop-shadow(0 0 5px #facc15); animation:mj-blink .9s ease-in-out infinite alternate; }
+.mj-dir.on.t { border-bottom-color:#facc15; } .mj-dir.on.b { border-top-color:#facc15; } .mj-dir.on.l { border-right-color:#facc15; } .mj-dir.on.r { border-left-color:#facc15; }
+@keyframes mj-blink { to { opacity:.55; } }
+.mj-lastline { display:flex; align-items:center; gap:.45rem; font-size:.78rem; line-height:1.25; color:#d1fae5; text-align:left; }
+.mj-note { margin:.5rem auto 0; width:fit-content; max-width:100%; font-size:.8rem; color:#fef3c7; background:rgba(0,0,0,.22); border-radius:.8rem; padding:.3rem .7rem; }
+.mj-result { width:100%; margin:0 0 .6rem; }
+/* your hand, and to its right the tiles you have 碰 and 杠 (on a narrow screen they drop to a row of their own) */
+.mj-handrow { position:relative; display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:center; gap:.5rem 1.1rem; }
+.mj-mymelds { display:flex; align-items:center; gap:.35rem; padding-bottom:.1rem; }
+
+/* a phone held upright: 对家 across the top, 上家 and 下家 either side of the middle, your own discards underneath */
+@media (max-width:640px) {
+  .mj-board { --rw:1.62rem; --rh:2.18rem; grid-template-columns:minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas:"t t t" "l m r" "b b b"; gap:.55rem .4rem; padding:.45rem; }
+  .mj-board .mj-mid { flex-direction:column; gap:.35rem; align-self:center; }
+  .mj-board .mj-lastline { flex-direction:column; text-align:center; gap:.2rem; }
+  .mj-board .mj-lastline br { display:none; }
+  .mj-t .mj-who { flex-direction:row; flex-wrap:wrap; align-items:center; }
+  .mj-t .mj-who .mj-seat { flex:1 1 12rem; }
+  .mj-call { font-size:2.3rem; } .mj-call.hu { font-size:2.8rem; }
+}
+/* full screen, a phone on its side: everything on one screen — small name plates, the table, a one-row hand */
+.gt-full .mj-board { --rw:1.5rem; --rh:2.02rem; grid-template-columns:minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr); grid-template-areas:"l t r" "l m r" "l b r";
+  gap:.2rem .6rem; padding:.3rem .45rem; }
+.gt-full .mj-board .mj-mid { flex-direction:row; gap:.6rem; min-height:0; }
+.gt-full .mj-board .mj-lastline { flex-direction:row; text-align:left; }
+.gt-full .mj-plate { width:3.2rem; height:3.2rem; border-radius:.7rem; }
+.gt-full .mj-plate b { font-size:1.05rem; } .gt-full .mj-plate small { font-size:.5rem; margin-top:.05rem; }
+.gt-full .mj-dir { border-width:.3rem; }
+.gt-full .mj-dir.t, .gt-full .mj-dir.b { margin-left:-.3rem; } .gt-full .mj-dir.l, .gt-full .mj-dir.r { margin-top:-.3rem; }
+.gt-full .mj-side { gap:.2rem; }
+.gt-full .mj-who { gap:.2rem; }
+.gt-full .mj-t .mj-who { flex-direction:row; flex-wrap:wrap; align-items:center; }
+.gt-full .gt-seat.mj-seat { padding:.15rem .45rem; }
+.gt-full .mj-seat .mj-head { font-size:.82rem; }
+.gt-full .mj-stats { margin-top:0; font-size:.68rem; gap:0 .5rem; }
+.gt-full .mj-tile.xl { width:3.1rem; height:4.15rem; }
+.gt-full .mj-tile.mj-pop { margin:-2.07rem 0 0 -1.55rem; }
+.gt-full .mj-handrow { flex-wrap:nowrap; gap:.6rem; }
+.gt-full .mj-mymelds .mj-tile.sm { width:1.35rem; height:1.82rem; }
+.gt-full .mj-result { margin-bottom:.3rem; }
+@keyframes mj-pop-fade { 0%, 75% { opacity:1; } 100% { opacity:0; } }
+@keyframes mj-call-fade { 0%, 78% { opacity:1; } 100% { opacity:0; } }
+@media (prefers-reduced-motion: reduce) {
+  .mj-tile.rv.last::before, .mj-dir.on { animation:none; }
+  .mj-tile.mj-pop { animation:mj-pop-fade 1.3s linear both; } .mj-call { animation:mj-call-fade 1.45s linear both; }
+}

@@ -47,3 +47,5 @@
 /* the leaderboard's tile */
 .g48-chip { display:inline-flex; align-items:center; justify-content:center; min-width:2.6rem; padding:1px 6px; border-radius:.35rem; font-weight:900; font-size:.78rem; box-shadow:none; }
 @media (prefers-reduced-motion: reduce) { .g48-tile { transition:none; } .g48-new, .g48-merged, .g48-over { animation:none; } }
+/* the 🔊 switch (games/SoundToggles.jsx) on the light card */
+.g48-sound .gt-pill { background:#eee4da; color:#776e65; font-size:.85rem; padding:.45rem .6rem; }

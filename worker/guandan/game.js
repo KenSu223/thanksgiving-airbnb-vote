@@ -18,10 +18,11 @@
 import { deck, shuffle, sortHand, takeFrom, legalPlay, rankOf, BJ, value } from './cards.js';
 import { choosePlay, tributeCard, returnCard, canReturn } from './bot.js';
 import { snapshotOf, restoreInto, parkOut, unparkInto } from '../games/saving.js';
+import { note } from '../games/fx.js';
 import { beatOptions, leadOptions } from './hints.js';
 
 // aceBonus: 过 A (winning the match) — on top of the 60, each person on the winning team gets this from the house
-export const GD = { base: 10, matchBonus: 60, aceBonus: 100, startPoints: 1000, turnMs: 60000, tributeMs: 20000, botMs: 900, idleMs: 10 * 60 * 1000 };
+export const GD = { base: 10, matchBonus: 60, aceBonus: 100, startPoints: 1000, turnMs: 60000, tributeMs: 20000, botMs: 1100, idleMs: 10 * 60 * 1000 };
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑', '🤖 大橘'];
 const next = i => (i + 1) % 4;
 const team = i => i % 2;
@@ -39,6 +40,7 @@ export class GuandanGame {
     this.last = null;     // finishing order of the last hand, for 进贡
     this.round = 0;
     this.turn = -1; this.deadline = 0; this.timer = null;
+    this.fx = []; this.fxN = 0; // what just happened, for the page's sounds (games/fx.js)
     this.reset();
   }
   reset() {
@@ -97,6 +99,7 @@ export class GuandanGame {
     this.round++;
     const d = shuffle(deck(), this.h.rand);
     this.seats.forEach((s, i) => { s.cards = sortHand(d.slice(i * 27, i * 27 + 27), this.level); });
+    note(this, { k: 'deal' });
     if (this.last) this.startTribute(); else this.startPlay(this.first ?? 0);
   }
 
@@ -200,8 +203,10 @@ export class GuandanGame {
     this.trick = { play, cards: sortHand(cards, this.level), by: i };
     this.passes = 0;
     this.said[i] = { cards: this.trick.cards, play };
+    note(this, { k: 'play', seat: i, type: play.type, main: play.main, count: cards.length, left: left.length });
     if (!left.length) {
       this.order.push(i);
+      note(this, { k: 'out', seat: i, place: this.order.length });
       if (this.handOver()) { this.endHand(); return null; }
     }
     this.advance(i);
@@ -210,6 +215,7 @@ export class GuandanGame {
   doPass(i) {
     if (!this.toBeat(i)) return '该你出牌了，不能不出';
     this.said[i] = '不出';
+    note(this, { k: 'pass', seat: i });
     this.passes++;
     this.advance(i);
     return null;
@@ -301,6 +307,7 @@ export class GuandanGame {
       names: this.seats.map(s => s.name) };
     this.phase = 'result';
     this.turn = -1;
+    note(this, { k: 'end', winTeam: win, matchWon });
     // 豆子 are saved after every hand, not just on standing up
     for (const s of this.seats) if (s && !s.bot && !s.leaving && s.connected) this.h.save(s);
     this.release();
@@ -406,7 +413,7 @@ export class GuandanGame {
       phase: this.phase, round: this.round, turn: this.turn, deadline: this.deadline, now: this.h.now(),
       level: this.level, levels: this.levels, banker: this.banker, base: GD.base,
       trickBy: this.trick ? this.trick.by : -1,
-      said: this.said,
+      said: this.said, fx: this.fx,
       order: this.order,
       seats: this.seats.map((s, k) => s && {
         name: s.name, bot: s.bot, me: k === me, connected: s.connected, auto: !!s.auto, leaving: !!s.leaving,
