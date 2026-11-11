@@ -108,14 +108,16 @@ export function say(text, after = 0) {
 // fx: the table's event list ([{ n, k, … }], oldest first). handler(e, after) is called once for
 // each event that's new since the last state — not for what was already there when the page opened,
 // when you look at another table (tableKey changes), or while `on` is false (the game isn't on
-// screen). `after` staggers events that came in the same message.
+// screen) or the page is in the background (nothing piles up to blurt out when you come back).
+// `after` staggers events that came in the same message.
 export function useTableFx(fx, tableKey, on, handler) {
   const seen = useRef(null), key = useRef(tableKey), cb = useRef(handler);
   cb.current = handler;
   useEffect(() => {
     if (!fx) return;
     const top = fx.length ? fx[fx.length - 1].n : 0;
-    if (seen.current == null || key.current !== tableKey || top < seen.current || !on) { seen.current = top; key.current = tableKey; return; }
+    const away = typeof document !== 'undefined' && document.hidden; // the tab is in the background, the phone is locked
+    if (seen.current == null || key.current !== tableKey || top < seen.current || !on || away) { seen.current = top; key.current = tableKey; return; }
     const fresh = fx.filter(e => e.n > seen.current);
     seen.current = top;
     fresh.slice(-4).forEach((e, i) => cb.current(e, i * 0.28));
