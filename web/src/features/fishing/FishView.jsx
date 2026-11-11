@@ -5,7 +5,7 @@ import { load, save } from '../../lib/storage.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
-import { SIM_VERSION, KINDS, KIND_KEYS, target } from './sim.js';
+import { SIM_VERSION, KINDS, KIND_KEYS } from './sim.js';
 import FishGame from './FishGame.jsx';
 import KindIcon from './KindIcon.jsx';
 import { BoardRows, place, TOP_NOTE } from '../games/TopBoard.jsx';
@@ -13,12 +13,14 @@ import * as sfx from './sfx.js';
 import './fishing.css';
 
 // 小小钓鱼：一个人玩，小船上的鱼线左右摆，看准了放下去，钓各种各样的鱼。每关 60 秒，
-// 金币够了目标就进商店、下一关；不够就结束。成绩是最后的金币，全时间排行榜；
+// 金币够了目标就进商店、下一关；不够就结束。每关的目标是「过上一关时的金币 + 这关要新钓的」
+// （第 N 关 400×N），所以每关都得重新钓够。第 2 关起有鲨鱼抢鱼、水雷、水母蜇人。
+// 成绩是最后的金币，全时间排行榜（旧版游戏的成绩排在后面，标「旧版」）；
 // 钓到过的每一种都记进自己的图鉴。手机上开打就铺满整个屏幕（竖着玩）。
 const coins = n => '🪙 ' + n.toLocaleString('en-US');
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 const ENDS = { fail: '时间到，没够目标', quit: '结算了', time: '玩太久了（45 分钟），自动结算' };
-const GROUPS = [['fish', '🐟 鱼'], ['bed', '🐚 海底宝贝'], ['junk', '🗑️ 垃圾']];
+const GROUPS = [['fish', '🐟 鱼'], ['bed', '🐚 海底宝贝'], ['junk', '🗑️ 垃圾和水雷']];
 
 // 交成绩和躲技能一样：开局时服务器发一张签了名的「票」（种子在里面），这局的每个操作都记下来；
 // 结束以后把票和操作交上去，服务器自己重放一遍算出金币，那才是成绩（verify.js）。
@@ -132,7 +134,7 @@ export default function FishView({ active }) {
     }
   }
   function done(sim, events) {
-    const res = { money: sim.money, level: sim.level, cleared: sim.cleared, end: sim.end, caught: { ...sim.caught } };
+    const res = { money: sim.money, level: sim.level, cleared: sim.cleared, end: sim.end, target: sim.target, caught: { ...sim.caught } };
     if (run.replay) { setResult({ ...res, replay: true }); return; }
     setResult({ ...res, practice: run.ticket ? null : run.practice });
     // money only picks the best of several saved runs; the server replays the inputs for the score
@@ -160,7 +162,7 @@ export default function FishView({ active }) {
     </div>
   ) : (
     <div className="fh-over">
-      <div className="text-sm text-sky-100/90">{ENDS[result.end] || '结束了'}{result.end === 'fail' ? `（第 ${result.level} 关要 ${coins(target(result.level))}）` : ''}</div>
+      <div className="text-sm text-sky-100/90">{ENDS[result.end] || '结束了'}{result.end === 'fail' ? `（第 ${result.level} 关要 ${coins(result.target)}，差 ${coins(result.target - result.money)}）` : ''}</div>
       <div className="text-3xl font-extrabold mt-1 text-amber-300">{coins(result.server?.money ?? result.money)}</div>
       <div className="text-sm mt-1">{reached(result.server || result)}</div>
       <Catch caught={result.caught} />
@@ -201,16 +203,18 @@ export default function FishView({ active }) {
                 <div className="fh-intro-content">
                   <div className="fh-eyebrow">LITTLE FISHING · 钓鱼</div>
                   <div className="fh-title">小小钓鱼<span>看准了再放线。</span></div>
-                  <p className="fh-description">小船上的美短拿着鱼竿，鱼钩在水里左右摆，点一下就放下去；收回来的路上碰到的也能钩住。各种鱼在不同的深度游来游去，越大越值钱、也越重；海底还有珍珠、宝箱和垃圾。每关 60 秒，金币够了目标才能进下一关。</p>
-                  <div className="fh-rule-tags"><span>每关 60 秒</span><span>{KIND_KEYS.length} 种可以钓</span><span>商店买道具</span></div>
+                  <p className="fh-description">小船上的美短拿着鱼竿，鱼钩在水里左右摆，点一下就放下去；越大的越值钱、也越重越慢。每关 60 秒，要<b>新钓</b>够金币才能进下一关：第 1 关 400，以后每关多 400。</p>
+                  <div className="fh-rule-tags"><span>每关 60 秒</span><span>{KIND_KEYS.length} 种可以钓</span><span>商店买道具</span><span>第 2 关起有危险</span></div>
                   <ul className="mt-3 text-sm text-sky-50/90 space-y-1">
-                    <li>{touch ? '👆 点水面放线' : '🖱️ 点画面，或者按 ↓ / 空格放线'}；鱼会游，要算好提前量</li>
-                    <li>✂️ 钓到靴子、礁石这种不想要的，{touch ? '点 ✂️' : '点 ✂️ 或按 ↑'} 剪断线，钩子马上空着回来</li>
-                    <li>🐙 章鱼值 300 可是又沉又慢；🐉 龙鱼在最深处，第 3 关起才有，游得飞快，值 800</li>
-                    <li>⚠️ 河豚扎手，钓上来扣钱；海龟慢得要命还得放生；鲨鱼又大又慢不值钱、还挡路——绕开它们，或者用 ✂️ 剪掉</li>
-                    <li>🏪 过关进商店；买东西花的金币会从成绩里扣掉</li>
+                    <li>{touch ? '👆 点水面放线' : '🖱️ 点画面，或者按 ↓ / 空格放线'}；鱼会游，要算提前量。放空了，旁边的小鱼会吓跑</li>
+                    <li>🦈 鲨鱼会冲过来吃掉钩上的鱼（宝贝和垃圾它不吃）：等它游过去再收</li>
+                    <li>💣 水雷钩到就炸，周围全没了；水母蜇人，线会麻一会儿</li>
+                    <li>🐙 章鱼 300、珍珠 600、宝石蟹 450、龙鱼 800，都又深又难；河豚扣钱，海龟白费时间</li>
+                    <li>✂️ 钩到不划算的，{touch ? '点 ✂️' : '点 ✂️ 或按 ↑'} 剪断线，钩子马上空着回来</li>
+                    <li>🏪 过关进商店；花掉的金币，下一关要多钓回来</li>
                   </ul>
-                  {mine && <p className="mt-3 text-amber-200 font-bold">你的最好：{coins(mine.money)}（{reached(mine)}）</p>}
+                  {mine && <p className="mt-3 text-amber-200 font-bold">你的最好：{coins(mine.money)}（{reached(mine)}{mine.old ? ' · 旧版' : ''}）</p>}
+                  {mine?.old && <p className="text-xs text-amber-100/80">这是游戏变难以前打的；新打一局有金币，就换成新的成绩</p>}
                   <button onClick={start} className="fh-btn fh-start mt-4 text-lg">开始钓鱼 <span aria-hidden="true">→</span></button>
                   {msg && <p className="mt-2 text-sm text-amber-200">{msg}</p>}
                 </div>
@@ -229,8 +233,8 @@ export default function FishView({ active }) {
                           <div key={k} className={'fh-dex-card' + (got.has(k) ? ' got' : '')}>
                             <KindIcon kind={k} w={64} h={44} className="fh-dex-icon" label={KINDS[k].label} />
                             <b>{KINDS[k].label}</b>
-                            <span className={'fh-dex-value' + (KINDS[k].value < 0 ? ' bad' : '')}>{k === 'chest' ? '🪙 ？' : KINDS[k].value < 0 ? '扣 ' + -KINDS[k].value : coins(KINDS[k].value)}</span>
-                            <small>{got.has(k) ? KINDS[k].note : '还没钓到'}</small>
+                            <span className={'fh-dex-value' + (KINDS[k].value < 0 || k === 'mine' ? ' bad' : '')}>{k === 'chest' ? '🪙 ？' : k === 'mine' ? '💥 会炸' : KINDS[k].value < 0 ? '扣 ' + -KINDS[k].value : coins(KINDS[k].value)}</span>
+                            <small>{got.has(k) ? KINDS[k].note : k === 'mine' ? '还没炸过' : '还没钓到'}</small>
                           </div>
                         ))}
                       </div>
@@ -243,10 +247,10 @@ export default function FishView({ active }) {
         </section>
         <aside className="glass-card rounded-2xl p-5 self-start">
           <h2 className="font-bold text-lg mb-1">🏆 小小钓鱼排行榜</h2>
-          <p className="text-xs text-slate-500 mb-3">每人最好的一局（最后剩下的金币）· {TOP_NOTE} · 成绩由服务器重放核对 · 前三名的录像公开（点 ▶ 看）· 「种」是图鉴里钓到过几种</p>
+          <p className="text-xs text-slate-500 mb-3">每人最好的一局（最后剩下的金币）· {TOP_NOTE} · 成绩由服务器重放核对 · 前三名的录像公开（点 ▶ 看）· 「种」是图鉴里钓到过几种 · 游戏改难了：标「旧版」的是以前容易的时候打的，排在新成绩后面，录像也放不了了</p>
           <BoardRows rows={board} me={boardMe} empty="还没人钓过，来当第一" row={(r, i, isMe) => (
             <div key={isMe ? 'me' : r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (isMe || (mine && r.name === mine.name) ? ' font-bold text-indigo-700' : '')}>
-              <span className="truncate">{place(i)} {r.name}</span>
+              <span className="flex items-center min-w-0"><span className="truncate">{place(i)} {r.name}</span>{r.old && <span className="fh-old" title="旧版游戏（比现在容易）的成绩">旧版</span>}</span>
               <span className="flex items-center gap-1.5">
                 <span className="text-xs text-slate-400 whitespace-nowrap">{r.kinds || 0} 种 · {reached(r)}</span>
                 <span className="tabular-nums whitespace-nowrap">{coins(r.money)}</span>
