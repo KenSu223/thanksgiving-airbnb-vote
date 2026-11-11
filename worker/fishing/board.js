@@ -26,7 +26,8 @@ import { badEvents, replay } from '../../web/src/features/fishing/verify.js';
 import { byRank, isOld, takesOver, nextRecord } from './rank.js';
 
 const TICKET_DAYS = 7; // a run saved on the device can still be sent this long after it started
-// Only the top 3 are on the board (lib/board.js), and their replays are public,
+// Only the top 3 are on the board (lib/board.js), and their replays are public
+// (not an older version's: it can no longer be played, so its row has no ▶),
 // for everyone to check; the rest stay private.
 const OPEN_REPLAYS = TOP;
 
@@ -59,7 +60,7 @@ export class FishBoard {
   // in p:<name>); which kinds goes only to that person (kinds).
   boardFor(key) {
     return {
-      ...topFor(this.ranked().map(([k, r], i) => [k, { name: r.name, money: r.money, level: r.level, cleared: r.cleared, kinds: (r.kinds || []).length, at: r.at, replay: i < OPEN_REPLAYS, ...(isOld(r, SIM_VERSION) ? { old: true } : {}) }]), key),
+      ...topFor(this.ranked().map(([k, r], i) => [k, { name: r.name, money: r.money, level: r.level, cleared: r.cleared, kinds: (r.kinds || []).length, at: r.at, replay: i < OPEN_REPLAYS && !isOld(r, SIM_VERSION), ...(isOld(r, SIM_VERSION) ? { old: true } : {}) }]), key),
       kinds: key ? this.best.get(key)?.kinds || [] : [],
     };
   }
