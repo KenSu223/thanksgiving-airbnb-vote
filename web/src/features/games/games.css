@@ -1,0 +1,12 @@
+/* The game picker (GamesView). On a wide screen the names wrap. On a phone they're one row you swipe sideways
+   (the edges fade, so it reads as "there is more"), which leaves the screen to the game right under it. Picking one
+   scrolls the row up to just under the account button (scroll-margin-top), so the game is on screen at once. */
+.games-tabs { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1.25rem; }
+.games-tab { flex:none; white-space:nowrap; border-radius:9999px; padding:.5rem 1.25rem; font-weight:700; }
+@media (max-width:767px) {
+  .games-tabs { flex-wrap:nowrap; overflow-x:auto; margin-bottom:.9rem; padding:.3rem .25rem; scroll-margin-top:3.5rem; scrollbar-width:none; overscroll-behavior-x:contain;
+    -webkit-mask-image:linear-gradient(90deg, transparent, #000 1.1rem, #000 calc(100% - 2.2rem), transparent);
+    mask-image:linear-gradient(90deg, transparent, #000 1.1rem, #000 calc(100% - 2.2rem), transparent); }
+  .games-tabs::-webkit-scrollbar { display:none; }
+  .games-tab { padding:.45rem 1rem; }
+}

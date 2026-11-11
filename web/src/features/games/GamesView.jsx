@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { load, save } from '../../lib/storage.js';
 import PresencePanel from '../../components/PresencePanel.jsx';
 import { usePresence } from '../../session/PresenceContext.jsx';
@@ -14,6 +14,7 @@ import DoomView from '../doom/DoomView.jsx';
 import AvalonView from '../party/AvalonView.jsx';
 import WerewolfView from '../party/WerewolfView.jsx';
 import UndercoverView from '../party/UndercoverView.jsx';
+import './games.css';
 
 // Gameroom：几个小游戏放在一个标签页里，每个有自己的筹码 / 豆子榜。
 // 每个游戏一直挂着（切走只是藏起来），各自按 active 决定连不连服务器。
@@ -34,7 +35,18 @@ const GAMES = [
 
 export default function GamesView({ active }) {
   const [game, setGame] = useState(() => (GAMES.some(g => g.key === load('game')) ? load('game') : 'bj'));
-  const pick = g => { setGame(g); save('game', g); };
+  // 手机上 12 个游戏的名单是一行，左右划；选中的那个自己滑到中间。选了一个游戏，就把这一行滚到屏幕顶上，
+  // 游戏紧跟在下面，不用自己往下翻（电脑上名单照旧折行，不动）。
+  const tabs = useRef(null);
+  const phone = () => window.matchMedia('(max-width: 767px)').matches;
+  const pick = g => {
+    setGame(g); save('game', g);
+    if (phone()) requestAnimationFrame(() => tabs.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  };
+  useEffect(() => {
+    const row = tabs.current, on = row?.querySelector('[aria-pressed="true"]');
+    if (on && row.scrollWidth > row.clientWidth) row.scrollLeft = on.offsetLeft - (row.clientWidth - on.offsetWidth) / 2;
+  }, [game, active]);
   // 把「我此刻在玩哪个游戏」报给在线名单（游戏 tab 里的名单会写出来）：
   // 在这个 tab 上就是选中的那个游戏，切走 / 关掉就清空。
   const { setActivity } = usePresence();
@@ -47,10 +59,10 @@ export default function GamesView({ active }) {
       <div className="md:hidden glass-card rounded-2xl px-3 py-2 mb-4">
         <PresencePanel fold showGame />
       </div>
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div ref={tabs} className="games-tabs" role="group" aria-label="选游戏">
         {GAMES.map(g => (
-          <button key={g.key} onClick={() => pick(g.key)}
-            className={'rounded-full px-5 py-2 font-bold ' + (g.key === game ? 'bg-indigo-600 text-white shadow' : 'glass-pill text-slate-600')}>{g.label}</button>
+          <button key={g.key} onClick={() => pick(g.key)} aria-pressed={g.key === game}
+            className={'games-tab ' + (g.key === game ? 'bg-indigo-600 text-white shadow' : 'glass-pill text-slate-600')}>{g.label}</button>
         ))}
       </div>
       {GAMES.map(({ key, View }) => <div key={key} hidden={game !== key}><View active={active && game === key} /></div>)}
