@@ -361,7 +361,9 @@ export default function MahjongView({ active }) {
               {t.phase === 'lack' && mySeat?.received && <div className="mj-note">换三张：从{FROM[t.swapDir]}拿到 {mySeat.received.map((k, i) => <MjTile key={i} kind={k} size="xs" inline className="mx-px" />)}（手里标了「新」）</div>}
               {mySeat && tingBar}
               {mySeat && (
-                <div className="mj-handrow">
+                // 全屏时自己的名牌收起来了：别人拖给你的表情就落在手牌这一行上
+                <div className="mj-handrow" data-react-to={full ? mySeat.name.toLowerCase() : undefined}>
+                  {full && <ReactBubbles list={reactionsFor(st?.reactions, mySeat.name.toLowerCase())} />}
                   <div className="mj-hand">
                     {order.map((i, n) => {
                       const k = hand[i], drawn = i === drawnAt;

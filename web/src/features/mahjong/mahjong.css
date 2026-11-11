@@ -174,7 +174,7 @@ button.mj-tile { cursor:pointer; touch-action:manipulation; transition:transform
 .mj-note { margin:.5rem auto 0; width:fit-content; max-width:100%; font-size:.8rem; color:#fef3c7; background:rgba(0,0,0,.22); border-radius:.8rem; padding:.3rem .7rem; }
 .mj-result { width:100%; margin:0 0 .6rem; }
 /* your hand, and to its right the tiles you have 碰 and 杠 (on a narrow screen they drop to a row of their own) */
-.mj-handrow { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:center; gap:.5rem 1.1rem; }
+.mj-handrow { position:relative; display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:center; gap:.5rem 1.1rem; }
 .mj-mymelds { display:flex; align-items:center; gap:.35rem; padding-bottom:.1rem; }
 
 /* a phone held upright: 对家 across the top, 上家 and 下家 either side of the middle, your own discards underneath */
