@@ -8,13 +8,24 @@
 // swings under the water at the end of the line. Cast it and the hook goes
 // straight down its line until it catches something (or leaves the water),
 // then reels back, slower the heavier the catch; reeling back empty it can
-// still hook something on the way. The fish swim
-// across at their own depths and speeds, so it's about timing the swing and
-// the fish together; pearls, chests and junk lie on the seabed. A run is
-// levels of 60 seconds with a coin target each; reach it and you get the
-// shop, then the next level; fall short and the run is over. The score is the
-// coins at the end (what you spend in the shop is gone). Every kind you've
-// ever caught goes in your 图鉴 (kept by the server).
+// still hook something on the way. The fish swim across at their own depths
+// and speeds (quicker every level), so it's about timing the swing and the
+// fish together; pearls, chests and junk lie on the seabed.
+//
+// What makes it hard (all from level 2 on; level 1 is plain fishing):
+//   sharks bite   a fish being reeled past a shark's mouth is eaten: gone
+//   water mines   hook one and it blows up everything around it
+//   jellyfish     sting: the reel stops for a moment
+//   shy fish      when a cast stops, the small fish near the line dart away
+//   the reel      big things are really slow, so each one is a choice
+//   the target    every level asks for new coins on top of what you came in
+//                 with, so a good level doesn't make the next one easier
+//
+// A run is levels of 60 seconds with a coin target each; reach it and you get
+// the shop, then the next level; fall short and the run is over. The score is
+// the coins at the end (what you spend in the shop is gone, and has to be
+// earned again for the next target). Every kind you've ever caught goes in
+// your 图鉴 (kept by the server).
 //
 // Inputs are events [tick, type, a], applied at the start of that tick:
 //   [t, 0]     cast (while the line swings)
@@ -37,28 +48,41 @@ export const ROPE0 = 74;
 export const SWING = { max: 0.95, period: 150 };
 export const CAST = 4.6, PULL = 7.6, HOOK_R = 5;
 export const STRONG = 1.6;                  // 大力水: reeling in this much faster
+export const BITE = 17;                     // how far a shark's mouth reaches
+// A shark that has a hooked fish in front of it (this far ahead, this far above or below) charges at it.
+export const LUNGE = { far: 110, tall: 46, speed: 2.4 };
+export const BLAST = 58;                    // a mine takes everything this near with it
+export const STING = 80, DAZE = 45;         // ticks the reel stops: stung by a jellyfish, after a blast
+export const SPOOK = { near: 30, ticks: 50, speed: 2.5 }; // shy fish this near the line dart away
 // Bump whenever a change makes the same seed and inputs play out differently:
 // runs started under another version can't be checked or replayed.
-export const SIM_VERSION = 3; // 2: the hook swings under the water, and catches on the way back too
+// 2: the hook swings under the water, and catches on the way back too
+// 3: traps (puffers, turtles) and heavier prizes
+// 4: sharks bite, mines, stings, shy fish, 宝石蟹, a much slower reel, a target of its own for every level
+export const SIM_VERSION = 4;
 
 // value: coins when it's in the boat; w: how much it slows the reel.
 // Swimmers keep to a depth band [top, bottom] and cross at speed [lo, hi]
-// px a tick, bobbing up and down by `bob`; the rest lie on the seabed.
+// px a tick, bobbing up and down by `bob`; walkers go back and forth on the
+// seabed in fits and starts; the rest stay where they are (a mine hangs in its
+// band). prey: a shark eats it off the hook; shy: darts away from a cast.
 export const KINDS = {
-  minnow: { group: 'fish', label: '小黄鱼', r: 8, value: 20, w: 0.3, swim: [1.1, 1.6], band: [150, 260], bob: 2, note: '浅水里游得快' },
-  clown: { group: 'fish', label: '小丑鱼', r: 9, value: 40, w: 0.35, swim: [0.9, 1.3], band: [155, 300], bob: 2, note: '橙白条纹' },
-  angel: { group: 'fish', label: '神仙鱼', r: 12, value: 70, w: 0.6, swim: [0.7, 1.0], band: [170, 330], bob: 3, note: '扁扁高高的' },
-  puffer: { group: 'fish', label: '河豚', r: 13, value: -60, w: 1.0, swim: [0.5, 0.8], band: [170, 360], bob: 5, note: '扎手！钓上来扣 60' },
-  octopus: { group: 'fish', label: '章鱼', r: 15, value: 300, w: 3.0, swim: [0.3, 0.5], band: [280, 410], bob: 8, note: '很值钱，可是又沉又慢' },
-  turtle: { group: 'fish', label: '海龟', r: 20, value: 0, w: 6.5, swim: [0.25, 0.4], band: [200, 380], bob: 3, note: '慢得要命，钓上来还得放生，一分不给' },
-  shark: { group: 'fish', label: '鲨鱼', r: 24, value: 100, w: 5.0, swim: [0.8, 1.1], band: [290, 410], bob: 2, note: '又大又慢，不值什么钱，挡路' },
-  dragon: { group: 'fish', label: '龙鱼', r: 14, value: 800, w: 0.9, swim: [1.6, 2.0], band: [370, 425], bob: 2, note: '最深处，很少见，游得飞快' },
-  jelly: { group: 'fish', label: '水母', r: 11, value: 5, w: 0.15, swim: [0.15, 0.3], band: [150, 380], bob: 12, note: '轻飘飘，几乎不值钱' },
-  pearl: { group: 'bed', label: '珍珠贝', r: 9, value: 600, w: 0.4, note: '躺在海底，小又轻' },
+  minnow: { group: 'fish', label: '小黄鱼', r: 8, value: 20, w: 0.4, swim: [1.1, 1.6], band: [150, 260], bob: 2, prey: true, shy: true, note: '浅水里游得快，胆子小' },
+  clown: { group: 'fish', label: '小丑鱼', r: 9, value: 40, w: 0.6, swim: [0.9, 1.3], band: [155, 300], bob: 2, prey: true, shy: true, note: '橙白条纹，一吓就跑' },
+  angel: { group: 'fish', label: '神仙鱼', r: 12, value: 70, w: 1.2, swim: [0.7, 1.0], band: [170, 330], bob: 3, prey: true, shy: true, note: '扁扁高高的' },
+  puffer: { group: 'fish', label: '河豚', r: 13, value: -80, w: 1.5, swim: [0.5, 0.8], band: [170, 360], bob: 5, prey: true, note: '扎手！钓上来扣 80' },
+  octopus: { group: 'fish', label: '章鱼', r: 15, value: 300, w: 7, swim: [0.3, 0.5], band: [280, 410], bob: 8, prey: true, note: '很值钱，可是又沉又慢，鲨鱼最爱抢' },
+  turtle: { group: 'fish', label: '海龟', r: 20, value: 0, w: 12, swim: [0.25, 0.4], band: [200, 380], bob: 3, note: '慢得要命，钓上来还得放生，一分不给' },
+  shark: { group: 'fish', label: '鲨鱼', r: 24, value: 50, w: 10, swim: [0.8, 1.1], band: [230, 400], bob: 2, note: '看见钩上的鱼就冲过来一口吃掉；自己又沉又不值钱' },
+  dragon: { group: 'fish', label: '龙鱼', r: 14, value: 800, w: 2, swim: [1.6, 2.0], band: [370, 425], bob: 2, prey: true, shy: true, note: '最深处，很少见，游得飞快' },
+  jelly: { group: 'fish', label: '水母', r: 11, value: 5, w: 0.15, swim: [0.15, 0.3], band: [150, 380], bob: 12, prey: true, note: '蜇人！钩到会麻一会儿收不动线' },
+  pearl: { group: 'bed', label: '珍珠贝', r: 9, value: 600, w: 1.2, note: '躺在海底，小又轻' },
+  crab: { group: 'bed', label: '宝石蟹', r: 13, value: 450, w: 1.5, walk: [0.9, 1.3], note: '举着宝石在海底横着跑，走走停停' },
   chest: { group: 'bed', label: '宝箱', r: 13, value: 0, w: 1.5, note: '打开看看：金币、剪刀或者大力水' },
-  boot: { group: 'junk', label: '旧靴子', r: 11, value: 3, w: 2.2, note: '谁丢的…' },
-  can: { group: 'junk', label: '易拉罐', r: 7, value: 1, w: 0.6, note: '捡起来也算环保' },
-  rock: { group: 'junk', label: '礁石', r: 18, value: 10, w: 4.8, note: '又重又不值钱，挡路' },
+  boot: { group: 'junk', label: '旧靴子', r: 11, value: 3, w: 4, note: '谁丢的…' },
+  can: { group: 'junk', label: '易拉罐', r: 7, value: 1, w: 1, note: '捡起来也算环保' },
+  rock: { group: 'junk', label: '礁石', r: 18, value: 10, w: 10, note: '又重又不值钱，挡路' },
+  mine: { group: 'junk', label: '水雷', r: 11, value: 0, w: 0, band: [300, 392], note: '钩到就炸，周围的东西全没了' },
 };
 export const KIND_KEYS = Object.keys(KINDS);
 
@@ -66,18 +90,17 @@ export const KIND_KEYS = Object.keys(KINDS);
 // all but the scissors last for the next level only.
 export const GOODS = [
   { key: 'scissors', emoji: '✂️', label: '剪刀', tip: '钓到不想要的，剪断线放走，钩子空着快快回来', odds: 0.85, price: [15, 90], per: 6 },
-  { key: 'strong', emoji: '💪', label: '大力水', tip: '下一关收线快一半多', odds: 0.5, price: [80, 300], per: 25 },
+  { key: 'strong', emoji: '💪', label: '大力水', tip: '下一关收线快一半多，鲨鱼更难抢到', odds: 0.5, price: [80, 300], per: 25 },
   { key: 'bait', emoji: '🪱', label: '香饵', tip: '下一关多来两条大鱼', odds: 0.5, price: [40, 200], per: 15 },
   { key: 'clover', emoji: '🍀', label: '幸运草', tip: '下一关宝箱里的东西更好', odds: 0.5, price: [20, 140], per: 12 },
   { key: 'recycle', emoji: '♻️', label: '回收袋', tip: '下一关垃圾（靴子、罐子、礁石）值三倍', odds: 0.45, price: [5, 60], per: 4 },
 ];
 
-// The coins to have by the end of each level: 650, 1195, 2010, 3095, 4450, …
-export function target(level) {
-  let t = 650, inc = 545;
-  for (let l = 1; l < level; l++) { t += inc; inc += 270; }
-  return t;
-}
+// The new coins each level asks for: 400 for the first, 800 for the second,
+// 1200, 1600, … The target is that many more than the coins held when the
+// level before was passed, so a rich level doesn't carry over, and what the
+// shop costs has to be caught again.
+export const quota = level => 400 * level;
 
 // ---- deterministic sine ----
 const PI = 3.141592653589793;
@@ -103,52 +126,64 @@ function rng(seed) {
 }
 const mix = (seed, level, salt) => (seed ^ Math.imul(level + 1, 0x9E3779B1) ^ salt) >>> 0;
 
+// How much quicker the fish are on this level: 6% a level, up to half again.
+export const quick = level => 1 + Math.min(level - 1, 9) * 0.06;
+
+// How many of each kind a level has, by level (the last number goes on for
+// every level after), in the order they're put in the water.
+export const STOCK = [
+  ['crab', [0, 0, 0, 0, 1, 1, 1, 2]],
+  ['rock', [1, 1, 2, 2, 3, 3, 4]],
+  ['pearl', [0, 0, 1, 1, 1, 2]],
+  ['chest', [2, 1, 2]],
+  ['boot', [1, 1, 2]],
+  ['can', [1, 1, 1, 2]],
+  ['mine', [0, 0, 1, 1, 2, 2, 2, 3]],
+  ['shark', [0, 1, 2, 2, 3, 3, 3, 4]],
+  ['turtle', [0, 0, 1, 2, 2, 2, 3]],
+  ['octopus', [1, 2, 2, 2, 2, 2, 3]],
+  ['puffer', [0, 1, 1, 2, 2, 3, 3, 4]],
+  ['angel', [4, 3, 3, 2]],
+  ['clown', [4, 3, 3, 3, 2]],
+  ['minnow', [5, 4, 4, 3, 3, 2]],
+  ['dragon', [0, 0, 0, 1, 1, 1, 1, 2]],
+  ['jelly', [0, 0, 2, 3, 3, 3, 4]],
+];
+
 // ---- a level's water ----
-// The seabed first (big rocks before the small things), then the fish, each
-// somewhere in its depth band, not on top of anything at the start. Each level
-// has more of the big and the precious.
+// The seabed first (the crabs, so they get a place among the rocks; big rocks
+// before the small things), then the mines that hang just above it, then the
+// fish, each somewhere in its depth band, not on top of anything at the
+// start. Level 1 is plain fishing; from level 2 on there's more of what bites,
+// stings, blows up and wastes time every level, and the prizes that pay for
+// the bigger targets sit among it. The numbers in STOCK and quota() were set
+// by measuring (see ARCHITECTURE.md): a careful player's haul is about 1.3×
+// what levels 2–4 ask for, about even on levels 5–6, and short after that.
 export function makeLevel(seed, level, boost = {}) {
-  const rand = rng(mix(seed, level, 0x51ED)), items = [];
+  const rand = rng(mix(seed, level, 0x51ED)), items = [], fast = quick(level);
   const free = (x, y, r) => items.every(o => { const dx = o.x - x, dy = o.y - y, m = o.r + r + 4; return dx * dx + dy * dy > m * m; });
   const put = (kind, n) => {
     const k = KINDS[kind], r = k.r;
     for (let i = 0; i < n; i++) {
       for (let tries = 0; tries < 60; tries++) {
         const x = r + 6 + rand() * (W - 2 * r - 12);
-        const [y0, y1] = k.swim ? k.band : [SEABED - r * 0.3, H - 6 - r];
+        const [y0, y1] = k.band || [SEABED - r * 0.3, H - 6 - r];
         const y = y0 + rand() * (y1 - y0);
         if (!free(x, y, r)) continue;
         const it = { id: items.length, kind, x, y, r };
-        if (k.swim) {
-          const speed = k.swim[0] + rand() * (k.swim[1] - k.swim[0]);
+        const pace = k.swim || k.walk;
+        if (pace) {
+          const speed = (pace[0] + rand() * (pace[1] - pace[0])) * (k.swim ? fast : 1);
           Object.assign(it, { vx: rand() < 0.5 ? -speed : speed, y0: y, ph: rand() * 2 * PI });
         }
-        if (kind === 'chest') it.w = 0.8 + rand() * 2.2;
+        if (kind === 'chest') it.w = 2 + rand() * 4;
         items.push(it);
         break;
       }
     }
   };
-  const L = level;
-  // Like gold miner: what's worth having is about 1.7× what the level needs,
-  // the big money (pearls, 龙鱼, 章鱼) is deep and slow or fast and rare, and
-  // from level 2 on the traps (puffers cost coins, turtles waste time and pay
-  // nothing) and the blockers (sharks, rocks) get in the way more every level.
-  put('rock', Math.min(1 + (L >> 1), 4));
-  put('pearl', L < 2 ? 0 : L < 6 ? 1 : L < 10 ? 2 : 3);
-  put('chest', L === 1 || L >= 4 ? 2 : 1);
-  put('boot', L < 3 ? 1 : 2);
-  put('can', L < 5 ? 1 : 2);
-  put('shark', Math.min(1 + (L >> 1), 4));
-  put('turtle', Math.min(L >> 1, 4));
-  put('octopus', L <= 3 ? 1 : L <= 7 ? 2 : L <= 9 ? 3 : 4);
-  put('puffer', Math.min(L - 1, 5));
-  put('angel', L === 1 ? 4 : Math.max(3 - (L >> 1), 1));
-  put('clown', Math.max(4 - (L >> 1), 1));
-  put('minnow', Math.max(6 - L, 2));
-  put('dragon', L < 3 ? 0 : L < 8 ? 1 : 2);
-  put('jelly', Math.min(L >> 1, 4));
-  if (boost.bait) for (let i = 0; i < 2; i++) put(L >= 3 && rand() < 0.4 ? 'dragon' : 'octopus', 1);
+  for (const [kind, counts] of STOCK) put(kind, counts[Math.min(level, counts.length) - 1]);
+  if (boost.bait) for (let i = 0; i < 2; i++) put(level >= 4 && rand() < 0.4 ? 'dragon' : 'octopus', 1);
   return { items, rand };
 }
 
@@ -163,24 +198,29 @@ function makeShop(g) {
   return offers;
 }
 
+// target: the coins this level needs; from: the coins it started with (the
+// bar on screen); nextTarget: in the shop, what the next level will need.
 export function newGame(seed) {
   const g = { seed: seed >>> 0, tick: 0, phase: 'play', over: false, end: null, level: 0, money: 0, scissors: 1, cleared: 0,
-    caught: {}, next: {}, boost: {}, items: [], hook: null, shop: null, left: 0, target: 0, rand: null, happened: [] };
+    caught: {}, next: {}, boost: {}, items: [], hook: null, shop: null, left: 0, target: 0, from: 0, nextTarget: quota(1), rand: null, happened: [] };
   startLevel(g, 1);
   return g;
 }
 function startLevel(g, level) {
   const boost = g.next;
   const { items, rand } = makeLevel(g.seed, level, boost);
-  Object.assign(g, { phase: 'play', level, target: target(level), left: LEVEL_TICKS, items, rand, shop: null, boost, next: {},
-    hook: { state: 'swing', phase: 0, a: 0, len: ROPE0, item: null } });
+  Object.assign(g, { phase: 'play', level, target: g.nextTarget, from: g.money, left: LEVEL_TICKS, items, rand, shop: null, boost, next: {},
+    hook: { state: 'swing', phase: 0, a: 0, len: ROPE0, item: null, stun: 0, bare: false } });
 }
 function finish(g, end) { g.over = true; g.phase = 'over'; g.end = end; g.hook.item = null; }
 function endLevel(g) {
-  if (g.hook.item) { g.happened.push({ type: 'lost', kind: g.hook.item.kind }); g.hook.item = null; }
-  g.hook.state = 'swing'; g.hook.len = ROPE0;
-  if (g.money >= g.target) { g.cleared = g.level; g.phase = 'shop'; g.shop = makeShop(g); g.happened.push({ type: 'pass' }); }
-  else finish(g, 'fail');
+  const h = g.hook;
+  if (h.item) { g.happened.push({ type: 'lost', kind: h.item.kind }); h.item = null; }
+  h.state = 'swing'; h.len = ROPE0; h.stun = 0; h.bare = false;
+  if (g.money >= g.target) {
+    g.cleared = g.level; g.phase = 'shop'; g.shop = makeShop(g); g.nextTarget = g.money + quota(g.level + 1);
+    g.happened.push({ type: 'pass' });
+  } else finish(g, 'fail');
 }
 
 // where the hook is, for the line as it is now
@@ -195,6 +235,10 @@ function pullSpeed(g, it) {
   const w = it.w ?? KINDS[it.kind].w;
   return PULL * (g.boost.strong ? STRONG : 1) / (1 + w);
 }
+// where a shark's mouth is: at the front, the way it's swimming
+export function mouthOf(shark) {
+  return [shark.x + (shark.vx < 0 ? -1 : 1) * shark.r * 0.95, shark.y + shark.r * 0.1];
+}
 // In the boat: what it's worth. A chest is a surprise, drawn from the level's
 // own random numbers (so it's the same in a replay).
 function landIt(g, it) {
@@ -203,7 +247,7 @@ function landIt(g, it) {
     const r = g.rand();
     if (r < 0.1) { g.scissors++; v = 0; what = 'scissors'; }
     else if (r < 0.18 && !g.boost.strong) { g.boost = { ...g.boost, strong: true }; v = 0; what = 'strong'; }
-    else v = g.boost.clover ? 150 + Math.floor(g.rand() * 650) : 20 + Math.floor(g.rand() * (280 + 30 * g.level));
+    else v = g.boost.clover ? 150 + Math.floor(g.rand() * 450) : 30 + Math.floor(g.rand() * (220 + 20 * g.level));
   }
   // a puffer costs coins, never below none
   if (g.money + v < 0) v = -g.money;
@@ -221,7 +265,7 @@ function apply(g, e) {
     else if (type === 1 && h.state === 'back' && h.item && g.scissors > 0) {
       g.scissors--;
       g.happened.push({ type: 'cut', kind: h.item.kind, x: h.item.x, y: h.item.y });
-      h.item = null;
+      h.item = null; h.stun = 0;
     } else if (type === 3 && g.money >= g.target) endLevel(g);
   } else if (g.phase === 'shop') {
     const o = g.shop[a];
@@ -251,9 +295,52 @@ function firstHit(g, from, to) {
   }
   return hit;
 }
+// A cast has stopped (it caught something, or ran out of water): the shy fish
+// near the line bolt away from it, to whichever side they're on.
+function spook(g) {
+  const h = g.hook, s = dsin(h.a), c = dcos(h.a);
+  let n = 0;
+  for (const it of g.items) {
+    if (!KINDS[it.kind].shy) continue;
+    const px = it.x - PIVOT.x, py = it.y - PIVOT.y, mid = px * s + py * c;
+    if (mid < 0 || mid > h.len + SPOOK.near) continue;
+    const ox = px - s * mid, oy = py - c * mid, m = SPOOK.near + it.r;
+    if (ox * ox + oy * oy > m * m) continue;
+    const speed = it.vx < 0 ? -it.vx : it.vx;
+    it.vx = ox < 0 ? -speed : speed;
+    it.dart = SPOOK.ticks;
+    n++;
+  }
+  if (n) g.happened.push({ type: 'spook', n });
+}
+// A mine goes off: everything within the blast is gone (other mines go off in
+// turn), nothing is paid, and the reel is dazed for a moment.
+function explode(g, mine) {
+  const h = g.hook, fuse = [mine];
+  g.items = g.items.filter(o => o !== mine);
+  while (fuse.length) {
+    const m = fuse.pop(), gone = [];
+    g.items = g.items.filter(o => {
+      const dx = o.x - m.x, dy = o.y - m.y, d = BLAST + o.r;
+      if (dx * dx + dy * dy > d * d) return true;
+      gone.push({ kind: o.kind, x: o.x, y: o.y, r: o.r });
+      if (o.kind === 'mine') fuse.push(o);
+      return false;
+    });
+    g.happened.push({ type: 'boom', x: m.x, y: m.y, gone });
+  }
+  const first = !g.caught.mine;
+  g.caught.mine = (g.caught.mine || 0) + 1;
+  if (first) g.happened.push({ type: 'first', kind: 'mine' });
+  h.item = null; h.state = 'back'; h.stun = DAZE; h.bare = true;
+}
 function hookIt(g, it) {
+  const h = g.hook;
+  spook(g);
+  if (it.kind === 'mine') { explode(g, it); return; }
   g.items = g.items.filter(o => o !== it);
-  g.hook.item = it; g.hook.state = 'back';
+  h.item = it; h.state = 'back';
+  if (it.kind === 'jelly') h.stun = STING;
   g.happened.push({ type: 'hook', kind: it.kind });
 }
 
@@ -265,11 +352,31 @@ export function step(g, events) {
   if (g.over) return;
   g.tick++;
   if (g.phase === 'play') {
-    const h = g.hook;
-    // the fish swim across (out one side, back in the other) and bob up and down
+    const h = g.hook, prey = h.state === 'back' && h.item && KINDS[h.item.kind].prey ? h.item : null;
     for (const it of g.items) {
       if (!it.vx) continue;
-      it.x += it.vx;
+      if (KINDS[it.kind].walk) {
+        // a crab scuttles along the seabed in fits and starts, and turns round
+        // at the edges and at whatever lies in its way
+        if (dsin(it.ph + g.tick * 0.045) > -0.25) {
+          const x = it.x + it.vx;
+          const blocked = x < it.r + 6 || x > W - it.r - 6 || g.items.some(o => {
+            if (o === it || o.vx) return false;
+            const dx = o.x - x, dy = o.y - it.y, m = o.r + it.r;
+            return dx * dx + dy * dy < m * m;
+          });
+          if (blocked) it.vx = -it.vx; else it.x = x;
+        }
+        continue;
+      }
+      // the fish swim across (out one side, back in the other) and bob up and down
+      if (it.dart > 0) { it.x += it.vx * SPOOK.speed; it.dart--; }
+      else if (it.kind === 'shark') {
+        // a shark charges at a hooked fish in front of it
+        const ahead = prey ? (prey.x - it.x) * (it.vx < 0 ? -1 : 1) : -1, dy = prey ? prey.y - it.y : 0;
+        it.rush = ahead > 0 && ahead < LUNGE.far && dy < LUNGE.tall && dy > -LUNGE.tall;
+        it.x += it.rush ? it.vx * LUNGE.speed : it.vx;
+      } else it.x += it.vx;
       const edge = it.r + 12;
       if (it.x > W + edge) it.x = -edge; else if (it.x < -edge) it.x = W + edge;
       it.y = it.y0 + KINDS[it.kind].bob * dsin(it.ph + g.tick * 0.05);
@@ -283,19 +390,33 @@ export function step(g, events) {
       const hit = firstHit(g, from, h.len);
       const [tx, ty] = tipOf(h);
       if (hit) hookIt(g, hit);
-      else if (tx < 0 || tx > W || ty > H) { h.state = 'back'; g.happened.push({ type: 'miss' }); }
+      else if (tx < 0 || tx > W || ty > H) { h.state = 'back'; spook(g); g.happened.push({ type: 'miss' }); }
+    } else if (h.stun > 0) {
+      h.stun--; // stung or dazed: the reel doesn't turn
     } else if (h.state === 'back') {
       const from = h.len;
       h.len -= h.item ? pullSpeed(g, h.item) : PULL;
       // coming back empty (a miss, or cut loose), the hook still catches what it runs into
-      if (!h.item) { const hit = firstHit(g, from, Math.max(h.len, ROPE0)); if (hit) hookIt(g, hit); }
+      if (!h.item && !h.bare) { const hit = firstHit(g, from, Math.max(h.len, ROPE0)); if (hit) hookIt(g, hit); }
       if (h.len <= ROPE0) {
-        h.len = ROPE0; h.state = 'swing';
+        h.len = ROPE0; h.state = 'swing'; h.bare = false;
         if (h.item) { landIt(g, h.item); h.item = null; }
       } else if (h.item) {
         // the catch hangs just under the hook
         const d = h.len + h.item.r * 0.7;
         h.item.x = PIVOT.x + dsin(h.a) * d; h.item.y = PIVOT.y + dcos(h.a) * d;
+      }
+    }
+    // a shark takes a fish off the hook as it passes its mouth; the line comes back slack
+    if (h.state === 'back' && h.item && KINDS[h.item.kind].prey) {
+      const reach = BITE + h.item.r * 0.5;
+      for (const sh of g.items) {
+        if (sh.kind !== 'shark') continue;
+        const [mx, my] = mouthOf(sh), dx = h.item.x - mx, dy = h.item.y - my;
+        if (dx * dx + dy * dy > reach * reach) continue;
+        g.happened.push({ type: 'bite', kind: h.item.kind, x: h.item.x, y: h.item.y, by: sh.id });
+        h.item = null; h.stun = 0; h.bare = true;
+        break;
       }
     }
     g.left--;

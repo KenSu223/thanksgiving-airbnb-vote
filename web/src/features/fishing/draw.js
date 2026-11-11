@@ -1,8 +1,9 @@
-import { W, H, WATER, SEABED, PIVOT, HZ, ROPE0, KINDS, tipOf } from './sim.js';
+import { W, H, WATER, SEABED, PIVOT, HZ, ROPE0, BLAST, KINDS, tipOf } from './sim.js';
+import { reduceMotion } from '../../lib/motion.js';
 
 // Drawing one frame of 小小钓鱼: sky and a little boat on top, the sea below
 // with everything in it, the line and hook, and the effects (coins popping
-// up, splashes). Only reads the game, never changes it, and its own random
+// up, splashes, a shark's bite, a mine going off). Only reads the game, never changes it, and its own random
 // numbers (for the seabed and the bubbles) are separate from the game's, so
 // drawing can't change how a run plays out. paintKind draws one kind on its
 // own too, for the 图鉴 cards.
@@ -105,8 +106,8 @@ const PAINT = {
       ctx.beginPath(); for (let k = 0; k < 6; k++) { const a = (k / 6) * TAU; ctx.lineTo(x * r + Math.cos(a) * r * 0.25, y * r + Math.sin(a) * r * 0.22); } ctx.closePath(); ctx.stroke();
     }
   },
-  shark(ctx, r, t) {
-    const wag = Math.sin(t * 6) * r * 0.08;
+  shark(ctx, r, t, seed, mood) {
+    const rush = mood === 'rush', wag = Math.sin(t * (rush ? 16 : 6)) * r * (rush ? 0.14 : 0.08);
     tail(ctx, -r * 1.25, r * 1.1, '#6d7f92', 0.75, wag);
     ctx.fillStyle = '#6d7f92';
     ctx.beginPath(); ctx.moveTo(-r * 0.1, -r * 0.42); ctx.lineTo(-r * 0.35, -r * 1.0); ctx.lineTo(r * 0.3, -r * 0.42); ctx.fill();
@@ -117,8 +118,20 @@ const PAINT = {
     ctx.fillStyle = '#eef3f7'; ctx.beginPath(); ctx.moveTo(r * 1.3, r * 0.05); ctx.quadraticCurveTo(r * 0.6, r * 0.45, -r * 0.6, r * 0.3); ctx.quadraticCurveTo(r * 0.4, r * 0.15, r * 1.3, r * 0.05); ctx.fill();
     ctx.strokeStyle = 'rgba(40,50,60,.5)'; ctx.lineWidth = r * 0.04;
     for (const x of [0.45, 0.35, 0.25]) { ctx.beginPath(); ctx.moveTo(x * r, -r * 0.18); ctx.lineTo(x * r - r * 0.04, r * 0.14); ctx.stroke(); }
-    dot(ctx, r * 0.95, -r * 0.12, r * 0.07, '#111');
-    ctx.strokeStyle = '#3c4652'; ctx.lineWidth = r * 0.04; ctx.beginPath(); ctx.moveTo(r * 1.15, r * 0.14); ctx.quadraticCurveTo(r * 0.95, r * 0.24, r * 0.75, r * 0.16); ctx.stroke();
+    if (rush) {
+      // charging: jaws wide open, teeth showing, a red eye
+      ctx.fillStyle = '#8f1d2c';
+      ctx.beginPath(); ctx.moveTo(r * 1.38, -r * 0.08); ctx.lineTo(r * 0.72, r * 0.02); ctx.lineTo(r * 1.2, r * 0.42); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff';
+      for (let k = 0; k < 4; k++) {
+        const x = r * (0.86 + k * 0.13);
+        ctx.beginPath(); ctx.moveTo(x - r * 0.05, -r * 0.03 + k * r * 0.005); ctx.lineTo(x + r * 0.05, -r * 0.05 + k * r * 0.005); ctx.lineTo(x + r * 0.01, r * 0.09); ctx.fill();
+      }
+      dot(ctx, r * 0.95, -r * 0.16, r * 0.09, '#ff3b30');
+    } else {
+      dot(ctx, r * 0.95, -r * 0.12, r * 0.07, '#111');
+      ctx.strokeStyle = '#3c4652'; ctx.lineWidth = r * 0.04; ctx.beginPath(); ctx.moveTo(r * 1.15, r * 0.14); ctx.quadraticCurveTo(r * 0.95, r * 0.24, r * 0.75, r * 0.16); ctx.stroke();
+    }
   },
   dragon(ctx, r, t) {
     const wag = Math.sin(t * 9) * r * 0.1;
@@ -210,6 +223,54 @@ const PAINT = {
     ctx.fillStyle = 'rgba(90,150,90,.55)'; ell(ctx, -r * 0.2, -r * 0.55, r * 0.45, r * 0.12); ctx.fill();
     for (const [x, y] of [[0.3, -0.1], [-0.4, 0.15], [0.1, 0.3]]) dot(ctx, x * r, y * r, r * 0.08, 'rgba(235,235,225,.7)');
   },
+  // a crab holding a gem up over its head, legs going
+  crab(ctx, r, t) {
+    const go = Math.sin(t * 12);
+    ctx.strokeStyle = '#c2410c'; ctx.lineWidth = r * 0.13; ctx.lineCap = 'round';
+    for (const s of [-1, 1]) {
+      for (let k = 0; k < 3; k++) {
+        const x0 = s * r * (0.35 + k * 0.17), y0 = r * 0.4, kick = 0.09 * go * (k % 2 ? 1 : -1);
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 + s * r * 0.36, y0, x0 + s * r * (0.42 + kick), y0 + r * 0.5); ctx.stroke();
+      }
+      // the arms, up to the gem
+      ctx.beginPath(); ctx.moveTo(s * r * 0.6, r * 0.05); ctx.quadraticCurveTo(s * r * 1.05, -r * 0.45, s * r * 0.5, -r * 0.85); ctx.stroke();
+      dot(ctx, s * r * 0.46, -r * 0.9, r * 0.2, '#ea580c');
+    }
+    ctx.lineCap = 'butt';
+    ctx.fillStyle = grad(ctx, -r * 0.35, r * 0.7, '#fdba74', '#c2410c'); ell(ctx, 0, r * 0.18, r * 0.82, r * 0.5); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.3)'; ell(ctx, -r * 0.2, 0, r * 0.4, r * 0.14); ctx.fill();
+    ctx.strokeStyle = '#c2410c'; ctx.lineWidth = r * 0.1;
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * r * 0.22, -r * 0.15); ctx.lineTo(s * r * 0.26, -r * 0.42); ctx.stroke(); eye(ctx, s * r * 0.26, -r * 0.48, r * 0.14); }
+    // the gem
+    const gy = -r * 1.28, gs = r * 0.44;
+    const g = ctx.createLinearGradient(-gs, gy - gs, gs, gy + gs);
+    g.addColorStop(0, '#f0fdff'); g.addColorStop(0.5, '#67e8f9'); g.addColorStop(1, '#0ea5e9');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(-gs, gy - gs * 0.25); ctx.lineTo(-gs * 0.5, gy - gs * 0.8); ctx.lineTo(gs * 0.5, gy - gs * 0.8); ctx.lineTo(gs, gy - gs * 0.25); ctx.lineTo(0, gy + gs * 0.9); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = r * 0.05;
+    ctx.beginPath(); ctx.moveTo(-gs, gy - gs * 0.25); ctx.lineTo(gs, gy - gs * 0.25); ctx.moveTo(-gs * 0.5, gy - gs * 0.8); ctx.lineTo(0, gy + gs * 0.9); ctx.lineTo(gs * 0.5, gy - gs * 0.8); ctx.stroke();
+    const s = (Math.sin(t * 4.5) + 1) / 2;
+    star(ctx, gs * 0.55, gy - gs * 0.6, r * 0.34 * s, 'rgba(255,255,255,.95)');
+  },
+  // a sea mine: a dark ball with horns, a red light blinking, a bit of chain under it
+  mine(ctx, r, t) {
+    ctx.strokeStyle = '#3a4450'; ctx.lineWidth = r * 0.16; ctx.setLineDash([r * 0.24, r * 0.16]);
+    ctx.beginPath(); ctx.moveTo(0, r * 0.85); ctx.lineTo(0, r * 1.5); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#28303a';
+    for (let k = 0; k < 8; k++) {
+      ctx.save(); ctx.rotate((k / 8) * TAU + 0.39);
+      ctx.fillRect(r * 0.75, -r * 0.11, r * 0.42, r * 0.22); dot(ctx, r * 1.2, 0, r * 0.15, '#28303a'); ctx.fillStyle = '#28303a';
+      ctx.restore();
+    }
+    const g = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.08, 0, 0, r * 0.95);
+    g.addColorStop(0, '#8793a1'); g.addColorStop(0.55, '#47515d'); g.addColorStop(1, '#1b2129');
+    ctx.fillStyle = g; ell(ctx, 0, 0, r * 0.9, r * 0.9); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = r * 0.07; ctx.beginPath(); ctx.ellipse(0, 0, r * 0.9, r * 0.28, 0, 0, Math.PI); ctx.stroke();
+    const on = Math.sin(t * 7) > 0;
+    if (on) dot(ctx, 0, -r * 0.3, r * 0.42, 'rgba(255,70,50,.3)');
+    dot(ctx, 0, -r * 0.3, r * 0.2, on ? '#ff5a45' : '#7c241c');
+    dot(ctx, -r * 0.06, -r * 0.36, r * 0.07, 'rgba(255,255,255,.7)');
+  },
 };
 function star(ctx, x, y, s, color) {
   if (s <= 0.2) return;
@@ -219,8 +280,9 @@ function star(ctx, x, y, s, color) {
   ctx.closePath(); ctx.fill();
 }
 // One kind on its own, centred at 0, 0, facing right (the 图鉴 cards, and the game).
-export function paintKind(ctx, kind, r, t = 0, seed = 1) {
-  PAINT[kind](ctx, r, t, seed);
+// mood: 'rush' for a shark charging at the hook.
+export function paintKind(ctx, kind, r, t = 0, seed = 1, mood = null) {
+  PAINT[kind](ctx, r, t, seed, mood);
 }
 
 // ---- the background: sky, sea, seabed, drawn once per level and size ----
@@ -311,8 +373,25 @@ function item(ctx, g, it, t, held) {
     ctx.rotate(-g.hook.a);
     if (k.group === 'fish' && it.kind !== 'jelly' && it.kind !== 'octopus') ctx.rotate(-Math.PI / 2 + Math.sin(t * 14) * 0.25);
   } else if (it.vx < 0) ctx.scale(-1, 1);
-  paintKind(ctx, it.kind, it.r, t + it.id * 0.37, it.id + g.level * 101);
+  if (!held && it.kind === 'mine') {
+    // its chain, down to the sand
+    ctx.strokeStyle = 'rgba(40,50,62,.8)'; ctx.lineWidth = 1.6; ctx.setLineDash([3, 2.2]);
+    ctx.beginPath(); ctx.moveTo(0, it.r * 1.4); ctx.lineTo(0, SEABED + 6 - it.y); ctx.stroke(); ctx.setLineDash([]);
+  }
+  const rush = !held && it.kind === 'shark' && it.rush, dart = !held && it.dart > 0;
+  if (rush || dart) {
+    // going flat out: streaks behind it
+    ctx.strokeStyle = rush ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.55)'; ctx.lineWidth = rush ? 1.6 : 1.1; ctx.lineCap = 'round';
+    for (const [y, len] of [[-0.45, 0.9], [0.05, 1.3], [0.5, 0.8]]) { ctx.beginPath(); ctx.moveTo(-it.r * (rush ? 1.9 : 1.7), y * it.r); ctx.lineTo(-it.r * ((rush ? 1.9 : 1.7) + len), y * it.r); ctx.stroke(); }
+    ctx.lineCap = 'butt';
+  }
+  paintKind(ctx, it.kind, it.r, t + it.id * 0.37, it.id + g.level * 101, rush ? 'rush' : null);
   ctx.restore();
+  if (rush) {
+    ctx.font = '900 15px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(90,10,10,.8)'; ctx.lineJoin = 'round';
+    ctx.strokeText('!', it.x, it.y - it.r - 6); ctx.fillStyle = '#ffd9d4'; ctx.fillText('!', it.x, it.y - it.r - 6);
+  }
 }
 
 // ---- the boat, the cat and the rod ----
@@ -373,15 +452,50 @@ function hook(ctx, g, t) {
     ctx.lineCap = 'butt';
   }
   ctx.restore();
+  if (h.stun > 0) {
+    // the reel has stopped: sparks from a jellyfish's sting, or stars after a blast
+    const stung = h.item?.kind === 'jelly';
+    for (let k = 0; k < 3; k++) {
+      const a = t * 5 + (k / 3) * TAU, x = tx + Math.cos(a) * 12, y = ty + 2 + Math.sin(a) * 7;
+      if (stung) {
+        ctx.strokeStyle = '#fff27a'; ctx.lineWidth = 1.6; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(x - 2, y - 5); ctx.lineTo(x + 1.5, y - 1); ctx.lineTo(x - 1.5, y + 1); ctx.lineTo(x + 2, y + 5); ctx.stroke();
+      } else star(ctx, x, y, 4, 'rgba(255,240,170,.95)');
+    }
+  }
 }
 
-// ---- effects: coins popping up, splashes, a cut line ----
+// ---- effects: coins popping up, splashes, a cut line, a bite, a blast ----
 // fx: [{ kind: 'pop', text, color, x, y, at, big } | { kind: 'ring', x, y, at }
-//      | { kind: 'fly', what, r, x, y, at }  (a catch flying from the hook into the boat)], at in ms
+//      | { kind: 'fly', what, r, x, y, at }  (a catch flying from the hook into the boat)
+//      | { kind: 'boom', x, y, at }  (a mine going off: the fireball is as wide as the blast)
+//      | { kind: 'chomp', x, y, at }  (a shark's bite)], at in ms
 function effects(ctx, fx, now) {
   for (const e of fx) {
     const age = (now - e.at) / 1000;
-    if (e.kind === 'fly') {
+    if (e.kind === 'boom') {
+      if (age < 0 || age > 0.7) continue;
+      const k = age / 0.7, grow = Math.min(1, k * 2.4), R = BLAST * (0.25 + 0.75 * grow);
+      const g = ctx.createRadialGradient(e.x, e.y, R * 0.1, e.x, e.y, R);
+      g.addColorStop(0, `rgba(255,250,210,${0.95 * (1 - k)})`); g.addColorStop(0.45, `rgba(255,170,50,${0.8 * (1 - k)})`); g.addColorStop(1, 'rgba(255,90,30,0)');
+      ctx.fillStyle = g; ell(ctx, e.x, e.y, R, R); ctx.fill();
+      ctx.strokeStyle = `rgba(255,255,255,${0.85 * (1 - k)})`; ctx.lineWidth = 2.5 * (1 - k) + 0.5;
+      ell(ctx, e.x, e.y, BLAST * grow, BLAST * grow); ctx.stroke();
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU + hash(i * 7 + 1) * 0.5, d = BLAST * (0.3 + hash(i * 3 + 2) * 0.9) * Math.min(1, k * 1.6);
+        dot(ctx, e.x + Math.cos(a) * d, e.y + Math.sin(a) * d - 10 * k, 2.2 * (1 - k) + 0.6, `rgba(255,255,255,${0.8 * (1 - k)})`);
+      }
+    } else if (e.kind === 'chomp') {
+      if (age < 0 || age > 0.5) continue;
+      const k = age / 0.5;
+      ctx.strokeStyle = `rgba(255,255,255,${0.9 * (1 - k)})`; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU + 0.3;
+        ctx.beginPath(); ctx.moveTo(e.x + Math.cos(a) * (6 + 10 * k), e.y + Math.sin(a) * (6 + 10 * k)); ctx.lineTo(e.x + Math.cos(a) * (12 + 20 * k), e.y + Math.sin(a) * (12 + 20 * k)); ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+      dot(ctx, e.x, e.y, 9 * (1 - k), `rgba(255,120,110,${0.5 * (1 - k)})`);
+    } else if (e.kind === 'fly') {
       if (age < 0 || age > 0.55) continue;
       const k = age / 0.55, tx = BOAT.x - 8, ty = BOAT.y - 14;
       const x = e.x + (tx - e.x) * k, y = e.y + (ty - e.y) * k - Math.sin(k * Math.PI) * 40;
@@ -426,6 +540,11 @@ function hud(ctx, g, now) {
   text(coins(g.money), 31, 26, 20, '#ffe25c');
   const done = g.money >= g.target;
   text((done ? '✓ ' : '目标 ') + coins(g.target), 11, 45, 12.5, done ? '#c8ffb0' : '#fff');
+  // how far along this level's own catch is: from the coins it started with to its target
+  const span = Math.max(1, g.target - g.from), part = Math.max(0, Math.min(1, (g.money - g.from) / span));
+  ctx.fillStyle = 'rgba(10,40,70,.5)'; ctx.fillRect(11, 51, 92, 5);
+  ctx.fillStyle = done ? '#8ef08a' : '#ffe25c'; ctx.fillRect(11, 51, 92 * part, 5);
+  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 0.8; ctx.strokeRect(11, 51, 92, 5);
   text('第 ' + g.level + ' 关', W - 10, 24, 15, '#fff', 'right');
   if (g.phase === 'play') {
     const secs = Math.ceil(g.left / HZ), low = secs <= 10;
@@ -441,6 +560,9 @@ export function draw(ctx, g, scale, fx, now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(background(g, scale), 0, 0);
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  // a blast shakes the picture for a moment
+  const boom = reduceMotion ? null : fx.find(e => e.kind === 'boom' && now - e.at >= 0 && now - e.at < 320);
+  if (boom) { const k = 1 - (now - boom.at) / 320; ctx.translate(Math.sin(now / 13) * 3.5 * k, Math.cos(now / 17) * 2.5 * k); }
   sea(ctx, g, t);
   for (const it of g.items) item(ctx, g, it, t, false);
   boat(ctx, g, t);
@@ -460,7 +582,7 @@ const EXTENT = {
   minnow: [1.65, 1.25, 0.95, 0.65], clown: [1.7, 1.2, 1.05, 0.75], angel: [1.6, 1.0, 1.75, 1.75], puffer: [1.6, 1.25, 1.25, 1.25],
   octopus: [0.95, 0.95, 1.0, 1.45], turtle: [1.0, 1.35, 1.0, 1.0], shark: [2.1, 1.45, 1.05, 0.85], dragon: [2.3, 1.9, 0.95, 0.95],
   jelly: [1.1, 1.1, 0.9, 1.65], pearl: [1.25, 1.25, 0.95, 0.9], chest: [1.15, 1.15, 0.9, 0.75], boot: [0.65, 1.15, 1.05, 0.75],
-  can: [1.0, 1.0, 1.1, 1.1], rock: [1.05, 1.05, 0.85, 0.85],
+  can: [1.0, 1.0, 1.1, 1.1], rock: [1.05, 1.05, 0.85, 0.85], crab: [1.15, 1.15, 1.8, 0.95], mine: [1.4, 1.4, 1.4, 1.55],
 };
 export function fitKind(kind, w, h) {
   const [l, r, t, b] = EXTENT[kind];
