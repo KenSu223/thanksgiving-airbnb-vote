@@ -116,16 +116,28 @@ export function SecretCard({ label, children, tone = '' }) {
   );
 }
 
-// 投票：选好了点「投 X 号」，也可以弃票
-export function VoteBar({ p, choice, setChoice, label = '投' }) {
+// 投票：选好了点「投 X 号」，也可以弃票。给了 setChanging 的话投完还能改：点了「改票」
+// 座位又能点了（view 那边把 pickable 打开），投新的、弃票、或者「不改了」都行。
+export function VoteBar({ p, choice, setChoice, label = '投', changing = false, setChanging = null }) {
   const v = p.t?.vote;
   if (!v || !v.voters.includes(p.me)) return null;
-  if (v.mine != null) return <p className="pt-hint">已经{v.mine >= 0 ? label + ' ' + (v.mine + 1) + ' 号' : '弃票'}，等别人投完（{v.voted.length}/{v.voters.length}）</p>;
+  const sendVote = target => { p.send({ type: 'vote', target }); setChoice(null); if (setChanging) setChanging(false); };
+  if (v.mine != null && !changing) {
+    const text = '已经' + (v.mine >= 0 ? label + ' ' + (v.mine + 1) + ' 号' : '弃票') + '，等别人投完（' + v.voted.length + '/' + v.voters.length + '）';
+    if (!setChanging) return <p className="pt-hint">{text}</p>;
+    return (
+      <div className="pt-actions">
+        <span className="pt-hint">{text}</span>
+        <button className="pt-btn" onClick={() => { setChoice(v.mine >= 0 ? v.mine : null); setChanging(true); }}>改票</button>
+      </div>
+    );
+  }
   return (
     <div className="pt-actions">
-      <span className="pt-hint">{choice != null ? '选了 ' + (choice + 1) + ' 号' : '点上面的座位选人'}</span>
-      <button className="pt-btn main" disabled={choice == null} onClick={() => { p.send({ type: 'vote', target: choice }); setChoice(null); }}>{choice != null ? label + ' ' + (choice + 1) + ' 号' : label}</button>
-      <button className="pt-btn" onClick={() => { p.send({ type: 'vote', target: -1 }); setChoice(null); }}>弃票</button>
+      <span className="pt-hint">{choice != null ? '选了 ' + (choice + 1) + ' 号' : '点座位选人'}</span>
+      <button className="pt-btn main" disabled={choice == null} onClick={() => sendVote(choice)}>{choice != null ? label + ' ' + (choice + 1) + ' 号' : label}</button>
+      <button className="pt-btn" onClick={() => sendVote(-1)}>弃票</button>
+      {changing && <button className="pt-link" onClick={() => { setChoice(null); setChanging(false); }}>不改了</button>}
     </div>
   );
 }

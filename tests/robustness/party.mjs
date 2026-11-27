@@ -1,7 +1,7 @@
 // Party games over real sockets (worker/party): 谁是卧底 run by a host — the host
 // chair, the host's words dealt (each person sees only their own; a watcher sees
 // none), a phone dropping and coming back, the host tapping outs and undoing,
-// ending it, the board; then 阿瓦隆 and 狼人杀 end to end.
+// a vote in the app, ending it, the board; then 阿瓦隆 and 狼人杀 end to end.
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/party.mjs
 import { ck, done, client, table, all, login } from './lib/partykit.mjs';
 
@@ -57,6 +57,25 @@ ck('the out player is shown as 平民 (not their word)', cs[0].t().out[0].role =
 host.send({ type: 'undo' });
 await host.until(t => t.out.length === 0 && t.alive[civ], 'undo');
 ck('the host can undo a wrong tap', true);
+// a round has been said: the host opens the vote, everyone votes in the app (and can change it)
+cs[0].send({ type: 'startvote' });
+await cs[0].until((t, st) => /只有主持人/.test(st.error || ''), 'player cannot open a vote');
+ck('players cannot open a vote', !cs[0].t().vote);
+host.send({ type: 'startvote' });
+await all([...cs, host, watcher], t => t.vote, 'vote open');
+ck('everyone still in votes; the host and the watcher do not', cs[0].t().vote.voters.length === 5 && host.t().vote.mine === null && watcher.t().vote.mine === null);
+const others = [0, 1, 2, 3, 4].filter(k => k !== spy);
+cs[others[0]].send({ type: 'vote', target: others[1] });
+await host.until(t => t.voteCounts?.[0]?.[0] === others[1], 'first ballot');
+cs[others[0]].send({ type: 'vote', target: spy }); // changed their mind
+await host.until(t => t.voteCounts?.length === 1 && t.voteCounts[0][0] === spy, 'changed ballot');
+ck('a vote can be changed until the round closes', cs[others[0]].t().vote.mine === spy && host.t().vote.voted.length === 1);
+ck('only the host sees the tally while the vote is open', cs.every(c => c.t().voteCounts === null) && watcher.t().voteCounts === null);
+for (const k of others.slice(1)) cs[k].send({ type: 'vote', target: spy });
+cs[spy].send({ type: 'vote', target: -1 });
+await all([...cs, host, watcher], t => !t.vote && t.voteResult, 'vote counted');
+ck('when every vote is in the tally is shown to everyone', cs[1].t().voteResult.top.length === 1 && cs[1].t().voteResult.top[0] === spy && cs[1].t().voteResult.counts[0][1] === 4, JSON.stringify(cs[1].t().voteResult));
+ck('the vote puts nobody out by itself, and the record has who voted for whom', host.t().alive[spy] && host.t().phase === 'playing' && cs[0].t().log.some(l => l.text.startsWith('票型：')));
 host.send({ type: 'out', seat: spy });
 await host.until(t => t.winner === 'civ', 'winner suggested');
 ck('when the 卧底 is out the app tells the host 平民 won, but does not end it', host.t().phase === 'playing');
