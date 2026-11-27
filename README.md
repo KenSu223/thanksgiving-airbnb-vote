@@ -62,22 +62,33 @@ works for any group picking a place together.
   `node --test web/src/features/dodge/*.test.js`. One all-time
   leaderboard of each person's longest survival
 - 小小钓鱼 (in the Gameroom): a fishing game after 奥比岛's 小小钓鱼, played
-  like gold miner. An American Shorthair (いらすとや's grey tabby with a white
-  belly and white paws) fishes from a little boat; the hook swings under the
-  water, tap (or ↓ / space) to send it straight down, and it reels in
-  whatever it hits first, slower the heavier; coming back empty it can still
-  hook something on the way. 14 kinds to catch: fish that swim across at
-  their own depths and speeds (小丑鱼, 章鱼, the rare 龙鱼 …), pearls and
-  chests on the seabed, junk, and traps like gold miner's rocks: 河豚 costs
-  coins, 海龟 is very slow and pays nothing, 鲨鱼 is big, slow and cheap.
-  Level 1 has no traps; every level after has more. 60 seconds a level; reach the
-  coin target to get the shop (scissors, strength drink, bait, lucky clover,
-  recycling bag) and the next level, or the run is over. ✂️ / ↑ cuts loose
-  what's on the line. The score is the coins left at the end; one all-time
-  board (top 3), checked the same way as 躲技能 below, with the top 3's runs
-  to watch again. Every kind you've ever caught goes in your 图鉴. Own art and
-  sounds, drawn and synthesized in the browser. Unit tests:
-  `node --test web/src/features/fishing/sim.test.js`
+  like gold miner, and about as hard. An American Shorthair (いらすとや's grey
+  tabby with a white belly and white paws) fishes from a little boat; the hook
+  swings under the water, tap (or ↓ / space) to send it straight down, and it
+  reels in whatever it hits first, slower the heavier (an octopus takes over
+  three seconds); coming back empty it can still hook something on the way.
+  16 kinds: fish that swim across at their own depths and speeds, quicker
+  every level (小丑鱼, 章鱼 300, the rare 龙鱼 800 …), pearls (600), chests and
+  the walking 宝石蟹 (450) on the seabed, junk, and the trouble: 河豚 costs
+  coins, 海龟 is very slow and pays nothing, 水母 stings (the reel stops for a
+  moment), 鲨鱼 charge at a fish on the hook and eat it, 水雷 blow up
+  everything around them, and small fish bolt when a cast lands near them.
+  60 seconds a level. Each level asks for new coins on top of what you had
+  when you passed the one before (level N: 400 × N), so a rich level doesn't
+  carry over and what you spend in the shop (scissors, strength drink, bait,
+  lucky clover, recycling bag) has to be caught again; fall short and the run
+  is over. Level 1 is plain fishing, each level after adds a danger. ✂️ / ↑
+  cuts loose what's on the line. Measured with test-only players (60 seeds
+  each; never in the app): a careful one, pressing within ±50 ms of the right
+  moment, usually ends on level 5 (3–7) after about 5½ minutes and reaches
+  each target from level 3 on with 6–26 seconds left; a sloppy one usually
+  ends on level 3; random tapping passes level 1 95% of the time. (Before
+  this version the same careful player cleared every level it was given and
+  the sloppy one reached level 9.) The score is the coins left at the end;
+  one all-time board (top 3), checked the same way as 躲技能 below, with the
+  top 3's runs to watch again. Every kind you've ever caught goes in your
+  图鉴. Own art and sounds, drawn and synthesized in the browser. Unit tests:
+  `node --test web/src/features/fishing/sim.test.js worker/fishing/rank.test.js`
 - 末日小队 (in the Gameroom): a small "number gate" zombie shooter, after
   games like 向末日开炮. The squad runs and fires on its own; you steer it
   left and right through gates (+N, ×2, faster fire; red gates take soldiers
@@ -159,9 +170,15 @@ works for any group picking a place together.
   `/api/fish/replay`): the same tickets and replay check as 躲技能, in the
   `FishBoard` Durable Object, with the game in
   `web/src/features/fishing/sim.js` (`verify.js` replays a run). Ranked by the
-  coins at the end, then levels cleared. Each counted run's catch is added to
-  that person's 图鉴, which only they get back. No 🤖 mark: the only input is
-  when to press, so the top 3's replays are what to look at.
+  coins at the end, then levels cleared. The game has been made harder more
+  than once, so every best remembers the game version it was made on
+  (`worker/fishing/rank.js`): bests from the current version rank first, older
+  ones after them with a 「旧版」 tag (their replays can't be played any
+  more); a run on the current version that earned anything takes the place of
+  your older-version best even with fewer coins, and the older best is kept in
+  the record, never deleted. Each counted run's catch is added to that
+  person's 图鉴, which only they get back. No 🤖 mark: the only input is when to
+  press, so the top 3's replays are what to look at.
 - **末日小队** (`/api/doom/start`, `/api/doom/score`, `/api/doom/board`,
   `/api/doom/replay`): the same tickets and replay check, in the `DoomBoard`
   Durable Object, with the game in `web/src/features/doom/sim.js`. Ranked by

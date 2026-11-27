@@ -5,8 +5,13 @@
 // ending a run straight away, a ticket that's someone else's, tampered or bad
 // inputs refused, a run longer than the time since its ticket refused, the
 // board (top 3 + your own place) and the public replay that plays back the same.
+// Bests remember the game version they were made on: one made now is on the
+// current version, so its row has no `old` flag and its replay says which
+// version it is. (How older-version bests rank and get replaced can't be set up
+// from outside — tickets are only ever signed for the current version — so
+// that is covered by the unit test worker/fishing/rank.test.js.)
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/fishing.mjs
-import { newGame, step, HZ } from '../../web/src/features/fishing/sim.js';
+import { newGame, step, HZ, SIM_VERSION } from '../../web/src/features/fishing/sim.js';
 import { replay } from '../../web/src/features/fishing/verify.js';
 
 const B = process.env.TEST_BASE || 'http://localhost:8791';
@@ -58,6 +63,7 @@ ck('the board has it', [...sc.board, sc.boardMe].some(r => r && r.name === a.nam
 const landed = Object.keys(run.caught);
 ck('what it landed is the catch, and new in the 图鉴', JSON.stringify(sc.caught) === JSON.stringify(run.caught) && JSON.stringify(sc.newKinds) === JSON.stringify(landed) && landed.every(k => sc.kinds.includes(k)), JSON.stringify({ caught: sc.caught, newKinds: sc.newKinds, kinds: sc.kinds }));
 ck('the board row shows how many kinds', [...sc.board, sc.boardMe].find(r => r && r.name === a.name)?.kinds === landed.length);
+ck('a best made now is on the current version: its row is not marked old', [...sc.board, sc.boardMe].find(r => r && r.name === a.name)?.old === undefined, JSON.stringify(sc.board));
 
 // ---- refusals ----
 const again = await J('POST', '/api/fish/start', { name: a.name, token: a.token });
@@ -90,6 +96,8 @@ ck('board: at most 3 rows, each with money and how far', board.ok === true && bo
 const mine = board.board.findIndex(r => r.name === a.name);
 ck('your own place: in the top 3 or as boardMe', mine >= 0 ? board.boardMe === null : board.boardMe?.name === a.name && board.boardMe.rank > 3, JSON.stringify(board));
 ck('no runs count is shown', [...board.board, board.boardMe].every(r => !r || r.runs === undefined));
+ck('rows carry no version number, only the old flag when it applies; current bests come before old ones', [...board.board, board.boardMe].every(r => !r || (r.v === undefined && (r.old === undefined || r.old === true)))
+  && board.board.every((r, i) => i === 0 || !board.board[i - 1].old || r.old), JSON.stringify(board.board));
 const bBoard = await J('GET', `/api/fish/board?name=${encodeURIComponent(b.name)}&token=${b.token}`);
 ck('someone with no runs gets no row of their own', bBoard.boardMe === null && bBoard.board.every(r => r.name !== b.name), JSON.stringify(bBoard));
 ck('your 图鉴 comes with your board; nobody else sees which kinds', landed.every(k => board.kinds.includes(k)) && bBoard.kinds.length === 0 && (await J('GET', '/api/fish/board')).kinds.length === 0, JSON.stringify({ mine: board.kinds, theirs: bBoard.kinds }));
@@ -97,6 +105,7 @@ if (mine >= 0) {
   const rep = await J('GET', '/api/fish/replay?name=' + encodeURIComponent(a.name));
   ck('a top-3 replay is public', rep.ok === true && rep.seed === t1.seed && JSON.stringify(rep.events) === JSON.stringify(run.events), JSON.stringify(rep).slice(0, 200));
   ck('and plays back to the same money', replay(rep.seed, rep.events).money === run.money);
+  ck('the replay says which game version it was made on', rep.v === SIM_VERSION, String(rep.v));
 } else {
   const rep = await J('GET', '/api/fish/replay?name=' + encodeURIComponent(a.name));
   ck('a replay below the top 3 stays private', rep.status === 403, JSON.stringify(rep));

@@ -8,9 +8,14 @@
 // about a run is held in memory between requests (the ticket carries it,
 // signed). Bests and their replays live in this object's storage (p:<name>,
 // r:<name>), never in KV.
+// The game has got harder more than once, so each best remembers the game
+// version it was made on (rank.js): bests from the current version rank
+// first, the older ones after them with `old: true` on their rows; a run on
+// the current version takes the place of an older-version best even with fewer
+// coins, and the older best stays in the record (`old`) with its replay (ro:<name>).
 //   POST /api/fish/start { name, token }                  -> { seed, ticket }
 //   POST /api/fish/score { name, token, ticket, events }  -> { money, level, cleared, end, caught, best, newBest, rank, kinds, newKinds, board, boardMe }
-//   GET  /api/fish/board?name=&token=                     -> { board, boardMe, kinds }  (the top 3; your own place and 图鉴 if signed in)
+//   GET  /api/fish/board?name=&token=                     -> { board, boardMe, kinds }  (the top 3; your own place and 图鉴 if signed in; rows: { name, money, level, cleared, kinds, at, replay, old? })
 //   GET  /api/fish/replay?name=                           -> { name, seed, v, events, money, level, cleared, end, caught } (top 3 only)
 //   POST /scrub-user { target }  (internal only: a retired account, users/retire.js)
 import { getUsers, sameName, cleanName } from '../users/users.js';
@@ -18,9 +23,11 @@ import { j } from '../lib/http.js';
 import { TOP, topFor } from '../lib/board.js';
 import { HZ, SIM_VERSION, KIND_KEYS } from '../../web/src/features/fishing/sim.js';
 import { badEvents, replay } from '../../web/src/features/fishing/verify.js';
+import { byRank, isOld, takesOver, nextRecord } from './rank.js';
 
 const TICKET_DAYS = 7; // a run saved on the device can still be sent this long after it started
-// Only the top 3 are on the board (lib/board.js), and their replays are public,
+// Only the top 3 are on the board (lib/board.js), and their replays are public
+// (not an older version's: it can no longer be played, so its row has no ▶),
 // for everyone to check; the rest stay private.
 const OPEN_REPLAYS = TOP;
 
@@ -31,7 +38,7 @@ const unb64u = s => Uint8Array.from(atob(s.replaceAll('-', '+').replaceAll('_', 
 export class FishBoard {
   constructor(state, env) {
     this.state = state; this.env = env;
-    this.best = new Map(); // key -> { name, money, level, cleared, runs, at, kinds: [kind, …] }
+    this.best = new Map(); // key -> { name, money, level, cleared, v, runs, at, kinds: [kind, …], old?: { money, level, cleared, at, v } }
     this.loaded = null; this.key = null;
   }
   load() {
@@ -43,16 +50,17 @@ export class FishBoard {
       this.key = await crypto.subtle.importKey('raw', secret, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
     });
   }
-  // [key, record], best first: more money, then further, then whoever got there first
+  // [key, record], best first: this version's bests before older ones, then
+  // more money, then further, then whoever got there first (rank.js)
   ranked() {
-    return [...this.best].sort(([, a], [, b]) => b.money - a.money || b.cleared - a.cleared || a.at - b.at);
+    return [...this.best].sort(byRank(SIM_VERSION));
   }
   // The top 3 and the viewer's own place, as rows, with how many kinds each
   // has caught. How many runs someone has played stays private (still counted
   // in p:<name>); which kinds goes only to that person (kinds).
   boardFor(key) {
     return {
-      ...topFor(this.ranked().map(([k, r], i) => [k, { name: r.name, money: r.money, level: r.level, cleared: r.cleared, kinds: (r.kinds || []).length, at: r.at, replay: i < OPEN_REPLAYS }]), key),
+      ...topFor(this.ranked().map(([k, r], i) => [k, { name: r.name, money: r.money, level: r.level, cleared: r.cleared, kinds: (r.kinds || []).length, at: r.at, replay: i < OPEN_REPLAYS && !isOld(r, SIM_VERSION), ...(isOld(r, SIM_VERSION) ? { old: true } : {}) }]), key),
       kinds: key ? this.best.get(key)?.kinds || [] : [],
     };
   }
@@ -81,7 +89,7 @@ export class FishBoard {
     const key = cleanName(target).toLowerCase();
     if (!key) return j({ ok: true, removed: 0 });
     const removed = this.best.delete(key) ? 1 : 0;
-    await this.state.storage.delete(['p:' + key, 'r:' + key]);
+    await this.state.storage.delete(['p:' + key, 'r:' + key, 'ro:' + key]);
     return j({ ok: true, removed });
   }
 
@@ -121,13 +129,17 @@ export class FishBoard {
     const r = replay(run.s, events);
     if (r.ticks * 1000 / HZ > Date.now() - run.t + 2000) return j({ ok: false, error: '这局比实际过去的时间还长，没记上' }, 400);
     const prev = this.best.get(key), now = Date.now();
-    const newBest = !prev || r.money > prev.money || (r.money === prev.money && r.cleared > prev.cleared);
+    const newBest = takesOver(prev, r, SIM_VERSION);
     // the 图鉴 grows with every run that counts, best or not
     const had = new Set(prev?.kinds || []), newKinds = KIND_KEYS.filter(k => r.caught[k] && !had.has(k));
     const kinds = KIND_KEYS.filter(k => had.has(k) || r.caught[k]);
-    const rec = newBest
-      ? { name: user.name, money: r.money, level: r.level, cleared: r.cleared, runs: (prev?.runs || 0) + 1, at: now, kinds }
-      : { ...prev, name: user.name, runs: prev.runs + 1, kinds };
+    const rec = nextRecord(prev, r, { name: user.name, now, version: SIM_VERSION, kinds });
+    // taking over from an older version's best: its replay is put aside first
+    // (it can't be played any more, but nothing of anyone's is thrown away)
+    if (newBest && prev && isOld(prev, SIM_VERSION)) {
+      const was = await this.state.storage.get('r:' + key);
+      if (was) await this.state.storage.put('ro:' + key, was);
+    }
     this.best.set(key, rec);
     await this.state.storage.put('p:' + key, rec);
     if (newBest) await this.state.storage.put('r:' + key, { name: user.name, seed: run.s, v: run.v, events, money: r.money, level: r.level, cleared: r.cleared, end: r.end, caught: r.caught, at: now });

@@ -48,6 +48,14 @@ const SOUNDS = {
   big: t => { tone(t, { f0: 1046, dur: 0.16, vol: 0.22 }); tone(t + 0.07, { f0: 1318, dur: 0.18, vol: 0.22 }); tone(t + 0.14, { f0: 2093, dur: 0.4, vol: 0.24 }); },
   junk: t => tone(t, { f0: 140, f1: 70, dur: 0.22, type: 'square', vol: 0.12 }),
   ouch: t => { tone(t, { f0: 520, f1: 180, dur: 0.25, type: 'sawtooth', vol: 0.14 }); tone(t + 0.08, { f0: 300, f1: 120, dur: 0.25, type: 'square', vol: 0.1 }); },
+  // a shark's bite: a low growl, then the snap
+  chomp: t => { tone(t, { f0: 170, f1: 60, dur: 0.22, type: 'sawtooth', vol: 0.22 }); noise(t + 0.09, { dur: 0.07, vol: 0.4, f0: 3200, f1: 900, type: 'bandpass' }); tone(t + 0.1, { f0: 90, f1: 45, dur: 0.2, type: 'square', vol: 0.16 }); },
+  // a mine going off under water: a thump and a long rumble
+  boom: t => { tone(t, { f0: 140, f1: 32, dur: 0.5, type: 'sine', vol: 0.5 }); noise(t, { dur: 0.6, vol: 0.45, f0: 900, f1: 60 }); noise(t + 0.02, { dur: 0.12, vol: 0.3, f0: 4000, f1: 800, type: 'bandpass' }); },
+  // a jellyfish's sting: a buzz
+  zap: t => { tone(t, { f0: 880, f1: 220, dur: 0.22, type: 'sawtooth', vol: 0.12 }); tone(t + 0.03, { f0: 1320, f1: 330, dur: 0.18, type: 'square', vol: 0.07 }); },
+  // fish bolting: a little swish
+  dart: t => noise(t, { dur: 0.1, vol: 0.08, f0: 1800, f1: 3600, type: 'bandpass' }),
   cut: t => { noise(t, { dur: 0.05, vol: 0.3, f0: 6000, f1: 3000, type: 'highpass' }); noise(t + 0.07, { dur: 0.05, vol: 0.3, f0: 6000, f1: 3000, type: 'highpass' }); },
   tick: t => tone(t, { f0: 1000, dur: 0.05, type: 'square', vol: 0.08 }),
   pass: t => [523, 659, 784, 1046].forEach((f, i) => tone(t + i * 0.09, { f0: f, dur: 0.25, type: 'triangle', vol: 0.25 })),

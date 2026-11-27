@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { newGame, step, HZ, W, H, WATER, GOODS, KINDS, target } from './sim.js';
+import { newGame, step, quota, HZ, W, H, WATER, GOODS, KINDS } from './sim.js';
 import { draw, POP_AT, surfaceX } from './draw.js';
 import * as sfx from './sfx.js';
 
@@ -8,20 +8,32 @@ import * as sfx from './sfx.js';
 // replays them to check the score (verify.js), and a best run can be watched
 // again. With `replay` (a recorded input list) it plays those back instead of
 // taking input, at 1×, 2× or 4×. Each level opens with a short card (第 N 关 ·
-// 目标) while the clock waits.
+// 目标, and on the levels where a new danger first shows up, one line about
+// it) while the clock waits.
 // Tap / click the water, ↓ or space: cast. ✂️ or ↑: cut loose what's on the line.
 // The hook swings under the water, and on the way back it still catches things.
+// What the sim says happened each tick (a bite, a blast, a sting…) becomes the
+// sounds, the splashes and the words popping up; the line under the field
+// says what to do about what's on the hook.
 const ASPECT = W / H;
 const PAD = 8, GAP = 8, BAR_H = 48; // around the field, and the button bar under it (fishing.css)
 const SPEEDS = [1, 2, 4];
-const CARD_MS = 1400;
+const CARD_MS = 1400, TIP_MS = 2600; // a level card; one with a new danger to read about
+// The level where each danger first shows up (sim.js STOCK): its card says so.
+const TIPS = {
+  2: '🦈 鲨鱼来了：它看见钩上的鱼会冲过来吃掉，等它游过去再收',
+  3: '💣 水雷钩到就炸，周围全没了 · 水母蜇人，线会麻一会儿',
+  4: '🐉 最深处有龙鱼，值 800；小鱼被钩子吓到会窜走',
+  5: '🦀 宝石蟹在海底走走停停，值 450',
+};
 const coins = n => '🪙 ' + n.toLocaleString('en-US');
 // what the buttons and the shop need; React only hears when it changes
 function viewOf(g) {
   const carrying = g.phase === 'play' && g.hook.state === 'back' && g.hook.item ? g.hook.item.kind : null;
-  const v = { phase: g.phase, level: g.level, money: g.money, target: g.target, scissors: g.scissors, carrying,
+  const stung = !!carrying && g.hook.stun > 0;
+  const v = { phase: g.phase, level: g.level, money: g.money, target: g.target, nextTarget: g.nextTarget, scissors: g.scissors, carrying, stung,
     canNext: g.phase === 'play' && g.money >= g.target, shop: g.shop };
-  v.key = [v.phase, v.level, v.money, v.scissors, carrying, v.canNext, (g.shop || []).map(o => +o.bought).join('')].join('|');
+  v.key = [v.phase, v.level, v.money, v.scissors, carrying, stung, v.canNext, (g.shop || []).map(o => +o.bought).join('')].join('|');
   return v;
 }
 const GOOD = Object.fromEntries(GOODS.map(x => [x.key, x]));
@@ -63,8 +75,9 @@ export default function FishGame({ seed, paused, onPause, onResume, onDone, onLe
   // the level card: on for a moment, then the clock starts
   useEffect(() => {
     if (!card || hold) return;
-    cardUntil.current = performance.now() + CARD_MS / speedRef.current;
-    const id = setTimeout(() => setCard(0), CARD_MS / speedRef.current);
+    const ms = (TIPS[card] ? TIP_MS : CARD_MS) / speedRef.current;
+    cardUntil.current = performance.now() + ms;
+    const id = setTimeout(() => setCard(0), ms);
     return () => clearTimeout(id);
   }, [card, hold]);
 
@@ -77,11 +90,23 @@ export default function FishGame({ seed, paused, onPause, onResume, onDone, onLe
     const ctx = c.getContext('2d');
     const scale = (size.w * dpr) / W;
     let raf = 0, last = performance.now(), acc = 0;
-    const pop = (text, color, now, big, dy = 0) => fx.current.push({ kind: 'pop', text, color, x: POP_AT.x, y: POP_AT.y + dy, at: now, big });
+    const pop = (text, color, now, big, dy = 0, at = POP_AT) => fx.current.push({ kind: 'pop', text, color, x: Math.max(66, Math.min(W - 66, at.x)), y: at.y + dy, at: now, big });
     const happened = (sim, now) => {
       for (const h of sim.happened) {
         if (h.type === 'cast') { sfx.play('cast'); fx.current.push({ kind: 'ring', x: surfaceX(sim.hook.a), y: WATER, at: now + 180 }); }
-        else if (h.type === 'hook') sfx.play('hook');
+        else if (h.type === 'hook') {
+          if (h.kind === 'jelly') { sfx.play('zap'); pop('⚡ 被蜇了！', '#fff27a', now, false, -14, sim.hook.item); } else sfx.play('hook');
+        } else if (h.type === 'bite') {
+          sfx.play('chomp');
+          fx.current.push({ kind: 'chomp', x: h.x, y: h.y, at: now });
+          pop('🦈 被吃了！', '#ff8a7a', now, true, -18, h);
+        } else if (h.type === 'boom') {
+          sfx.play('boom');
+          fx.current.push({ kind: 'boom', x: h.x, y: h.y, at: now });
+          pop(h.gone.length ? `💥 炸没了 ${h.gone.length} 个` : '💥 轰！', '#ffd08a', now, true, -30, h);
+        } else if (h.type === 'first') pop('新！' + KINDS[h.kind].label, '#b8ffcf', now + 250, false, 20);
+        else if (h.type === 'lost') pop('时间到，钩上的没了', '#ff8a7a', now, false);
+        else if (h.type === 'spook') sfx.play('dart');
         else if (h.type === 'miss') sfx.play('miss');
         else if (h.type === 'cut') { sfx.play('cut'); fx.current.push({ kind: 'ring', x: h.x, y: h.y, at: now }); pop('✂️', '#fff', now, false); }
         else if (h.type === 'buy') sfx.play('buy');
@@ -169,8 +194,13 @@ export default function FishGame({ seed, paused, onPause, onResume, onDone, onLe
     sfx.unlock();
     cast();
   };
-  const nextTarget = target(view.level + 1);
-  const junk = view.carrying && KINDS[view.carrying].group === 'junk';
+  // not worth the reeling: junk, a turtle (pays nothing), a shark, a puffer (costs coins), a jellyfish (stings)
+  const unwanted = view.carrying && (KINDS[view.carrying].group === 'junk' || ['turtle', 'shark', 'puffer', 'jelly'].includes(view.carrying));
+  const hint = view.phase === 'over' ? '' : replay ? '回放：操作和原来那局一模一样' : view.phase === 'shop' ? '商店：买完点「下一关」'
+    : view.stung ? (view.scissors ? '被水母蜇了，线麻住了 · ✂️ 能甩掉' : '被水母蜇了，线麻住了')
+    : unwanted && view.scissors ? `${KINDS[view.carrying].label}不划算 · 点 ✂️${touch ? '' : '（↑）'}放掉`
+    : view.carrying && view.level >= 2 && KINDS[view.carrying].prey ? '收线中 · 当心鲨鱼'
+    : touch ? '点水面放线' : '点画面 / ↓ / 空格 放线';
 
   return (
     <div ref={wrap} className="fh-stage" onPointerDownCapture={sfx.unlock}>
@@ -188,14 +218,16 @@ export default function FishGame({ seed, paused, onPause, onResume, onDone, onLe
           <div className="fh-card" aria-live="polite">
             <small>第 {card} 关</small>
             <strong>目标 {coins(view.target)}</strong>
-            <span>{card === 1 ? '60 秒内钓到这么多金币' : `还差 ${coins(Math.max(0, view.target - view.money))}`}</span>
+            <span>{card === 1 ? '60 秒内钓到这么多金币' : `这关要新钓 ${coins(quota(card))} · 还差 ${coins(Math.max(0, view.target - view.money))}`}</span>
+            {TIPS[card] && <em>{TIPS[card]}</em>}
           </div>
         )}
         {view.phase === 'shop' && (
           <div className="fh-shop">
             <div className="fh-shop-head">
               <div className="text-xl font-extrabold">🎉 第 {view.level} 关过了！</div>
-              <div className="text-sm text-sky-100/90">现在 {coins(view.money)} · 下一关目标 {coins(nextTarget)}</div>
+              <div className="text-sm text-sky-100/90">现在 {coins(view.money)} · 下一关目标 {coins(view.nextTarget)}</div>
+              <div className="text-xs text-amber-200">下一关要再钓 {coins(view.nextTarget - view.money)}（{coins(quota(view.level + 1))}{view.nextTarget - view.money > quota(view.level + 1) ? ' + 买东西花掉的' : ''}）</div>
             </div>
             <div className="fh-goods">
               {view.shop.map((o, i) => {
@@ -209,7 +241,7 @@ export default function FishGame({ seed, paused, onPause, onResume, onDone, onLe
                 );
               })}
             </div>
-            <p className="fh-shop-note">买东西会花金币，成绩是最后剩下的金币。现在有 ✂️ ×{view.scissors}</p>
+            <p className="fh-shop-note">目标已经定了：买东西花掉的金币，下一关要多钓回来。成绩是最后剩下的金币。现在有 ✂️ ×{view.scissors}</p>
             {!replay && <div className="flex gap-2 justify-center">
               <button className="fh-btn fh-btn-sun" onClick={next}>下一关 →</button>
               <button className="fh-btn fh-btn-dim" onClick={end}>到这里结算</button>
@@ -226,9 +258,9 @@ export default function FishGame({ seed, paused, onPause, onResume, onDone, onLe
         {children}
       </div>
       <div className="fh-bar" style={{ width: Math.max(size.w, 280) }}>
-        <button className={'fh-cut' + (junk && view.scissors ? ' ready' : '')} onClick={cut} disabled={!!replay || !view.scissors || view.phase !== 'play'}
+        <button className={'fh-cut' + (unwanted && view.scissors ? ' ready' : '')} onClick={cut} disabled={!!replay || !view.scissors || view.phase !== 'play'}
           aria-label={`剪刀：剪断线放走钩上的东西，还有 ${view.scissors} 把${touch ? '' : '（↑）'}`}>✂️<b>×{view.scissors}</b>{!touch && <small>↑</small>}</button>
-        <span className="fh-hint">{view.phase === 'over' ? '' : replay ? '回放：操作和原来那局一模一样' : view.phase === 'shop' ? '商店：买完点「下一关」' : touch ? '点水面放线' : '点画面 / ↓ / 空格 放线'}</span>
+        <span className="fh-hint">{hint}</span>
         {view.canNext && !card
           ? <button className="fh-next" onClick={next} disabled={!!replay}>够了，下一关 →</button>
           : <span className="fh-next-space" aria-hidden="true" />}
