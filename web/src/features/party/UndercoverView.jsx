@@ -2,13 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useConfirm } from '../../components/ConfirmDialog.jsx';
-import { useParty, PartyFrame, TopBar, Banner, SeatGrid, SecretCard, VoteBar, LogList, WinsBoard, Choice } from './PartyKit.jsx';
+import { useParty, PartyFrame, TopBar, Banner, SeatGrid, SecretCard, LogList, WinsBoard, Choice } from './PartyKit.jsx';
 import { ReactionBar } from '../games/Reactions.jsx';
 
 // 谁是卧底：有一个真人主持人。主持人坐主持位（不算玩家），自己想好平民的词和卧底的词写进来，
 // 定几个卧底、几个白板（随机分，或者点座位指定），然后发词。每个人只看到自己的词。
-// 描述、讨论当面来；投票在 app 里：主持人点「开始投票」，大家点座位投票，投完点别的座位
-// 能改（或者弃票），票数最多的主持人点 TA 出局，app 显示他是什么身份（不显示词）。
+// 描述、讨论、投票都当面来；谁被投出去由主持人点，app 显示他是什么身份（不显示词）。
 // 全程手动：不念、不计时、不自动往下走；哪边赢了 app 会提醒，由主持人点结束。
 const PHASES = { waiting: '等人', playing: '进行中', result: '这局结束' };
 const ROLE_TONE = { 平民: 'good', 卧底: 'bad', 白板: 'gold' };
@@ -55,23 +54,12 @@ export default function UndercoverView({ active }) {
   };
   const dim = i => players.includes(i) && t?.alive && !t.alive[i] && ph !== 'waiting';
 
-  // 投票：点座位选人，再点「投 X 号」；投完点了「改票」座位又能点了
-  const v = t?.vote;
-  const iAmVoter = !!v && v.voters.includes(me);
-  const [choice, setChoice] = useState(null);
-  const [changing, setChanging] = useState(false);
-  const voteKey = v ? 'v' + (t.voteRound || 0) : 'x' + (t.voteResult ? 'r' : '');
-  useEffect(() => { setChoice(null); setChanging(false); }, [voteKey]);
-
   // what tapping a seat does: the host picks 卧底 / 白板 before the game, and taps who's out during it
   let pickable = null, onPick = null;
   if (picking) { pickable = t.seats.map((s, i) => (s ? i : -1)).filter(i => i >= 0); onPick = i => send({ type: 'settings', settings: { pick: { seat: i, role: CYCLE[setup.picks[i]] } } }); }
   else if (isMc && playing) {
     pickable = players.filter(k => t.alive[k]);
     onPick = async i => { if (await confirm({ title: (i + 1) + ' 号 ' + (t.seats[i]?.name || '') + ' 出局？', message: '大家投出去的是 TA 吧？点错了可以撤销。', confirmText: '出局' })) send({ type: 'out', seat: i }); };
-  } else if (iAmVoter && (v.mine == null || changing)) {
-    pickable = v.targets.filter(k => !(v.noSelf && k === me));
-    onPick = setChoice;
   }
 
   let title = '谁是卧底', sub = '';
@@ -81,8 +69,8 @@ export default function UndercoverView({ active }) {
       else if (isMc) { title = '写好两个词，定好卧底和白板，点「发词」'; sub = n + ' 个玩家 · 至少 4 个'; }
       else { title = '等主持人 ' + t.mc.name + ' 发词'; sub = n + ' 个玩家 · 点空座位坐下'; }
     } else if (playing) {
-      if (v) { title = v.label === 'PK 投票' ? '平票：在他们里面投一个' : '投票：你觉得谁是卧底？'; sub = '已投 ' + v.voted.length + '/' + v.voters.length + (iAmVoter ? ' · 点座位选人，投完还能改' : ''); }
-      else { title = isMc ? '投出去了谁，就点谁' : '看你的词，当面轮流描述、投票'; sub = (t.counts ? t.counts.spies + ' 个卧底' + (t.counts.blanks ? '、' + t.counts.blanks + ' 个白板' : '') + ' · ' : '') + '场上还有 ' + players.filter(k => t.alive[k]).length + ' 人'; }
+      title = isMc ? '投出去了谁，就点谁' : '看你的词，当面轮流描述、投票';
+      sub = (t.counts ? t.counts.spies + ' 个卧底' + (t.counts.blanks ? '、' + t.counts.blanks + ' 个白板' : '') + ' · ' : '') + '场上还有 ' + players.filter(k => t.alive[k]).length + ' 人';
     } else if (ph === 'result') { title = t.result?.title || '这局结束'; sub = won ? '你赢了 🎉' : ''; }
   }
 
@@ -120,25 +108,10 @@ export default function UndercoverView({ active }) {
 
   // the host's controls during a game
   const winner = t?.winner;
-  const vr = t?.voteResult;
-  const voteLine = vr && !v && (vr.top.length === 0 ? '这轮没人投票，没人出局'
-    : vr.top.length > 1 ? '平票：' + vr.top.map(k => k + 1).join('、') + ' 号（各 ' + (vr.counts[0]?.[1] || 0) + ' 票）'
-    : '票数最多：' + (vr.top[0] + 1) + ' 号（' + (vr.counts[0]?.[1] || 0) + ' 票）');
   const hostPanel = isMc && playing && (
     <div className="pt-panel">
       <h3>主持人（只有你看得到）</h3>
       <p className="pt-hint">平民的词「<b>{t.words?.civ}</b>」{t.words?.spy ? <> · 卧底的词「<b>{t.words.spy}</b>」</> : null} · 点座位标记谁被投出去</p>
-      <div className="pt-actions">
-        {!v && <button className="pt-btn main" onClick={() => send({ type: 'startvote' })}>开始投票</button>}
-        {v && <button className="pt-btn" onClick={() => send({ type: 'closevote' })}>结束投票</button>}
-        <span className="pt-hint">{v ? '已投 ' + v.voted.length + '/' + v.voters.length + (t.voteCounts?.length ? ' · ' + t.voteCounts.map(([k, c]) => (k + 1) + ' 号 ' + c + ' 票').join('、') : '') : '大家在 app 里投票，票数最多的点 TA 出局'}</span>
-      </div>
-      {vr && !v && vr.top.length > 1 && (
-        <div className="pt-actions">
-          <button className="pt-btn main" onClick={() => send({ type: 'startvote', pk: vr.top })}>平票再投一次</button>
-          <span className="pt-hint">只在平票的人里面投</span>
-        </div>
-      )}
       {winner && <p className="pt-hint strong">按规则{winner === 'civ' ? '平民' : '卧底'}已经赢了，可以结束了</p>}
       <div className="pt-actions">
         <button className="pt-btn" onClick={() => send({ type: 'undo' })} disabled={!t.out?.length}>撤销上一次出局</button>
@@ -164,11 +137,9 @@ export default function UndercoverView({ active }) {
         <PartyFrame theme="undercover">
           <TopBar p={p} phases={PHASES} title="🕵️ 谁是卧底" />
           <Banner p={p} title={title} sub={sub} tone={isMc ? 'hot' : ''} />
-          {voteLine && <p className="pt-hint strong">{voteLine}</p>}
           {chair}
           {setupPanel}
           {hostPanel}
-          <VoteBar p={p} choice={choice} setChoice={setChoice} changeable changing={changing} setChanging={setChanging} />
           {card}
           {ph === 'result' && reveal && (
             <div className="pt-result">
@@ -180,7 +151,7 @@ export default function UndercoverView({ active }) {
               {isMc && <p className="pt-hint mt-2">想好下一组词，就可以再来一局</p>}
             </div>
           )}
-          <SeatGrid p={p} badges={badges} pickable={pickable} picked={choice} onPick={onPick} dim={dim} />
+          <SeatGrid p={p} badges={badges} pickable={pickable} picked={null} onPick={onPick} dim={dim} />
           {!seated && t && !mc && <p className="pt-hint">没有主持人就开不了局：谁来想词谁就坐主持位。</p>}
           {!seated && t && (ph === 'waiting' || ph === 'result') && <p className="pt-hint">玩家点一个空座位坐下。</p>}
           <LogList log={t?.log} />
@@ -190,7 +161,7 @@ export default function UndercoverView({ active }) {
       </div>
       <WinsBoard title="谁是卧底 胜场榜" rows={st?.board || []} me={st?.boardMe}>
         <p><b>怎么玩：</b>先有一个人坐主持位当主持人（不算玩家）。主持人自己想一对像但不一样的词，写进来，定几个卧底、几个白板（随机，或者点座位指定），点「发词」。</p>
-        <p className="mt-1">每个人点开看自己的词（别给旁边的人看）。卧底的词和大家的很像但不一样，白板没有词，谁也不知道自己是不是卧底。大家当面轮流描述、讨论，主持人点「开始投票」，大家在 app 里点座位投票，投完点「改票」还能改；票数最多的主持人点 TA 出局，app 显示他是平民、卧底还是白板。平票就再投一次。</p>
+        <p className="mt-1">每个人点开看自己的词（别给旁边的人看）。卧底的词和大家的很像但不一样，白板没有词，谁也不知道自己是不是卧底。大家当面轮流描述、讨论、投票，投出去的人由主持人点一下，app 显示他是平民、卧底还是白板。</p>
         <p className="mt-1">卧底（和白板）全出局平民赢；卧底人数追上平民，或者只剩 3 个人时卧底还在，卧底赢——app 会提醒主持人，由主持人点结束。</p>
       </WinsBoard>
     </div>

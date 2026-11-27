@@ -3,13 +3,10 @@
 // words and types them in — 平民的词 and 卧底的词 — sets how many 卧底 and 白板
 // (any number), and either lets the app deal them at random or taps who gets
 // which. Everyone then sees only their own word (白板 sees that they're 白板).
-// The game itself happens out loud: describing and discussing. Voting is in
-// the app: the host opens a round, everyone alive taps a seat (and can change
-// their vote until the round closes — or the host ends it early), the tally is
-// announced, and the host taps whoever was voted out. The app just keeps
-// track — the host taps whoever is voted out, the app shows what they were
-// (平民 / 卧底 / 白板, not their word), and the host can undo a wrong tap.
-// Nothing is timed, nothing is read aloud, nothing moves on its own.
+// The game itself happens out loud: describing, discussing, voting by hand.
+// The app just keeps track — the host taps whoever is voted out, the app shows
+// what they were (平民 / 卧底 / 白板, not their word), and the host can undo a
+// wrong tap. Nothing is timed, nothing is read aloud, nothing moves on its own.
 // When one side has clearly won the app says so, but the host ends the game:
 // 平民赢 / 卧底赢 (counted on the board) or 结束不算.
 //   平民 win when every 卧底 and 白板 is out; 卧底 (with 白板) win when they're
@@ -29,8 +26,6 @@ export class UndercoverGame extends PartyRoom {
     this.setup = { civWord: '', spyWord: '', spies: 1, blanks: 0, mode: 'random', picks: {} };
     this.roles = []; this.words = []; this.alive = []; this.out = [];
     this.civWord = ''; this.spyWord = '';
-    this.voteResult = null; // the last closed round's tally, until someone's out or a new round starts
-    this.voteRound = 0;
   }
 
   // ---- the host chair ----
@@ -136,7 +131,7 @@ export class UndercoverGame extends PartyRoom {
     }
     this.civWord = s.civWord; this.spyWord = s.spyWord;
     this.players = players; this.game++; this.round = 0; this.result = null; this.out = [];
-    this.speech = this.voting = this.looking = null; this.say = []; this.log = []; this.voteResult = null;
+    this.speech = this.voting = this.looking = null; this.say = []; this.log = [];
     this.host = key; this.phase = 'playing';
     this.touchMc();
     this.note('第 ' + this.game + ' 局：' + n + ' 个玩家，' + spySeats.length + ' 个卧底' + (blankSeats.length ? '、' + blankSeats.length + ' 个白板' : '') + ' · 主持人 ' + this.mc.name + (s.mode === 'pick' ? '（指定的）' : '（随机的）'));
@@ -145,59 +140,6 @@ export class UndercoverGame extends PartyRoom {
     return null;
   }
   living() { return this.players.filter(k => this.alive[k]); }
-
-  // ---- in-app voting: the host opens a round; everyone alive votes and can
-  // change their vote (a new ballot overwrites the old one, base vote()) until
-  // the round closes — when everyone alive has voted, or the host ends it
-  // early. No timer, no phase change: the game stays 'playing' throughout.
-  // The tally is announced and kept as voteResult for the host to act on;
-  // elimination itself is still the host tapping a seat (see eliminate).
-  startVote(key, pk = null) {
-    if (!this.isMc(key)) return '只有主持人能开始投票';
-    if (this.phase !== 'playing') return '现在不在局里';
-    if (this.voting) return '已经在投票了';
-    const live = this.living();
-    const tied = Array.isArray(pk) ? pk.map(Number).filter(k => live.includes(k)) : [];
-    const targets = tied.length ? tied : live;
-    if (targets.length < 2) return '场上人太少，没法投票';
-    const voters = tied.length ? live.filter(k => !targets.includes(k)) : live;
-    if (!voters.length) return '没人能投票';
-    this.voteRound++;
-    this.voteResult = null;
-    // set directly (not base startVote: that moves the phase and starts a
-    // timer, and this game has neither); base vote()/endVote()/tally() work
-    // on this shape as-is.
-    this.voting = { voters, targets, label: tied.length ? 'PK 投票' : '投票', ballots: new Map(), noSelf: true, weight: () => 1,
-      pk: tied.length ? targets : null, round: this.voteRound, then: r => this.counted(r, tied.length ? targets : null) };
-    this.announce(tied.length
-      ? '平票的 ' + targets.map(k => k + 1).join('、') + ' 号再说完了，其他人在他们里面投一个'
-      : '开始投票，投你觉得是卧底的人');
-    this.touchMc();
-    return null;
-  }
-  // The host ends a round early (partial ballots still count).
-  closeVote(key) {
-    if (!this.isMc(key)) return '只有主持人能结束投票';
-    if (!this.voting) return '现在没有在投的票';
-    this.endVote();
-    return null;
-  }
-  counted(r, pk) {
-    if (r.counts.length) this.note('票型：' + this.tally(r));
-    this.voteResult = { top: r.top, counts: r.counts, pk: !!pk };
-    if (!r.top.length) { this.announce('没人投票，这轮没人出局'); return; }
-    if (r.top.length > 1) {
-      this.announce(pk ? '又平票了，这轮没人出局' : r.top.map(k => k + 1).join('、') + ' 号平票，主持人可以再投一次');
-      return;
-    }
-    this.announce('票数最多的是 ' + this.num(r.top[0]) + '（' + r.counts[0][1] + ' 票），主持人点 TA 出局');
-  }
-  // Live per-target counts, for the host's eyes only (players see just 已投 N/M).
-  liveCounts() {
-    const m = new Map();
-    for (const t of this.voting.ballots.values()) if (t >= 0) m.set(t, (m.get(t) || 0) + 1);
-    return [...m].sort((a, b) => b[1] - a[1]);
-  }
 
   // ---- the host taps who's out (and can take a wrong tap back) ----
   eliminate(key, seat) {
@@ -208,17 +150,6 @@ export class UndercoverGame extends PartyRoom {
     this.alive[k] = false;
     this.out.push({ seat: k, role: this.roles[k] });
     this.note(this.nameOf(k) + ' 出局，是' + ROLE[this.roles[k]]);
-    this.voteResult = null; // the last tally is spent once someone's out
-    // a vote in progress loses the out player: their ballot doesn't count,
-    // and they stop being a voter or a target
-    const v = this.voting;
-    if (v) {
-      v.voters = v.voters.filter(x => x !== k);
-      v.targets = v.targets.filter(x => x !== k);
-      v.ballots.delete(k);
-      if (!v.voters.length || !v.targets.length) this.voting = null;
-      else if (v.voters.every(x => v.ballots.has(x))) this.endVote();
-    }
     this.touchMc();
     return null;
   }
@@ -229,18 +160,6 @@ export class UndercoverGame extends PartyRoom {
     if (!last) return '还没有人出局';
     this.alive[last.seat] = true;
     this.note('撤销：' + this.nameOf(last.seat) + ' 回到场上');
-    // a vote in progress gets them back: a tied target as a target, anyone
-    // else as a voter and a target (no ballot yet — they vote again)
-    const v = this.voting;
-    if (v) {
-      if (v.pk) {
-        if (v.pk.includes(last.seat)) { if (!v.targets.includes(last.seat)) v.targets.push(last.seat); }
-        else if (!v.voters.includes(last.seat)) v.voters.push(last.seat);
-      } else {
-        if (!v.voters.includes(last.seat)) v.voters.push(last.seat);
-        if (!v.targets.includes(last.seat)) v.targets.push(last.seat);
-      }
-    }
     this.touchMc();
     return null;
   }
@@ -259,7 +178,6 @@ export class UndercoverGame extends PartyRoom {
     if (this.phase !== 'playing') return '现在不在局里';
     const title = side === 'civ' ? '平民赢了' : side === 'spy' ? '卧底赢了' : '这局结束（不算输赢）';
     this.note(title + '。平民的词是「' + this.civWord + '」' + (this.spyWord ? '，卧底的词是「' + this.spyWord + '」' : ''));
-    this.voteResult = null;
     const winners = side === 'civ' ? k => this.roles[k] === 'civ' : side === 'spy' ? k => this.roles[k] !== 'civ' : null;
     this.finish(winners, title, { side: side === 'civ' || side === 'spy' ? side : null, ...this.reveal() });
     this.touchMc();
@@ -285,12 +203,6 @@ export class UndercoverGame extends PartyRoom {
       all: isMc && playing ? this.players.map(k => ({ seat: k, role: ROLE[this.roles[k]], word: this.words[k] })) : null,
       words: isMc && playing ? { civ: this.civWord, spy: this.spyWord } : null,
       winner: isMc ? this.winner() : null,
-      voteRound: this.voteRound,
-      voteResult: this.voteResult,
-      // the host watches the tally live (counts and who voted for whom);
-      // players only see how many have voted, in the base view's vote
-      voteCounts: isMc && this.voting ? this.liveCounts() : null,
-      voteBallots: isMc && this.voting ? [...this.voting.ballots].map(([k, t]) => [k, t]) : null,
       reveal: over && this.result?.roles ? { roles: this.result.roles, words: this.result.words, civWord: this.result.civWord, spyWord: this.result.spyWord } : null,
     };
   }
