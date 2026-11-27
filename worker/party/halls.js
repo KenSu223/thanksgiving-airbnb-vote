@@ -25,7 +25,10 @@ export const byWins = (a, b) => (b.wins || 0) - (a.wins || 0)
 const party = (Game, actions = {}) => ({ Game, rooms: ROOMS, actions: { ...COMMON, ...actions }, idleNotice: '太久没动，帮你站起来了', rejoin: true, boardSort: byWins });
 
 // 谁是卧底 is run by a person: the host chair (sit with { host: true }), the host's
-// setup (settings), dealing, tapping who's out, undo, and ending it.
+// setup (settings), dealing, tapping who's out, undo, and ending it. Voting is
+// in the app too: the host opens a round (startvote; pk = the tied seats for a
+// re-vote), everyone alive votes (vote, already in COMMON) and can change
+// their vote until the round closes, or the host ends it early (closevote).
 export class UndercoverHall extends TableHall {
   constructor(state, env) {
     super(state, env, party(UndercoverGame, {
@@ -33,6 +36,8 @@ export class UndercoverHall extends TableHall {
       out: (t, key, m) => t.eliminate(key, m.seat),
       undo: (t, key) => t.undo(key),
       end: (t, key, m) => t.end(key, m.side),
+      startvote: (t, key, m) => t.startVote(key, m.pk),
+      closevote: (t, key) => t.closeVote(key),
     }));
   }
 }

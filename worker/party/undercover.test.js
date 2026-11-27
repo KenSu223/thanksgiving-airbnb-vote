@@ -129,3 +129,94 @@ test('between games: the host keeps the chair, frees it, players can then take i
   assert.equal(t.seats[0], null);
   assert.ok(t.isMc(keys[0]));
 });
+
+test('in-app voting: the host opens it, a vote can change, the tally decides', () => {
+  const { t, keys, timers } = table(5, 4);
+  plan(t, { civWord: '牛奶', spyWord: '豆浆', spies: 1 });
+  t.deal('mc');
+  const spy = t.players.find(k => t.roles[k] === 'spy');
+  const other = t.players.find(k => t.roles[k] === 'civ');
+  const rest = t.players.filter(k => k !== spy && k !== other);
+  // only the host opens / ends a round; nobody votes before one is open
+  assert.match(t.startVote(keys[0]), /只有主持人/);
+  assert.match(t.closeVote(keys[0]), /只有主持人/);
+  assert.match(t.vote(keys[0], spy), /不用投/);
+  assert.equal(t.startVote('mc'), null);
+  assert.match(t.startVote('mc'), /已经在投票/);
+  assert.equal(timers.size, 0, 'voting is not timed');
+  const v = t.view(keys[0]);
+  assert.ok(v.vote);
+  assert.deepEqual(v.vote.voters, t.players);
+  assert.equal(v.voteCounts, null, 'players do not see the live tally');
+  assert.deepEqual(t.view('mc').voteCounts, []);
+  assert.match(t.vote(keys[rest[0]], rest[0]), /不能投自己/);
+  // two vote the spy; a third votes a 平民 then changes their mind to the spy
+  assert.equal(t.vote(keys[rest[0]], spy), null);
+  assert.equal(t.vote(keys[rest[1]], spy), null);
+  assert.equal(t.vote(keys[rest[2]], other), null);
+  assert.deepEqual(t.view('mc').voteCounts, [[spy, 2], [other, 1]]);
+  assert.equal(t.vote(keys[rest[2]], spy), null); // the changed vote overwrites the old one
+  assert.equal(t.view(keys[rest[2]]).vote.mine, spy);
+  assert.deepEqual(t.view('mc').voteCounts, [[spy, 3]]);
+  assert.equal(t.vote(keys[other], spy), null);
+  assert.equal(t.vote(keys[spy], other), null); // everyone in: the round closes by itself
+  assert.equal(t.voting, null);
+  assert.equal(t.phase, 'playing', 'the game stays in play; the host taps who is out');
+  assert.deepEqual(t.view(keys[0]).voteResult.top, [spy]);
+  assert.deepEqual(t.view(keys[0]).voteResult.counts, [[spy, 4], [other, 1]]);
+  assert.ok(t.log.some(l => l.text.startsWith('票型：')), 'the breakdown is in the record');
+  assert.ok(t.log.some(l => l.text.includes('票数最多的是')), 'the result is announced');
+  assert.match(t.vote(keys[0], spy), /不用投/);
+  // the tally is spent once the host taps someone out
+  assert.equal(t.eliminate('mc', spy), null);
+  assert.equal(t.view(keys[0]).voteResult, null);
+});
+
+test('a tie goes to a PK vote among the tied, and the host can end a round early', () => {
+  const { t, keys } = table(5, 7);
+  plan(t, { civWord: '牛奶', spyWord: '豆浆', spies: 1 });
+  t.deal('mc');
+  assert.equal(t.startVote('mc'), null);
+  t.vote(keys[0], 1); t.vote(keys[1], 0); t.vote(keys[2], 1); t.vote(keys[3], 0);
+  assert.equal(t.vote(keys[4], -1), null); // abstain: 2–2, a tie
+  assert.deepEqual(t.view(keys[0]).voteResult.top, [0, 1]);
+  assert.ok(t.log.some(l => l.text.includes('平票')));
+  // the re-vote: only the tied are targets, and they don't vote
+  assert.equal(t.startVote('mc', [0, 1]), null);
+  assert.deepEqual(t.view(keys[2]).vote.targets, [0, 1]);
+  assert.deepEqual(t.view(keys[2]).vote.voters, [2, 3, 4]);
+  assert.match(t.vote(keys[0], 1), /不用投/);
+  t.vote(keys[2], 0); t.vote(keys[3], 1); t.vote(keys[4], 0);
+  assert.deepEqual(t.view(keys[0]).voteResult.top, [0]);
+  // a fresh round, ended early with a partial tally
+  assert.equal(t.startVote('mc'), null);
+  assert.equal(t.vote(keys[0], 1), null);
+  assert.match(t.closeVote(keys[0]), /只有主持人/);
+  assert.equal(t.closeVote('mc'), null);
+  assert.deepEqual(t.view(keys[0]).voteResult, { top: [1], counts: [[1, 1]], pk: false });
+  assert.match(t.closeVote('mc'), /没有在投的票/);
+});
+
+test('mid-vote eliminate and undo keep the vote consistent', () => {
+  const { t, keys } = table(5, 12);
+  plan(t, { civWord: '牛奶', spyWord: '豆浆', spies: 1 });
+  t.deal('mc');
+  assert.equal(t.startVote('mc'), null);
+  assert.equal(t.vote(keys[0], 1), null);
+  // the host taps P0 out mid-vote: their ballot stops counting
+  assert.equal(t.eliminate('mc', 0), null);
+  assert.deepEqual(t.view('mc').voteCounts, []);
+  assert.deepEqual(t.view(keys[1]).vote.voters, [1, 2, 3, 4]);
+  t.vote(keys[1], 2); t.vote(keys[2], 1); t.vote(keys[3], 1); t.vote(keys[4], 1);
+  assert.deepEqual(t.view(keys[1]).voteResult, { top: [1], counts: [[1, 3], [2, 1]], pk: false });
+  // undo puts the out player back in the next round's vote
+  assert.equal(t.startVote('mc'), null);
+  assert.equal(t.vote(keys[2], 3), null);
+  assert.equal(t.eliminate('mc', 1), null); // P1 was a voter with no ballot yet
+  assert.equal(t.undo('mc'), null);
+  assert.ok(t.view(keys[1]).vote.voters.includes(1));
+  assert.ok(t.view(keys[1]).vote.targets.includes(1));
+  assert.equal(t.view(keys[1]).vote.mine, null, 'no ballot yet — they vote again');
+  t.vote(keys[1], 2); t.vote(keys[3], 2); t.vote(keys[4], 2);
+  assert.deepEqual(t.view(keys[1]).voteResult.counts, [[2, 3], [3, 1]]);
+});
