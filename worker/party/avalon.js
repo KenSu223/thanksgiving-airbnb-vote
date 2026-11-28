@@ -12,7 +12,13 @@
 // Official Avalon is 5–10 players; 11–14 is our own extension (more evil, bigger teams).
 import { PartyRoom, shuffle } from './room.js';
 
-export const AV = { min: 5, max: 14, lookMs: 45000, teamMs: 5 * 60000, voteMs: 60000, questMs: 45000, ladyMs: 2 * 60000, assassinMs: 3 * 60000 };
+export const AV = { min: 5, max: 14 };
+// No countdowns anywhere in this game: every phase waits for the people in it
+// (look until everyone's ready, team until the leader proposes, votes until
+// everyone's in, lady and assassin until they act). The one exception is a
+// player whose phone drops mid-vote — their ballot counts as 赞成 / 成功, the
+// same default the old timeouts used — and if they come back before the vote
+// closes they can still change it.
 export const SIDES = { 5: [3, 2], 6: [4, 2], 7: [4, 3], 8: [5, 3], 9: [6, 3], 10: [6, 4], 11: [7, 4], 12: [7, 5], 13: [8, 5], 14: [9, 5] };
 export const QUESTS = { 5: [2, 3, 2, 3, 3], 6: [2, 3, 4, 3, 4], 7: [2, 3, 3, 4, 4], 8: [3, 4, 4, 5, 5], 9: [3, 4, 4, 5, 5], 10: [3, 4, 4, 5, 5],
   11: [3, 4, 5, 5, 6], 12: [4, 4, 5, 6, 6], 13: [4, 5, 5, 6, 7], 14: [4, 5, 6, 6, 7] };
@@ -71,7 +77,7 @@ export class AvalonGame extends PartyRoom {
     this.leaderPos = Math.floor(this.h.rand() * n);
     if (this.ladyOn()) { this.lady = players[(this.leaderPos - 1 + n) % n]; this.ladyUsed = [this.lady]; }
     this.announce('身份发好了：' + good + ' 个好人，' + bad + ' 个坏人。请看自己的身份，和你知道的人，看好了点「看好了」');
-    this.startLook('look', AV.lookMs, () => this.startTeam());
+    this.startLook('look', null, () => this.startTeam());
   }
   leader() { return this.players[this.leaderPos]; }
   size() { return QUESTS[this.players.length][this.q]; }
@@ -82,13 +88,6 @@ export class AvalonGame extends PartyRoom {
     this.phase = 'team'; this.team = [];
     const n = this.players.length, two = needFails(n, this.q) === 2;
     this.announce('第' + CN_NUM[this.q] + '个任务，要 ' + this.size() + ' 个人' + (two ? '，这次两张失败才算失败' : '') + '。队长 ' + this.num(this.leader()) + '，请选人' + (this.rejects ? '（已经连续否决 ' + this.rejects + ' 次）' : ''));
-    this.setTimer(AV.teamMs, () => {
-      // time's up: the leader's picks so far, filled up at random
-      const rest = shuffle(this.players.filter(k => !this.team.includes(k)), this.h.rand);
-      this.team = [...this.team, ...rest].slice(0, this.size());
-      this.note('队长没选完，系统帮他补齐了');
-      this.startTeamVote();
-    });
   }
   pick(key, seat) {
     const i = this.seatOf(key);
@@ -109,10 +108,10 @@ export class AvalonGame extends PartyRoom {
     this.startTeamVote();
     return null;
   }
-  // everyone votes in the open: 1 = 赞成, 0 = 反对; time's up counts as 赞成
+  // everyone votes in the open: 1 = 赞成, 0 = 反对; no countdown, the vote waits for everyone
   startTeamVote() {
     this.announce('队长选了 ' + nums(this.team) + '。所有人投票：赞成还是反对这个队伍');
-    this.startVote('teamvote', { voters: this.players, targets: [0, 1], ms: AV.voteMs, noSelf: false, label: '组队投票', then: r => this.teamCounted(r) });
+    this.startVote('teamvote', { voters: this.players, targets: [0, 1], noSelf: false, label: '组队投票', then: r => this.teamCounted(r) });
   }
   teamCounted(r) {
     const yes = r.ballots.filter(([, t]) => t !== 0).map(([k]) => k), no = r.ballots.filter(([, t]) => t === 0).map(([k]) => k);
@@ -134,8 +133,8 @@ export class AvalonGame extends PartyRoom {
   // ---- the team plays 成功 / 失败 in secret ----
   startQuest() {
     this.announce('请 ' + nums(this.team) + '执行任务：好人只能出成功，坏人可以出失败');
-    // 1 = 成功, 0 = 失败; time's up counts as 成功
-    this.startVote('quest', { voters: this.team, targets: [0, 1], ms: AV.questMs, noSelf: false, label: '执行任务', then: r => this.questDone(r) });
+    // 1 = 成功, 0 = 失败; no countdown, the quest waits for the whole team
+    this.startVote('quest', { voters: this.team, targets: [0, 1], noSelf: false, label: '执行任务', then: r => this.questDone(r) });
   }
   // team vote: 1 赞成 / 0 反对; quest: 1 成功 / 0 失败 — and good can only play 成功
   vote(key, target) {
@@ -144,6 +143,16 @@ export class AvalonGame extends PartyRoom {
     if ((this.phase === 'quest' || this.phase === 'teamvote') && target !== 0 && target !== 1) return '选一个';
     return super.vote(key, target);
   }
+  // A player whose phone drops (or who stands up) mid-vote doesn't stall the
+  // game: their ballot counts as 赞成 / 成功, the same default the old
+  // timeouts used. If they come back before the vote closes they can still
+  // change it — a new ballot overwrites the old one.
+  defaultVote(key) {
+    const v = this.voting, i = this.seatOf(key);
+    if (v && v.voters.includes(i) && !v.ballots.has(i)) this.vote(key, 1);
+  }
+  disconnect(key) { super.disconnect(key); this.defaultVote(key); }
+  leave(key) { this.defaultVote(key); super.leave(key); }
   questDone(r) {
     const n = this.players.length, fails = r.ballots.filter(([, t]) => t === 0).length;
     const ok = fails < needFails(n, this.q);
@@ -162,7 +171,6 @@ export class AvalonGame extends PartyRoom {
   startLady() {
     this.phase = 'lady';
     this.announce('湖中仙女在 ' + this.num(this.lady) + '手上，请选一个人，查看他是好人还是坏人');
-    this.setTimer(AV.ladyMs, () => { this.note('湖中仙女这次没用'); this.startTeam(); });
   }
   useLady(key, seat) {
     const i = this.seatOf(key), k = Number(seat);
@@ -175,7 +183,6 @@ export class AvalonGame extends PartyRoom {
     this.ladySeen.set(i, seen);
     this.announce(this.num(i) + '查验了 ' + this.num(k) + '，湖中仙女交给 ' + this.num(k));
     this.lady = k; this.ladyUsed.push(k);
-    this.clearTimer();
     this.startTeam();
     return null;
   }
@@ -184,18 +191,11 @@ export class AvalonGame extends PartyRoom {
   startAssassin() {
     this.phase = 'assassin';
     this.announce('好人完成了三个任务！刺客请现身，和坏人同伴商量，指认谁是梅林');
-    this.setTimer(AV.assassinMs, () => {
-      const assassin = this.players.find(k => this.roles[k] === 'assassin');
-      const guess = shuffle(this.players.filter(k => !(this.knows[assassin]?.see || []).includes(k) && k !== assassin), this.h.rand)[0];
-      this.note('刺客没选，系统随便指了一个');
-      this.assassinate(this.seats[assassin]?.key, guess, true);
-    });
   }
-  assassinate(key, seat, forced = false) {
+  assassinate(key, seat) {
     const i = this.seatOf(key), k = Number(seat);
-    if (this.phase !== 'assassin' || (!forced && this.roles[i] !== 'assassin')) return '只有刺客能指认';
+    if (this.phase !== 'assassin' || this.roles[i] !== 'assassin') return '只有刺客能指认';
     if (!this.players.includes(k) || k === i) return '选一个别人';
-    this.clearTimer();
     this.assassinGuess = k;
     const hit = this.roles[k] === 'merlin';
     this.announce('刺客指认 ' + this.num(k) + '是梅林——' + (hit ? '猜对了！' : '猜错了！'));

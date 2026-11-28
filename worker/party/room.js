@@ -187,10 +187,11 @@ export class PartyRoom {
   }
 
   // ---- "看好了": everyone looks at their card; go on when all are ready or time's up ----
+  // ms is optional: without it there's no countdown and it just waits for everyone.
   startLook(phase, ms, then) {
     this.phase = phase;
     this.looking = { ready: new Set(), then };
-    this.setTimer(ms, () => this.endLook());
+    if (ms != null) this.setTimer(ms, () => this.endLook());
   }
   ready(key) {
     const i = this.seatOf(key);
@@ -234,10 +235,11 @@ export class PartyRoom {
 
   // ---- votes: everyone in voters picks one of targets (or abstains); all in or time's up ----
   // weight(i) gives a voter's weight (警长 1.5). then({ counts, ballots, top }) gets the tally.
+  // ms is optional: without it there's no countdown and the vote just waits for everyone.
   startVote(phase, { voters, targets, ms, then, weight = () => 1, noSelf = true, label = '投票' }) {
     this.phase = phase;
     this.voting = { voters, targets, then, weight, noSelf, label, ballots: new Map() };
-    this.setTimer(ms, () => this.endVote());
+    if (ms != null) this.setTimer(ms, () => this.endVote());
   }
   vote(key, target) {
     const v = this.voting, i = this.seatOf(key);

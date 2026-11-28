@@ -120,7 +120,7 @@ test('7 players: the 4th quest needs two fails; 湖中仙女 checks after quests
   assert.equal(t.lady, target);
   assert.deepEqual(t.view(keys[holder]).mine.ladySeen, [{ seat: target, evil: isEvil(t.roles[target]) }]);
   assert.deepEqual(t.view(keys[target]).mine.ladySeen, [], 'only the checker sees the result');
-  // q3 success -> lady again; skip it by timing out
+  // q3 success -> lady again; use it
   proposeAndVote(t, keys, true, good); playQuest(t, keys, 0);
   assert.equal(t.phase, 'lady');
   // q4 with one fail only still succeeds (needs two)
@@ -131,14 +131,54 @@ test('7 players: the 4th quest needs two fails; 湖中仙女 checks after quests
   assert.equal(t.phase, 'assassin');
 });
 
-test('timeouts: missing team votes count as 赞成, missing quest cards as 成功, the leader is filled in', () => {
-  const { t, keys, advance } = seated(AvalonGame, 5, 13);
+test('no timers: nothing moves on its own', () => {
+  const { t, keys, advance, timers } = seated(AvalonGame, 5, 13);
   t.start(keys[0]);
-  advance(46000); assert.equal(t.phase, 'team');
-  advance(5 * 60000 + 1000); assert.equal(t.phase, 'teamvote'); assert.equal(t.team.length, 2);
-  advance(61000); assert.equal(t.phase, 'quest');
-  assert.ok(t.lastVote.ok);
-  advance(46000);
+  assert.equal(timers.size, 0);
+  advance(10 * 60000); assert.equal(t.phase, 'look', 'nobody is rushed through the look');
+  allReady(t, keys);
+  assert.equal(t.phase, 'team');
+  advance(10 * 60000); assert.equal(t.phase, 'team', 'the team is not filled in');
+  assert.deepEqual(t.team, []);
+  const L = t.leader();
+  for (const k of t.players.slice(0, 2)) t.pick(keys[L], k);
+  assert.equal(t.propose(keys[L]), null);
+  assert.equal(t.phase, 'teamvote');
+  t.vote(keys[0], 1);
+  advance(10 * 60000); assert.equal(t.phase, 'teamvote', 'the vote waits for everyone');
+  for (const k of t.players.slice(1)) t.vote(keys[k], 1);
+  assert.equal(t.phase, 'quest');
+  t.vote(keys[t.team[0]], 1);
+  advance(10 * 60000); assert.equal(t.phase, 'quest', 'the quest waits for the team');
+  t.vote(keys[t.team[1]], 1);
   assert.equal(t.quests[0].ok, true);
   assert.equal(t.phase, 'team');
+  assert.equal(timers.size, 0, 'no timer was ever set');
+});
+
+test('a dropped voter counts as 赞成 / 成功, and can change it on return', () => {
+  const { t, keys, timers } = seated(AvalonGame, 5, 13);
+  t.start(keys[0]); allReady(t, keys);
+  const L = t.leader();
+  const team = t.players.slice(0, 2);
+  for (const k of team) t.pick(keys[L], k);
+  assert.equal(t.propose(keys[L]), null);
+  // team vote: one yes, one drops (counts as yes), comes back and changes to no
+  assert.equal(t.vote(keys[0], 1), null);
+  t.disconnect(keys[1]);
+  assert.ok(t.view(keys[0]).vote.voted.includes(1), 'the dropped vote counts');
+  assert.equal(t.sit(keys[1], 'P2', null, {}), null, 'back at the table');
+  assert.equal(t.vote(keys[1], 0), null, 'the default ballot can be changed');
+  for (const k of [2, 3, 4]) t.vote(keys[k], 1);
+  assert.equal(t.phase, 'quest');
+  assert.deepEqual(t.lastVote.no, [1]);
+  assert.deepEqual(t.lastVote.yes, [0, 2, 3, 4]);
+  // quest: one of the team drops before playing (counts as 成功）
+  const [a, b] = t.team;
+  t.disconnect(keys[a]);
+  assert.ok(t.view(keys[0]).vote.voted.includes(a));
+  assert.equal(t.vote(keys[b], 1), null);
+  assert.equal(t.quests[0].ok, true);
+  assert.equal(t.phase, 'team');
+  assert.equal(timers.size, 0);
 });
